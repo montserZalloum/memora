@@ -1,0 +1,2317 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>درس التاريخ - تاريخ الأردن</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #007D5B;
+            --primary-dark: #005A42;
+            --primary-light: #00A878;
+            --secondary: #E8A838;
+            --secondary-light: #FFD166;
+            --accent: #D64550;
+            --bg-cream: #FDF8F3;
+            --bg-warm: #F5EDE6;
+            --text-dark: #2D3436;
+            --text-muted: #636E72;
+            --success: #00B894;
+            --error: #E17055;
+            --heart-red: #E74C3C;
+            --gem-blue: #3498DB;
+            --card-shadow: 0 4px 20px rgba(0, 125, 91, 0.15);
+            --hover-shadow: 0 8px 30px rgba(0, 125, 91, 0.25);
+            --border-radius: 16px;
+            --border-radius-lg: 24px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background: var(--bg-cream);
+            color: var(--text-dark);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Background Pattern */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                radial-gradient(circle at 20% 80%, rgba(0, 125, 91, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(232, 168, 56, 0.08) 0%, transparent 50%),
+                url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23007D5B' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0, 125, 91, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: white;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--secondary);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(232, 168, 56, 0.4);
+        }
+
+        .logo h1 {
+            font-size: 24px;
+            font-weight: 800;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.15);
+            padding: 8px 16px;
+            border-radius: 20px;
+            color: white;
+            font-weight: 700;
+            font-size: 18px;
+            backdrop-filter: blur(10px);
+            transition: var(--transition);
+        }
+
+        .stat-item:hover {
+            background: rgba(255,255,255,0.25);
+            transform: scale(1.05);
+        }
+
+        .stat-icon {
+            font-size: 22px;
+        }
+
+        .hearts {
+            display: flex;
+            gap: 4px;
+        }
+
+        .heart {
+            font-size: 20px;
+            transition: var(--transition);
+        }
+
+        .heart.lost {
+            opacity: 0.3;
+            filter: grayscale(1);
+        }
+
+        /* Main Container */
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 32px;
+        }
+
+        /* Skill Tree Screen */
+        .skill-tree-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 0;
+        }
+
+        .skill-tree-title {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--primary-dark);
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        .skill-tree {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+            position: relative;
+        }
+
+        .skill-node {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            border: 4px solid transparent;
+        }
+
+        .skill-node.locked {
+            background: var(--bg-warm);
+            border-color: #ddd;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .skill-node.available {
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+            border-color: var(--primary-dark);
+            box-shadow: var(--card-shadow), 0 0 0 4px rgba(0, 125, 91, 0.2);
+            animation: pulse 2s infinite;
+        }
+
+        .skill-node.completed {
+            background: linear-gradient(135deg, var(--secondary-light) 0%, var(--secondary) 100%);
+            border-color: #D4940A;
+            box-shadow: var(--card-shadow);
+        }
+
+        .skill-node:not(.locked):hover {
+            transform: scale(1.1);
+            box-shadow: var(--hover-shadow);
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: var(--card-shadow), 0 0 0 4px rgba(0, 125, 91, 0.2); }
+            50% { box-shadow: var(--card-shadow), 0 0 0 8px rgba(0, 125, 91, 0.1); }
+        }
+
+        .skill-icon {
+            font-size: 36px;
+            margin-bottom: 4px;
+        }
+
+        .skill-node.locked .skill-icon {
+            filter: grayscale(1);
+        }
+
+        .skill-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: white;
+            text-align: center;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .skill-node.locked .skill-name {
+            color: var(--text-muted);
+            text-shadow: none;
+        }
+
+        .skill-connector {
+            width: 4px;
+            height: 40px;
+            background: linear-gradient(to bottom, var(--primary) 0%, var(--primary-light) 100%);
+            border-radius: 2px;
+        }
+
+        .skill-connector.locked {
+            background: #ddd;
+        }
+
+        .crown-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            font-size: 28px;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+
+        /* Lesson Screen */
+        .lesson-screen {
+            display: none;
+            flex-direction: column;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .lesson-screen.active {
+            display: flex;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .back-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            border: 2px solid #ddd;
+            background: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: var(--transition);
+        }
+
+        .back-btn:hover {
+            border-color: var(--primary);
+            background: var(--bg-warm);
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 16px;
+            background: var(--bg-warm);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%);
+            border-radius: 8px;
+            transition: width 0.5s ease;
+            position: relative;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.3), transparent);
+            border-radius: 8px 8px 0 0;
+        }
+
+        /* Stage Container */
+        .stage-container {
+            background: white;
+            border-radius: var(--border-radius-lg);
+            padding: 40px;
+            box-shadow: var(--card-shadow);
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stage-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .stage-instruction {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--text-dark);
+            text-align: center;
+            margin-bottom: 32px;
+            line-height: 1.4;
+        }
+
+        /* Stage 1: Tap to Reveal */
+        .reveal-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+        }
+
+        .reveal-image {
+            width: 200px;
+            height: 200px;
+            border-radius: var(--border-radius);
+            background: linear-gradient(135deg, var(--bg-warm) 0%, #E8DDD5 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 80px;
+            margin-bottom: 24px;
+            box-shadow: var(--card-shadow);
+            border: 4px solid var(--secondary);
+        }
+
+        .reveal-sentence {
+            font-size: 24px;
+            line-height: 2;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .reveal-word {
+            display: inline-block;
+            padding: 4px 12px;
+            margin: 4px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .reveal-word.highlight {
+            background: linear-gradient(135deg, var(--secondary-light) 0%, var(--secondary) 100%);
+            color: var(--text-dark);
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(232, 168, 56, 0.4);
+        }
+
+        .reveal-word.highlight:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(232, 168, 56, 0.5);
+        }
+
+        .explanation-card {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 24px;
+            border-radius: var(--border-radius);
+            max-width: 400px;
+            text-align: center;
+            box-shadow: var(--card-shadow);
+            animation: slideUp 0.3s ease;
+            display: none;
+        }
+
+        .explanation-card.visible {
+            display: block;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .explanation-card h4 {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+
+        .explanation-card p {
+            font-size: 16px;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+
+        /* Stage 2: Matching */
+        .matching-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 40px;
+            flex: 1;
+            padding: 20px;
+        }
+
+        .matching-column {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            flex: 1;
+        }
+
+        .matching-item {
+            background: white;
+            border: 3px solid #ddd;
+            border-radius: var(--border-radius);
+            padding: 20px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .matching-item:hover:not(.matched):not(.selected) {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--card-shadow);
+        }
+
+        .matching-item.selected {
+            border-color: var(--primary);
+            background: rgba(0, 125, 91, 0.1);
+            transform: scale(1.02);
+        }
+
+        .matching-item.matched {
+            border-color: var(--success);
+            background: rgba(0, 184, 148, 0.1);
+            cursor: default;
+        }
+
+        .matching-item.error {
+            border-color: var(--error);
+            background: rgba(225, 112, 85, 0.1);
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+
+        .match-line {
+            position: absolute;
+            height: 3px;
+            background: var(--success);
+            transform-origin: left center;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* Stage 3: Sentence Building */
+        .sentence-building {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            gap: 32px;
+        }
+
+        .sentence-target {
+            min-height: 80px;
+            border: 3px dashed #ddd;
+            border-radius: var(--border-radius);
+            padding: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 125, 91, 0.03);
+        }
+
+        .sentence-target.drag-over {
+            border-color: var(--primary);
+            background: rgba(0, 125, 91, 0.08);
+        }
+
+        .word-bank {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            padding: 24px;
+            background: var(--bg-warm);
+            border-radius: var(--border-radius);
+        }
+
+        .draggable-word {
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 12px;
+            padding: 12px 20px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: grab;
+            transition: var(--transition);
+            user-select: none;
+        }
+
+        .draggable-word:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--card-shadow);
+        }
+
+        .draggable-word.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+
+        .draggable-word.placed {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border-color: var(--primary-dark);
+        }
+
+        .draggable-word.correct {
+            background: linear-gradient(135deg, var(--success) 0%, #00A085 100%);
+            border-color: var(--success);
+        }
+
+        .draggable-word.incorrect {
+            background: linear-gradient(135deg, var(--error) 0%, #C0392B 100%);
+            border-color: var(--error);
+            animation: shake 0.5s ease;
+        }
+
+        /* Stage 4: Audio Cloze */
+        .audio-cloze {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            gap: 32px;
+        }
+
+        .audio-player {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .play-btn {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: white;
+            box-shadow: var(--card-shadow);
+            transition: var(--transition);
+        }
+
+        .play-btn:hover {
+            transform: scale(1.1);
+            box-shadow: var(--hover-shadow);
+        }
+
+        .play-btn.playing {
+            animation: pulseBig 1s infinite;
+        }
+
+        @keyframes pulseBig {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .cloze-sentence {
+            font-size: 24px;
+            text-align: center;
+            line-height: 2;
+            background: var(--bg-warm);
+            padding: 24px 32px;
+            border-radius: var(--border-radius);
+        }
+
+        .cloze-blank {
+            display: inline-block;
+            min-width: 120px;
+            border-bottom: 3px solid var(--primary);
+            margin: 0 8px;
+            padding: 4px 8px;
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .cloze-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            justify-content: center;
+        }
+
+        .cloze-option {
+            background: white;
+            border: 3px solid #ddd;
+            border-radius: var(--border-radius);
+            padding: 16px 32px;
+            font-size: 20px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .cloze-option:hover:not(.selected) {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--card-shadow);
+        }
+
+        .cloze-option.selected {
+            border-color: var(--primary);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+        }
+
+        .cloze-option.correct {
+            border-color: var(--success);
+            background: linear-gradient(135deg, var(--success) 0%, #00A085 100%);
+            color: white;
+        }
+
+        .cloze-option.incorrect {
+            border-color: var(--error);
+            background: linear-gradient(135deg, var(--error) 0%, #C0392B 100%);
+            color: white;
+        }
+
+        /* Stage 5: Contextual Stories */
+        .story-container {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            gap: 16px;
+        }
+
+        .chat-messages {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 0;
+        }
+
+        .chat-message {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .chat-message.user {
+            flex-direction: row-reverse;
+        }
+
+        .chat-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            flex-shrink: 0;
+        }
+
+        .chat-message:not(.user) .chat-avatar {
+            background: linear-gradient(135deg, var(--secondary-light) 0%, var(--secondary) 100%);
+        }
+
+        .chat-message.user .chat-avatar {
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+        }
+
+        .chat-bubble {
+            background: var(--bg-warm);
+            padding: 16px 20px;
+            border-radius: var(--border-radius);
+            max-width: 70%;
+            font-size: 18px;
+            line-height: 1.6;
+        }
+
+        .chat-message.user .chat-bubble {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+        }
+
+        .chat-options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-top: 16px;
+        }
+
+        .chat-option {
+            background: white;
+            border: 3px solid #ddd;
+            border-radius: var(--border-radius);
+            padding: 16px 24px;
+            font-size: 18px;
+            text-align: right;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .chat-option:hover:not(.disabled) {
+            border-color: var(--primary);
+            background: rgba(0, 125, 91, 0.05);
+        }
+
+        .chat-option.correct {
+            border-color: var(--success);
+            background: rgba(0, 184, 148, 0.1);
+        }
+
+        .chat-option.incorrect {
+            border-color: var(--error);
+            background: rgba(225, 112, 85, 0.1);
+        }
+
+        .chat-option.disabled {
+            cursor: default;
+            opacity: 0.7;
+        }
+
+        /* Continue Button */
+        .continue-btn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border: none;
+            padding: 16px 48px;
+            font-size: 20px;
+            font-weight: 700;
+            border-radius: 30px;
+            cursor: pointer;
+            margin-top: 24px;
+            align-self: center;
+            transition: var(--transition);
+            box-shadow: 0 4px 15px rgba(0, 125, 91, 0.4);
+            font-family: 'Tajawal', sans-serif;
+        }
+
+        .continue-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 125, 91, 0.5);
+        }
+
+        .continue-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* Feedback Modal */
+        .feedback-modal {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 24px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            z-index: 200;
+        }
+
+        .feedback-modal.visible {
+            transform: translateY(0);
+        }
+
+        .feedback-modal.correct {
+            background: linear-gradient(135deg, #00B894 0%, #00A085 100%);
+        }
+
+        .feedback-modal.incorrect {
+            background: linear-gradient(135deg, #E17055 0%, #D63031 100%);
+        }
+
+        .feedback-content {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            color: white;
+        }
+
+        .feedback-icon {
+            font-size: 40px;
+        }
+
+        .feedback-text h3 {
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .feedback-text p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .feedback-btn {
+            background: white;
+            color: var(--text-dark);
+            border: none;
+            padding: 14px 40px;
+            font-size: 18px;
+            font-weight: 700;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: 'Tajawal', sans-serif;
+        }
+
+        .feedback-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* Lesson Complete Screen */
+        .lesson-complete {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+            text-align: center;
+        }
+
+        .lesson-complete.active {
+            display: flex;
+        }
+
+        .complete-icon {
+            font-size: 120px;
+            margin-bottom: 24px;
+            animation: bounce 1s ease infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .complete-title {
+            font-size: 40px;
+            font-weight: 900;
+            color: var(--primary-dark);
+            margin-bottom: 16px;
+        }
+
+        .complete-subtitle {
+            font-size: 20px;
+            color: var(--text-muted);
+            margin-bottom: 40px;
+        }
+
+        .rewards-container {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .reward-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-warm);
+            padding: 24px 40px;
+            border-radius: var(--border-radius);
+        }
+
+        .reward-icon {
+            font-size: 48px;
+        }
+
+        .reward-value {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--text-dark);
+        }
+
+        .reward-label {
+            font-size: 14px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        /* Sound Effects */
+        .sound-btn {
+            position: fixed;
+            bottom: 24px;
+            left: 24px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid #ddd;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: var(--transition);
+            z-index: 50;
+        }
+
+        .sound-btn:hover {
+            border-color: var(--primary);
+            transform: scale(1.1);
+        }
+
+        /* Hidden */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Animations */
+        .animate-pop {
+            animation: pop 0.3s ease;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(0.8); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                padding: 12px 16px;
+            }
+
+            .logo h1 {
+                font-size: 18px;
+            }
+
+            .stats-bar {
+                gap: 12px;
+            }
+
+            .stat-item {
+                padding: 6px 12px;
+                font-size: 14px;
+            }
+
+            .main-container {
+                padding: 16px;
+            }
+
+            .stage-container {
+                padding: 24px;
+            }
+
+            .stage-instruction {
+                font-size: 22px;
+            }
+
+            .matching-container {
+                flex-direction: column;
+                gap: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">📜</div>
+            <h1>درس التاريخ</h1>
+        </div>
+        <div class="stats-bar">
+            <div class="stat-item" id="gems-display">
+                <span class="stat-icon">💎</span>
+                <span id="gems-count">0</span>
+            </div>
+            <div class="stat-item" id="hearts-display">
+                <div class="hearts" id="hearts-container">
+                    <span class="heart">❤️</span>
+                    <span class="heart">❤️</span>
+                    <span class="heart">❤️</span>
+                    <span class="heart">❤️</span>
+                    <span class="heart">❤️</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-container">
+        <!-- Skill Tree Screen -->
+        <div class="skill-tree-screen" id="skill-tree-screen">
+            <h2 class="skill-tree-title">🏛️ رحلة تاريخ الأردن</h2>
+            <div class="skill-tree" id="skill-tree">
+                <!-- Nodes will be generated by JS -->
+            </div>
+        </div>
+
+        <!-- Lesson Screen -->
+        <div class="lesson-screen" id="lesson-screen">
+            <div class="progress-container">
+                <button class="back-btn" id="back-btn">✕</button>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="stage-container" id="stage-container">
+                <!-- Stage content will be dynamically inserted -->
+            </div>
+        </div>
+
+        <!-- Lesson Complete Screen -->
+        <div class="lesson-complete" id="lesson-complete">
+            <div class="complete-icon">🎉</div>
+            <h2 class="complete-title">أحسنت!</h2>
+            <p class="complete-subtitle">لقد أكملت الدرس بنجاح</p>
+            <div class="rewards-container">
+                <div class="reward-item">
+                    <span class="reward-icon">💎</span>
+                    <span class="reward-value" id="earned-gems">+10</span>
+                    <span class="reward-label">جواهر</span>
+                </div>
+                <div class="reward-item">
+                    <span class="reward-icon">⭐</span>
+                    <span class="reward-value" id="accuracy">100%</span>
+                    <span class="reward-label">الدقة</span>
+                </div>
+            </div>
+            <button class="continue-btn" id="finish-btn">متابعة</button>
+        </div>
+    </main>
+
+    <!-- Feedback Modal -->
+    <div class="feedback-modal" id="feedback-modal">
+        <div class="feedback-content">
+            <span class="feedback-icon" id="feedback-icon">✓</span>
+            <div class="feedback-text">
+                <h3 id="feedback-title">ممتاز!</h3>
+                <p id="feedback-message"></p>
+            </div>
+        </div>
+        <button class="feedback-btn" id="feedback-btn">متابعة</button>
+    </div>
+
+    <!-- Sound Toggle -->
+    <button class="sound-btn" id="sound-btn" title="تشغيل/إيقاف الصوت">🔊</button>
+
+    <script>
+        // ============================================
+        // QUESTIONS DATA FROM JSON
+        // ============================================
+        const questionsData = [
+            { id: 7739, question_text: "الأردن متحف مفتوح, يزخر بتراثه الحضاري منذ العصور:", options: ["الإسلامية", "الحجرية", "الثلاثية", "البرونزية"], correct_answer: "الحجرية" },
+            { id: 7742, question_text: "الاسم الإغريقي للأردن هو:", options: ["الشدّة والغلَبة", "يوردانيم", "النهر المتعرج شديد الانحدار", "جوردان"], correct_answer: "يوردانيم" },
+            { id: 7745, question_text: "دلّت الاكتشافات الأثرية على أنّ الأردن كان مأهولًا بالسكان, ونشأت على أرضه العديد من الحضارات بسبب كل الآتية, ما عدا:", options: ["الموقع المتوسط بين حضارات بلاد الشام وبلاد الرافدين من جهة, وحضارات شبه الجزيرة العربية ومصر من جهة أخرى", "وفرة المياه والتربة الخصبة", "وفرة القوى العاملة", "اعتدال المناخ"], correct_answer: "وفرة القوى العاملة" },
+            { id: 7748, question_text: "تبدأ عصور ما قبل التاريخ من نشأة الإنسان على الأرض حتى:", options: ["بداية صناعة الإنسان لأدواته وأسلحته من معدن الحديد", "بداية استخدام البرونز", "ميلاد المسيح", "بداية اختراعه الكتابة"], correct_answer: "بداية اختراعه الكتابة" },
+            { id: 7751, question_text: "تعود أقدم بقايا أثرية للإنسان في الأردن إلى:", options: ["100,000 سنة تقريبًا", "2.5 مليون سنة تقريبًا", "3.5 مليون سنة تقريبًا", "25 مليون سنة تقريبًا"], correct_answer: "2.5 مليون سنة تقريبًا" },
+            { id: 7754, question_text: "تُعد كل الآتية من العصور التاريخية, ما عدا:", options: ["العصر الحديدي", "العصر الحجري الحديث", "العصر البرونزي", "الجزء الثاني من العصر الحجري النحاسي"], correct_answer: "العصر الحجري الحديث" },
+            { id: 7757, question_text: "تُسمى الفترة من 8500 ق.م إلى 4500 ق.م بِـ :", options: ["العصر البرونزي", "العصر الحجري الحديث", "العصر الحجري النحاسي", "العصر الحجري الوسيط"], correct_answer: "العصر الحجري الحديث" },
+            { id: 7763, question_text: "تعود معظم المواقع الأثرية في الأردن إلى عصور:", options: ["ما بعد التاريخ", "ما قبل التاريخ", "الحضارة الرومانية", "الحضارات المتأخرة"], correct_answer: "ما قبل التاريخ" },
+            { id: 7760, question_text: "تُسمى الفترة من 1200 ق.م إلى 332 ق.م بِـ :", options: ["العصر البرونزي", "العصر الحجري الحديث", "العصر الحديدي", "العصر الحجري الوسيط"], correct_answer: "العصر الحديدي" },
+            { id: 7766, question_text: "العصر الذي استقر فيه الإنسان في قرى زراعية, ودجّن الحيوانات, وبنى البيوت التي أصبحت تتخذ شكلًا هندسيًا:", options: ["العصر الحجري النحاسي", "العصر الحجري الوسيط", "العصر الحجري الحديث", "العصر الحجري القديم"], correct_answer: "العصر الحجري الحديث" },
+            { id: 7769, question_text: "العصر الذي استخدم فيه الإنسان أدوات مصنوعة من خليط من النحاس والقصدير:", options: ["العصر الحجري النحاسي", "العصر الحجري الوسيط", "العصر الحجري الحديث", "العصر البرونزي"], correct_answer: "العصر البرونزي" },
+            { id: 7772, question_text: "موقع يقع في وادي زقلاب, ويُعد أقدم مقبرة منظّمة في العالم:", options: ["موقع عيون الحَمام", "موقع دوقرة", "موقع عين غزال", "وادي فينان"], correct_answer: "موقع عيون الحَمام" },
+            { id: 7775, question_text: "موقع يقع في غور الأردن الجنوبي التابع لمحافظة الكرك, ويُعد من أبرز معالم العصر البرونزي:", options: ["باب ذراع", "موقع دوقرة", "وادي الحسا واللجّون", "جاوا"], correct_answer: "باب ذراع" },
+            { id: 7778, question_text: "من المواقع التي تقع في محافظتي الطفيلة والكرك, وتُعد من معالم العصر الحجري القديم:", options: ["تلّ السعيدية", "طبقة فحل", "وادي الحسا واللجّون", "جاوا"], correct_answer: "وادي الحسا واللجّون" },
+            { id: 7781, question_text: "يقع وادي زقلاب في محافظة:", options: ["الزرقاء", "إربد", "المفرق", "جرش"], correct_answer: "إربد" },
+            { id: 7784, question_text: "موقع يقع شمال البحر الميت, ويُعد من معالم العصر الحجري النحاسي:", options: ["تل أبو الصوّان", "موقع عيون الحَمام", "تليلات الغسول", "طبقة فحل"], correct_answer: "تليلات الغسول" },
+            { id: 7787, question_text: "يقع موقع الخّرانة العائد للعصر الحجري الوسيط في:", options: ["الحّرانة - شرق عمان", "الحّرانة - جنوب شرق عمان", "الحّرانة - جنوب غرب عمان", "الحّرانة - شمال عمان"], correct_answer: "الحّرانة - جنوب شرق عمان" },
+            { id: 7790, question_text: "تُعد كل الآتية من مظاهر تطور الإنسان في العصر الحجري القديم, ما عدا:", options: ["صنع أدواته من الشظايا المقطوعة من الحجارة أو العظام أو القرون", "اصطاد الحيوانات كالثيران والماعز البرّي والغزلان والطيور", "زراعة النباتات البرية وتدجين الحيوانات", "سكن الكهوف والملاجئ الصخرية"], correct_answer: "زراعة النباتات البرية وتدجين الحيوانات" },
+            { id: 7793, question_text: "تُعد كل الآتية من مظاهر تطور الإنسان في العصر الحجري الحديث, ما عدا:", options: ["صنع الفخار", "الاستقرار في قرى وظهور الملكية الفردية", "ظهور بعض الأدوات الزراعية كالمناجل والأجران ورحى الطحن", "صنع التماثيل من الطين للدلالة على عبادة الآلهة"], correct_answer: "ظهور بعض الأدوات الزراعية كالمناجل والأجران ورحى الطحن" },
+            { id: 7796, question_text: "تُعد كل الآتية من مظاهر تطور الإنسان في العصر الحجري النحاسي, ما عدا:", options: ["اختراع الكتابة", "استخدام الأختام الاسطوانية", "ابتكار العجلة ودولاب الخزف", "تأسيس المدن وإحاطتها بأسوار دفاعية"], correct_answer: "تأسيس المدن وإحاطتها بأسوار دفاعية" },
+            { id: 7802, question_text: "الترتيب الصحيح لمظاهر تطور الحياة الإنسانية:", options: ["ظهور السلطتين الدينية والسياسية ← تدجين الحيوانات واختراع العجلة ← تطور العمارة وظهورالفنون", "تطور العمارة وظهورالفنون ← ظهور السلطتين الدينية والسياسية ← تدجين الحيوانات واختراع العجلة", "تطور العمارة وظهورالفنون ← تدجين الحيوانات واختراع العجلة ← ظهور السلطتين الدينية والسياسية", "تدجين الحيوانات واختراع العجلة ← ظهور السلطتين الدينية والسياسية ← تطور العمارة وظهورالفنون"], correct_answer: "تدجين الحيوانات واختراع العجلة ← ظهور السلطتين الدينية والسياسية ← تطور العمارة وظهورالفنون" },
+            { id: 7799, question_text: "العصر الذي بدأت به الحاجة المُلحة لتأسيس المدن وإحاطتها بأسوار دفاعية:", options: ["العصر الحجري الحديث", "العصر الحجري النحاسي", "العصر البرونزي", "العصر الحديدي"], correct_answer: "العصر البرونزي" },
+            { id: 7740, question_text: "تتألف كلمة الأردن (جوردان Jordan) من (جور: بانياس) و (دان), وهما:", options: ["الشدّة والغلَبة", "يوردانيم", "النهر المتعرج شديد الانحدار", "الرافدان الشماليان لنهر الأردن"], correct_answer: "الرافدان الشماليان لنهر الأردن" },
+            { id: 7743, question_text: "معنى الأردن بالآرامية:", options: ["الشدّة والغلَبة", "يوردانيم", "النهر المتعرج شديد الانحدار", "الرافدان الشماليان لنهر الأردن"], correct_answer: "النهر المتعرج شديد الانحدار" },
+            { id: 7746, question_text: "اتّفق علماء الآثار والمؤرّخون على تقسيم العصور القديمة إلى:", options: ["عصور ما قبل التاريخ والعصور التاريخية", "عصر حجري وعصر حديدي وعصر برونزي", "العصر الترياسي والعصر الحجري", "العصور الحجرية والعصور ما بعد الحجرية"], correct_answer: "عصور ما قبل التاريخ والعصور التاريخية" },
+            { id: 7749, question_text: "بدأت العصور التاريخية منذ:", options: ["بداية صناعة الإنسان لأدواته وأسلحته من معدن الحديد", "بداية استخدام البرونز", "ميلاد المسيح", "بداية اختراع الإنسان للكتابة"], correct_answer: "بداية اختراع الإنسان للكتابة" },
+            { id: 7752, question_text: "تُعد كل العصور الآتية من عصور ما قبل التاريخ, ما عدا:", options: ["العصر الحجري الوسيط", "العصر الحجري الحديث", "العصر الحجري القديم", "العصر البرونزي"], correct_answer: "العصر البرونزي" },
+            { id: 7755, question_text: "تُسمى الفترة من 2.5 مليون سنة إلى 20.000 ق.م بِـ :", options: ["العصر الحديدي", "العصر الحجري الحديث", "العصر الحجري القديم", "العصر الحجري الوسيط"], correct_answer: "العصر الحجري القديم" },
+            { id: 7758, question_text: "تُسمى الفترة من 4500 ق.م إلى 2000 ق.م بِـ :", options: ["العصر البرونزي", "العصر الحجري الحديث", "العصر الحجري النحاسي", "العصر الحجري الوسيط"], correct_answer: "العصر الحجري النحاسي" },
+            { id: 7761, question_text: "بلغ عدد المواقع الأثرية المكتشفة في الأردن نحو:", options: ["مئة ألف موقع أثري تقريبًا", "خمسون ألف موقع أثري تقريبًا", "خمسة عشر ألف موقع أثري", "تسعة آلاف موقع أثري"], correct_answer: "مئة ألف موقع أثري تقريبًا" },
+            { id: 7764, question_text: "بدأ الإنسان بصنع أدواته من الحجر في:", options: ["العصر الحجري النحاسي", "العصر الحجري الوسيط", "العصر الحجري الحديث", "العصر الحجري القديم"], correct_answer: "العصر الحجري القديم" },
+            { id: 7767, question_text: "يُعد موقع عين غزال في عَمّان نموذجًا للقرى في:", options: ["العصر الحجري النحاسي", "العصر الحجري الوسيط", "العصر الحجري الحديث", "العصر الحجري القديم"], correct_answer: "العصر الحجري الحديث" },
+            { id: 7770, question_text: "العصر الذي بنى فيه الإنسان الأسوار والبوابات والتحصينات الضخمة والمعابد:", options: ["العصر الحجري النحاسي", "العصر الحجري الوسيط", "العصر الحجري الحديث", "العصر البرونزي"], correct_answer: "العصر البرونزي" },
+            { id: 7773, question_text: "الموقع الذي يعود إلى العصر الحجري الحديث, واكتشفت فيه أقدم تماثيل في العالم:", options: ["باب ذراع", "موقع دوقرة", "موقع عين غزال", "وادي فينان"], correct_answer: "موقع عين غزال" },
+            { id: 7776, question_text: "موقع يقع في البادية الشمالية الشرقية التابعة لمحافظة المفرق:", options: ["تلّ السعيدية", "موقع عيون الحَمام", "وادي الحسا واللجّون", "جاوا"], correct_answer: "جاوا" },
+            { id: 7779, question_text: "من المواقع التي تقع في غور الأردن الشمالي التابع لمحافظة إربد:", options: ["موقع بسطة", "طبقة فحل", "الأزرق والخّرانة", "تل أبو الصوّان"], correct_answer: "طبقة فحل" },
+            { id: 7782, question_text: "موقع يقع في محافظة معان, ويُعد من معالم العصر الحجري الحديث:", options: ["موقع بسطة", "تلّ أبو حامد", "تليلات الغسول", "طبقة فحل"], correct_answer: "موقع بسطة" },
+            { id: 7785, question_text: "موقع يقع في غور الأردن الشمالي, ويُعد من معالم العصر الحجري النحاسي:", options: ["تل أبو الصوّان", "تلّ أبو حامد", "جاوا", "طبقة فحل"], correct_answer: "تلّ أبو حامد" },
+            { id: 7788, question_text: "العصر البرونزي هو العصر الذي استخدم الإنسان فيه معدن البرونز وهو خليط من:", options: ["النحاس والحديد", "البرونز والقصدير", "الفضة والنحاس", "النحاس والقصدير"], correct_answer: "النحاس والقصدير" },
+            { id: 7791, question_text: "تُعد كل الآتية من مظاهر تطور الإنسان في العصر الحجري الوسيط, ما عدا:", options: ["الاستقرار التدريجي والتحول إلى الإنتاج", "السكن قرب الأنهار والينابيع والعيون", "محاولة زراعة النباتات البرية وتدجين الحيوانات", "تطور القرى وظهور المدن الصغيرة"], correct_answer: "تطور القرى وظهور المدن الصغيرة" },
+            { id: 7794, question_text: "تُعد كل الآتية من مظاهر تطور الإنسان في العصر الحجري الحديث, ما عدا:", options: ["محاولة زراعة النباتات البرية وتدجين الحيوانات", "تعلم الزراعة وتربية الحيوانات", "تعلم حياكة الملابس", "بناء البيوت من المواد المتوافرة محليًّا"], correct_answer: "محاولة زراعة النباتات البرية وتدجين الحيوانات" },
+            { id: 7797, question_text: "الأمر الذي أثر في الاستقرار وتطور العمران والعلاقات الاجتماعية في العصر الحجري الحديث:", options: ["تعلم الزراعة وتربية الحيوانات", "بناء البيوت من المواد المتوافرة محليًّا", "ابتكار العجلة ودولاب الخزف", "تأسيس المدن وإحاطتها بأسوار دفاعية"], correct_answer: "بناء البيوت من المواد المتوافرة محليًّا" },
+            { id: 7800, question_text: "العصر الذي ازدهرت به الزراعة والتجارة:", options: ["العصر الحجري الحديث", "العصر الحجري النحاسي", "العصر البرونزي", "العصر الحديدي"], correct_answer: "العصر البرونزي" },
+            { id: 7741, question_text: "أطلق العرب على هذه المنطقة اسم الأردن وتعني:", options: ["الشدّة والغلَبة", "يوردانيم", "النهر المتعرج شديد الانحدار", "الرافدان الشماليان لنهر الأردن"], correct_answer: "الشدّة والغلَبة" },
+            { id: 7803, question_text: "كل الآتية تُعد صحيحة, ما عدا:", options: ["العصر الذي يلي العصر الحجري النحاسي هو: العصر البرونزي", "أطلق العرب على هذه المنطقة اسم الأردن وتعني: الشدّة والغلَبة", "اقتات الإنسان في العصر الحجري الوسيط على الجمع والالتقاط والصيد", "يقع موقع دوقرة في وادي الزرقاء"], correct_answer: "اقتات الإنسان في العصر الحجري الوسيط على الجمع والالتقاط والصيد" },
+            { id: 7744, question_text: "استقر الإنسان في الأردن منذ:", options: ["الفتح الإسلامي", "العصور الحجرية القديمة", "العصور الوسطى", "العصر الحديدي"], correct_answer: "العصور الحجرية القديمة" },
+            { id: 7747, question_text: "تسهيلًا لدراسة العصور ومعرفة النشاط البشري في العصور القديمة, اتفق العلماء على:", options: ["الحفاظ على الموروث البشري", "تقسيم العصور التاريخية", "دراسة الآثار وحراستها", "توثيق السير الذاتية لأبرز القادة والملوك"], correct_answer: "تقسيم العصور التاريخية" },
+            { id: 7750, question_text: "اخترع الإنسان الكتابة:", options: ["1447 م", "332 ق.م", "3500 ق.م", "4500 ق.م"], correct_answer: "3500 ق.م" },
+            { id: 7753, question_text: "تُعد إحدى العصور الآتية من العصور التاريخية:", options: ["العصر الحديدي", "العصر الحجري الحديث", "العصر الحجري القديم", "العصر الحجري الوسيط"], correct_answer: "العصر الحديدي" },
+            { id: 7756, question_text: "تُسمى الفترة من 20.000 ق.م إلى 8500 ق.م بِـ :", options: ["العصر الحديدي", "العصر الحجري الحديث", "العصر الحجري القديم", "العصر الحجري الوسيط"], correct_answer: "العصر الحجري الوسيط" },
+            { id: 7759, question_text: "تُسمى الفترة من 2000 ق.م إلى 1200 ق.م بِـ :", options: ["العصر البرونزي", "العصر الحجري الحديث", "العصر الحديدي", "العصر الحجري الوسيط"], correct_answer: "العصر البرونزي" },
+            { id: 7762, question_text: "بلغ عدد المواقع الأثرية المسجلة في الأردن نحو:", options: ["مئة ألف موقع أثري تقريبًا", "خمسون ألف موقع أثري تقريبًا", "خمسة عشر ألف موقع أثري", "تسعة آلاف موقع أثري"], correct_answer: "خمسة عشر ألف موقع أثري" },
+            { id: 7765, question_text: "العصر الذي يُمثل مرحلة انتقالية من مجتمعات الصيد وجمع الطعام:", options: ["العصر الحجري النحاسي", "العصر الحجري الوسيط", "العصر الحجري الحديث", "العصر الحجري القديم"], correct_answer: "العصر الحجري الوسيط" },
+            { id: 7768, question_text: "العصر الذي ظهرت فيه طبقة من الصنّاع والحرفيين إلى جانب المزارعين والرعاة:", options: ["العصر الحجري النحاسي", "العصر الحجري الوسيط", "العصر الحجري الحديث", "العصر البرونزي"], correct_answer: "العصر الحجري النحاسي" },
+            { id: 7771, question_text: "موقع يقع في وادي الزرقاء, يُعد من أقدم مواقع العصر الحجري القديم في قارة آسيا:", options: ["موقع عيون الحَمام", "موقع دوقرة", "موقع عين غزال", "وادي فينان"], correct_answer: "موقع دوقرة" },
+            { id: 7774, question_text: "موقع يقع بالقرب من وادي عربة في جنوبي الأردن وهو من أشهر مواقع استخراج معدن النحاس:", options: ["باب ذراع", "موقع دوقرة", "وادي الحسا واللجّون", "وادي فينان"], correct_answer: "وادي فينان" },
+            { id: 7777, question_text: "موقع يقع في غور الأردن الشمالي, ويُعد من معالم العصر البرونزي:", options: ["تلّ السعيدية", "الحّرانة", "وادي الحسا واللجّون", "جاوا"], correct_answer: "تلّ السعيدية" },
+            { id: 7780, question_text: "إحدى المواقع الآتية هي من المواقع التي تُعد من معالم العصر الحجري الوسيط:", options: ["موقع بسطة", "طبقة فحل", "الأزرق والخّرانة", "تل أبو الصوّان"], correct_answer: "الأزرق والخّرانة" },
+            { id: 7783, question_text: "موقع يقع في محافظة جرش, ويُعد من معالم العصر الحجري الحديث:", options: ["تل أبو الصوّان", "تلّ أبو حامد", "تليلات الغسول", "طبقة فحل"], correct_answer: "تل أبو الصوّان" },
+            { id: 7786, question_text: "يُعد تل الشونة الشمالية التابع لمحافظة إربد من المواقع التي تعود إلى العصر:", options: ["الحجري النحاسي", "الحجري الوسيط", "الحجري الحديث", "البرونزي"], correct_answer: "الحجري النحاسي" },
+            { id: 7789, question_text: "العصر الذي عاش الإنسان فيه حياة التنقل والترحال, فسكن الكهوف والملاجئ الصخرية:", options: ["العصر الحجري القديم", "العصر الحجري الوسيط", "العصر الحجري الحديث", "العصر الحجري النحاسي"], correct_answer: "العصر الحجري القديم" },
+            { id: 7792, question_text: "تُعد كل الآتية من مظاهر تطور الإنسان في العصر الحجري الوسيط, ما عدا:", options: ["أصبحت الأدوات أكثر دقة وأصغر حجمًا", "عرف استخدام النار", "ظهور بعض الأدوات الزراعية كالمناجل والأجران ورحى الطحن", "الانتقال من مرحلة الجمع والالتقاط إلى مرحلة الاقتصاد المنتِج"], correct_answer: "عرف استخدام النار" },
+            { id: 7795, question_text: "تُعد كل الآتية من مظاهر تطور الإنسان في العصر الحجري النحاسي, ما عدا:", options: ["تطور القرى وظهور المدن الصغيرة", "دفن الموتى", "بدأ الإنسان بالتجارة عن طريق المقايضة", "بناء المعابد"], correct_answer: "دفن الموتى" },
+            { id: 7798, question_text: "العصر الذي يُعد أول مراحل التمدن؛ إذ بدأت المدن الصغيرة بالنمو:", options: ["العصر الحجري الحديث", "العصر الحجري النحاسي", "العصر البرونزي", "العصر الحديدي"], correct_answer: "العصر البرونزي" },
+            { id: 7804, question_text: "كل الآتية تُعد صحيحة, ما عدا:", options: ["ابتُكرت العجلة ودولاب الخزف في العصر البرونزي", "يُعد وادي فينان من أشهر مناجم استخراج النحاس", "سكن الإنسان الكهوف والملاجئ الصخرية في العصر الحجري القديم", "ظهرت المناجل والأجران ورحى الطحن في العصر الحجري الوسيط"], correct_answer: "ابتُكرت العجلة ودولاب الخزف في العصر البرونزي" },
+            { id: 7801, question_text: "الترتيب الصحيح لمظاهر تطور الحياة الإنسانية:", options: ["اختراع الكتابة ← اكتشاف النار وصهر المعادن ← اكتشاف الزراعة وانتاج الطعام", "اكتشاف الزراعة وانتاج الطعام ← اكتشاف النار وصهر المعادن ← اختراع الكتابة", "اكتشاف النار وصهر المعادن ← اختراع الكتابة ← اكتشاف الزراعة وانتاج الطعام", "اكتشاف الزراعة وانتاج الطعام ← اختراع الكتابة ← اكتشاف النار وصهر المعادن"], correct_answer: "اكتشاف الزراعة وانتاج الطعام ← اكتشاف النار وصهر المعادن ← اختراع الكتابة" }
+        ];
+
+        // Generate quiz lessons from questions data
+        function generateQuizLessons() {
+            const quizLessons = [];
+            const questionsPerLesson = 10;
+            const totalLessons = Math.ceil(questionsData.length / questionsPerLesson);
+            
+            for (let i = 0; i < totalLessons; i++) {
+                const startIdx = i * questionsPerLesson;
+                const lessonQuestions = questionsData.slice(startIdx, startIdx + questionsPerLesson);
+                
+                const stages = lessonQuestions.map(q => ({
+                    type: "quiz",
+                    question: q.question_text,
+                    options: q.options,
+                    correct: q.correct_answer
+                }));
+                
+                quizLessons.push({
+                    id: 100 + i,
+                    title: `اختبار ${i + 1}`,
+                    icon: "📝",
+                    stages: stages
+                });
+            }
+            return quizLessons;
+        }
+
+        // ============================================
+        // JORDANIAN HISTORY LESSON DATA
+        // ============================================
+        const lessonsData = [
+            {
+                id: 1,
+                title: "التأسيس",
+                icon: "👑",
+                stages: [
+                    {
+                        type: "reveal",
+                        image: "👑",
+                        sentence: "الأمير عبدالله بن الحسين هو المؤسس لإمارة شرق الأردن",
+                        highlights: [
+                            { word: "المؤسس", explanation: "أسس الإمارة عام 1921، وأصبحت مملكة عام 1946" },
+                            { word: "شرق الأردن", explanation: "كانت تسمى إمارة شرق الأردن قبل أن تصبح المملكة الأردنية الهاشمية" }
+                        ]
+                    },
+                    {
+                        type: "matching",
+                        pairs: [
+                            { left: "1921", right: "تأسيس الإمارة" },
+                            { left: "1946", right: "الاستقلال" },
+                            { left: "الأمير عبدالله", right: "المؤسس" },
+                            { left: "معان", right: "أول مدينة وصلها الأمير" }
+                        ]
+                    },
+                    {
+                        type: "sentence",
+                        original: "وصل الأمير عبدالله إلى معان عام 1920",
+                        words: ["وصل", "الأمير عبدالله", "إلى معان", "عام 1920"]
+                    },
+                    {
+                        type: "audio",
+                        text: "عُقد مؤتمر أم قيس بعد وصول الأمير إلى معان",
+                        blank: "أم قيس",
+                        options: ["السلط", "أم قيس", "الكرك"],
+                        correct: "أم قيس"
+                    },
+                    {
+                        type: "story",
+                        messages: [
+                            { speaker: "grandfather", text: "هل تعلم يا بني متى تأسست إمارة شرق الأردن؟" },
+                            { 
+                                speaker: "question", 
+                                options: ["عام 1921", "عام 1946", "عام 1920"],
+                                correct: "عام 1921"
+                            },
+                            { speaker: "grandfather", text: "صحيح! وكان ذلك بقيادة الأمير عبدالله بن الحسين." },
+                            { speaker: "grandfather", text: "وفي أي عام حصل الأردن على استقلاله؟" },
+                            {
+                                speaker: "question",
+                                options: ["عام 1946", "عام 1948", "عام 1950"],
+                                correct: "عام 1946"
+                            },
+                            { speaker: "grandfather", text: "أحسنت! في 25 أيار 1946 أعلن استقلال المملكة الأردنية الهاشمية." }
+                        ]
+                    }
+                ]
+            },
+            {
+                id: 2,
+                title: "المعاهدات",
+                icon: "📜",
+                stages: [
+                    {
+                        type: "reveal",
+                        image: "📜",
+                        sentence: "وقّع الأردن معاهدة عام 1928 مع بريطانيا",
+                        highlights: [
+                            { word: "معاهدة", explanation: "اتفاقية رسمية بين دولتين أو أكثر" },
+                            { word: "بريطانيا", explanation: "كانت بريطانيا تحت الانتداب على شرق الأردن" }
+                        ]
+                    },
+                    {
+                        type: "matching",
+                        pairs: [
+                            { left: "1928", right: "المعاهدة البريطانية الأولى" },
+                            { left: "1946", right: "معاهدة الاستقلال" },
+                            { left: "الانتداب", right: "الإدارة البريطانية" },
+                            { left: "السيادة", right: "الحكم الذاتي" }
+                        ]
+                    },
+                    {
+                        type: "sentence",
+                        original: "منحت المعاهدة الأردن حق إصدار العملة",
+                        words: ["منحت", "المعاهدة", "الأردن", "حق إصدار العملة"]
+                    },
+                    {
+                        type: "audio",
+                        text: "ألغت معاهدة 1946 جميع القيود على السيادة الأردنية",
+                        blank: "السيادة",
+                        options: ["الاقتصاد", "السيادة", "الجيش"],
+                        correct: "السيادة"
+                    },
+                    {
+                        type: "story",
+                        messages: [
+                            { speaker: "grandfather", text: "معاهدة 1928 كانت خطوة مهمة، لكنها لم تمنح الاستقلال الكامل." },
+                            { speaker: "grandfather", text: "ما الذي أعطته معاهدة 1928 للأردن؟" },
+                            {
+                                speaker: "question",
+                                options: ["الاستقلال التام", "حق إصدار العملة والطوابع", "إلغاء الانتداب"],
+                                correct: "حق إصدار العملة والطوابع"
+                            },
+                            { speaker: "grandfather", text: "بالضبط! وجاء الاستقلال الكامل عام 1946." }
+                        ]
+                    }
+                ]
+            },
+            {
+                id: 3,
+                title: "الاستقلال",
+                icon: "🇯🇴",
+                stages: [
+                    {
+                        type: "reveal",
+                        image: "🇯🇴",
+                        sentence: "أعلن استقلال المملكة الأردنية الهاشمية في 25 أيار 1946",
+                        highlights: [
+                            { word: "استقلال", explanation: "إنهاء الانتداب البريطاني والحصول على السيادة الكاملة" },
+                            { word: "أيار", explanation: "يحتفل الأردن في 25 أيار بعيد الاستقلال" }
+                        ]
+                    },
+                    {
+                        type: "matching",
+                        pairs: [
+                            { left: "25 أيار", right: "عيد الاستقلال" },
+                            { left: "الملك عبدالله الأول", right: "أول ملك للأردن" },
+                            { left: "الدستور", right: "القانون الأساسي للدولة" },
+                            { left: "البرلمان", right: "مجلس الأمة" }
+                        ]
+                    },
+                    {
+                        type: "sentence",
+                        original: "أصبح الأمير عبدالله ملكاً على الأردن",
+                        words: ["أصبح", "الأمير عبدالله", "ملكاً", "على الأردن"]
+                    },
+                    {
+                        type: "audio",
+                        text: "صدر أول دستور أردني عام 1947",
+                        blank: "1947",
+                        options: ["1946", "1947", "1948"],
+                        correct: "1947"
+                    },
+                    {
+                        type: "story",
+                        messages: [
+                            { speaker: "grandfather", text: "يوم الاستقلال من أهم الأيام في تاريخ الأردن." },
+                            { speaker: "grandfather", text: "متى يحتفل الأردنيون بعيد الاستقلال؟" },
+                            {
+                                speaker: "question",
+                                options: ["25 أيار", "25 كانون الثاني", "9 حزيران"],
+                                correct: "25 أيار"
+                            },
+                            { speaker: "grandfather", text: "صحيح! وفي هذا اليوم عام 1946 أعلن الاستقلال رسمياً." }
+                        ]
+                    }
+                ]
+            },
+            {
+                id: 4,
+                title: "الوحدة",
+                icon: "🤝",
+                stages: [
+                    {
+                        type: "reveal",
+                        image: "🤝",
+                        sentence: "تمت وحدة الضفتين عام 1950 بين الأردن وفلسطين",
+                        highlights: [
+                            { word: "وحدة", explanation: "اتحاد الضفة الشرقية والضفة الغربية تحت الحكم الأردني" },
+                            { word: "1950", explanation: "عام إعلان الوحدة رسمياً في مؤتمر أريحا" }
+                        ]
+                    },
+                    {
+                        type: "matching",
+                        pairs: [
+                            { left: "1950", right: "وحدة الضفتين" },
+                            { left: "أريحا", right: "مكان إعلان الوحدة" },
+                            { left: "الضفة الشرقية", right: "الأردن" },
+                            { left: "الضفة الغربية", right: "فلسطين" }
+                        ]
+                    },
+                    {
+                        type: "sentence",
+                        original: "عُقد مؤتمر أريحا لإعلان الوحدة",
+                        words: ["عُقد", "مؤتمر أريحا", "لإعلان", "الوحدة"]
+                    },
+                    {
+                        type: "audio",
+                        text: "أصبحت القدس جزءاً من المملكة الأردنية",
+                        blank: "القدس",
+                        options: ["عمان", "القدس", "نابلس"],
+                        correct: "القدس"
+                    },
+                    {
+                        type: "story",
+                        messages: [
+                            { speaker: "grandfather", text: "وحدة الضفتين كانت حدثاً تاريخياً مهماً." },
+                            { speaker: "grandfather", text: "أين عُقد المؤتمر الذي أعلن فيه الوحدة؟" },
+                            {
+                                speaker: "question",
+                                options: ["في عمان", "في أريحا", "في القدس"],
+                                correct: "في أريحا"
+                            },
+                            { speaker: "grandfather", text: "أحسنت! مؤتمر أريحا عام 1950." }
+                        ]
+                    }
+                ]
+            }
+        ];
+
+        // ============================================
+        // GAME STATE
+        // ============================================
+        let gameState = {
+            gems: 0,
+            hearts: 5,
+            currentLesson: null,
+            currentStage: 0,
+            completedLessons: [],
+            soundEnabled: true,
+            totalCorrect: 0,
+            totalQuestions: 0
+        };
+
+        // Load saved state
+        const savedState = localStorage.getItem('jordanHistoryGame');
+        if (savedState) {
+            const parsed = JSON.parse(savedState);
+            gameState = { ...gameState, ...parsed };
+        }
+
+        // ============================================
+        // AUDIO SYSTEM
+        // ============================================
+        const AudioSystem = {
+            synth: window.speechSynthesis,
+            
+            speak(text) {
+                if (!gameState.soundEnabled) return;
+                
+                this.synth.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'ar-SA';
+                utterance.rate = 0.9;
+                utterance.pitch = 1;
+                this.synth.speak(utterance);
+            },
+            
+            playEffect(type) {
+                if (!gameState.soundEnabled) return;
+                
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                switch(type) {
+                    case 'correct':
+                        oscillator.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+                        oscillator.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
+                        oscillator.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2);
+                        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                        oscillator.start(audioCtx.currentTime);
+                        oscillator.stop(audioCtx.currentTime + 0.4);
+                        break;
+                    case 'incorrect':
+                        oscillator.frequency.setValueAtTime(200, audioCtx.currentTime);
+                        oscillator.frequency.setValueAtTime(150, audioCtx.currentTime + 0.15);
+                        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                        oscillator.start(audioCtx.currentTime);
+                        oscillator.stop(audioCtx.currentTime + 0.3);
+                        break;
+                    case 'click':
+                        oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+                        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+                        oscillator.start(audioCtx.currentTime);
+                        oscillator.stop(audioCtx.currentTime + 0.05);
+                        break;
+                    case 'complete':
+                        const notes = [523.25, 659.25, 783.99, 1046.50];
+                        notes.forEach((freq, i) => {
+                            const osc = audioCtx.createOscillator();
+                            const gain = audioCtx.createGain();
+                            osc.connect(gain);
+                            gain.connect(audioCtx.destination);
+                            osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.15);
+                            gain.gain.setValueAtTime(0.2, audioCtx.currentTime + i * 0.15);
+                            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.15 + 0.3);
+                            osc.start(audioCtx.currentTime + i * 0.15);
+                            osc.stop(audioCtx.currentTime + i * 0.15 + 0.3);
+                        });
+                        break;
+                }
+            },
+            
+            stop() {
+                this.synth.cancel();
+            }
+        };
+
+        // ============================================
+        // UI ELEMENTS
+        // ============================================
+        const UI = {
+            skillTreeScreen: document.getElementById('skill-tree-screen'),
+            lessonScreen: document.getElementById('lesson-screen'),
+            lessonComplete: document.getElementById('lesson-complete'),
+            stageContainer: document.getElementById('stage-container'),
+            progressFill: document.getElementById('progress-fill'),
+            feedbackModal: document.getElementById('feedback-modal'),
+            gemsCount: document.getElementById('gems-count'),
+            heartsContainer: document.getElementById('hearts-container'),
+            skillTree: document.getElementById('skill-tree'),
+            
+            updateStats() {
+                this.gemsCount.textContent = gameState.gems;
+                const hearts = this.heartsContainer.querySelectorAll('.heart');
+                hearts.forEach((heart, i) => {
+                    heart.classList.toggle('lost', i >= gameState.hearts);
+                });
+            },
+            
+            showScreen(screenName) {
+                this.skillTreeScreen.classList.toggle('hidden', screenName !== 'skillTree');
+                this.lessonScreen.classList.toggle('active', screenName === 'lesson');
+                this.lessonComplete.classList.toggle('active', screenName === 'complete');
+            },
+            
+            showFeedback(isCorrect, message = '') {
+                const modal = this.feedbackModal;
+                modal.classList.remove('correct', 'incorrect');
+                modal.classList.add(isCorrect ? 'correct' : 'incorrect', 'visible');
+                
+                document.getElementById('feedback-icon').textContent = isCorrect ? '✓' : '✗';
+                document.getElementById('feedback-title').textContent = isCorrect ? 'ممتاز!' : 'حاول مرة أخرى';
+                document.getElementById('feedback-message').textContent = message;
+                
+                AudioSystem.playEffect(isCorrect ? 'correct' : 'incorrect');
+            },
+            
+            hideFeedback() {
+                this.feedbackModal.classList.remove('visible');
+            },
+            
+            updateProgress(current, total) {
+                const percent = (current / total) * 100;
+                this.progressFill.style.width = `${percent}%`;
+            }
+        };
+
+        // ============================================
+        // SKILL TREE
+        // ============================================
+        function renderSkillTree() {
+            UI.skillTree.innerHTML = '';
+            
+            lessonsData.forEach((lesson, index) => {
+                const isCompleted = gameState.completedLessons.includes(lesson.id);
+                const isAvailable = index === 0 || gameState.completedLessons.includes(lessonsData[index - 1].id);
+                
+                // Add connector (except for first node)
+                if (index > 0) {
+                    const connector = document.createElement('div');
+                    connector.className = `skill-connector ${isAvailable ? '' : 'locked'}`;
+                    UI.skillTree.appendChild(connector);
+                }
+                
+                const node = document.createElement('div');
+                node.className = `skill-node ${isCompleted ? 'completed' : (isAvailable ? 'available' : 'locked')}`;
+                node.innerHTML = `
+                    <span class="skill-icon">${lesson.icon}</span>
+                    <span class="skill-name">${lesson.title}</span>
+                    ${isCompleted ? '<span class="crown-badge">👑</span>' : ''}
+                `;
+                
+                if (isAvailable && !isCompleted) {
+                    node.addEventListener('click', () => startLesson(lesson.id));
+                } else if (isCompleted) {
+                    node.addEventListener('click', () => startLesson(lesson.id));
+                }
+                
+                UI.skillTree.appendChild(node);
+            });
+        }
+
+        // ============================================
+        // LESSON CONTROLLER
+        // ============================================
+        function startLesson(lessonId) {
+            const lesson = lessonsData.find(l => l.id === lessonId);
+            if (!lesson) return;
+            
+            gameState.currentLesson = lesson;
+            gameState.currentStage = 0;
+            gameState.totalCorrect = 0;
+            gameState.totalQuestions = 0;
+            
+            // Reset hearts for new lesson
+            gameState.hearts = 5;
+            UI.updateStats();
+            
+            UI.showScreen('lesson');
+            UI.updateProgress(0, lesson.stages.length);
+            
+            AudioSystem.playEffect('click');
+            renderStage();
+        }
+
+        function renderStage() {
+            const lesson = gameState.currentLesson;
+            const stage = lesson.stages[gameState.currentStage];
+            
+            UI.stageContainer.innerHTML = '';
+            UI.updateProgress(gameState.currentStage, lesson.stages.length);
+            
+            switch(stage.type) {
+                case 'reveal':
+                    renderRevealStage(stage);
+                    break;
+                case 'matching':
+                    renderMatchingStage(stage);
+                    break;
+                case 'sentence':
+                    renderSentenceStage(stage);
+                    break;
+                case 'audio':
+                    renderAudioStage(stage);
+                    break;
+                case 'story':
+                    renderStoryStage(stage);
+                    break;
+                case 'quiz':
+                    renderQuizStage(stage);
+                    break;
+            }
+        }
+
+
+        function nextStage() {
+            gameState.currentStage++;
+            
+            if (gameState.currentStage >= gameState.currentLesson.stages.length) {
+                completeLesson();
+            } else {
+                UI.hideFeedback();
+                renderStage();
+            }
+        }
+
+        function completeLesson() {
+            const lesson = gameState.currentLesson;
+            
+            if (!gameState.completedLessons.includes(lesson.id)) {
+                gameState.completedLessons.push(lesson.id);
+                gameState.gems += 10;
+            }
+            
+            const accuracy = gameState.totalQuestions > 0 
+                ? Math.round((gameState.totalCorrect / gameState.totalQuestions) * 100) 
+                : 100;
+            
+            document.getElementById('earned-gems').textContent = '+10';
+            document.getElementById('accuracy').textContent = `${accuracy}%`;
+            
+            UI.hideFeedback();
+            UI.showScreen('complete');
+            AudioSystem.playEffect('complete');
+            
+            saveState();
+        }
+
+        // ============================================
+        // STAGE RENDERERS
+        // ============================================
+        
+        // Stage 1: Tap to Reveal
+        function renderRevealStage(stage) {
+            let revealedCount = 0;
+            const totalHighlights = stage.highlights.length;
+            
+            const html = `
+                <p class="stage-title">المرحلة الأولى - التلقين</p>
+                <h3 class="stage-instruction">اضغط على الكلمات المميزة للتعلم</h3>
+                <div class="reveal-content">
+                    <div class="reveal-image">${stage.image}</div>
+                    <p class="reveal-sentence" id="reveal-sentence"></p>
+                    <div class="explanation-card" id="explanation-card">
+                        <h4 id="explanation-word"></h4>
+                        <p id="explanation-text"></p>
+                    </div>
+                    <button class="continue-btn" id="reveal-continue" disabled>متابعة</button>
+                </div>
+            `;
+            
+            UI.stageContainer.innerHTML = html;
+            
+            // Build sentence with highlighted words
+            const sentenceEl = document.getElementById('reveal-sentence');
+            const words = stage.sentence.split(' ');
+            
+            words.forEach(word => {
+                const span = document.createElement('span');
+                span.className = 'reveal-word';
+                span.textContent = word;
+                
+                const highlight = stage.highlights.find(h => word.includes(h.word));
+                if (highlight) {
+                    span.classList.add('highlight');
+                    span.dataset.word = highlight.word;
+                    span.dataset.explanation = highlight.explanation;
+                    
+                    span.addEventListener('click', () => {
+                        const card = document.getElementById('explanation-card');
+                        document.getElementById('explanation-word').textContent = highlight.word;
+                        document.getElementById('explanation-text').textContent = highlight.explanation;
+                        card.classList.add('visible');
+                        
+                        AudioSystem.speak(highlight.explanation);
+                        AudioSystem.playEffect('click');
+                        
+                        span.classList.remove('highlight');
+                        span.style.background = 'var(--success)';
+                        span.style.color = 'white';
+                        
+                        revealedCount++;
+                        if (revealedCount >= totalHighlights) {
+                            document.getElementById('reveal-continue').disabled = false;
+                        }
+                    });
+                }
+                
+                sentenceEl.appendChild(span);
+            });
+            
+            // Read the sentence aloud
+            setTimeout(() => {
+                AudioSystem.speak(stage.sentence);
+            }, 500);
+            
+            document.getElementById('reveal-continue').addEventListener('click', () => {
+                gameState.totalQuestions++;
+                gameState.totalCorrect++;
+                nextStage();
+            });
+        }
+
+        // Stage 2: Matching
+        function renderMatchingStage(stage) {
+            const pairs = [...stage.pairs];
+            const shuffledRight = [...pairs].sort(() => Math.random() - 0.5);
+            
+            let selected = null;
+            let matchedPairs = 0;
+            
+            const html = `
+                <p class="stage-title">المرحلة الثانية - المطابقة</p>
+                <h3 class="stage-instruction">طابق العناصر المتشابهة</h3>
+                <div class="matching-container">
+                    <div class="matching-column" id="left-column">
+                        ${pairs.map((p, i) => `
+                            <div class="matching-item" data-side="left" data-index="${i}" data-value="${p.left}">
+                                ${p.left}
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="matching-column" id="right-column">
+                        ${shuffledRight.map((p, i) => `
+                            <div class="matching-item" data-side="right" data-index="${i}" data-value="${p.right}">
+                                ${p.right}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            
+            UI.stageContainer.innerHTML = html;
+            
+            const items = UI.stageContainer.querySelectorAll('.matching-item');
+            
+            items.forEach(item => {
+                item.addEventListener('click', () => {
+                    if (item.classList.contains('matched')) return;
+                    
+                    AudioSystem.playEffect('click');
+                    
+                    if (!selected) {
+                        selected = item;
+                        item.classList.add('selected');
+                    } else if (selected === item) {
+                        item.classList.remove('selected');
+                        selected = null;
+                    } else {
+                        // Check match
+                        const leftValue = selected.dataset.side === 'left' ? selected.dataset.value : item.dataset.value;
+                        const rightValue = selected.dataset.side === 'right' ? selected.dataset.value : item.dataset.value;
+                        
+                        const correctPair = pairs.find(p => p.left === leftValue && p.right === rightValue);
+                        
+                        gameState.totalQuestions++;
+                        
+                        if (correctPair) {
+                            selected.classList.remove('selected');
+                            selected.classList.add('matched');
+                            item.classList.add('matched');
+                            matchedPairs++;
+                            gameState.totalCorrect++;
+                            
+                            AudioSystem.playEffect('correct');
+                            
+                            if (matchedPairs === pairs.length) {
+                                setTimeout(() => {
+                                    UI.showFeedback(true, 'أحسنت! طابقت جميع العناصر');
+                                    document.getElementById('feedback-btn').onclick = () => nextStage();
+                                }, 300);
+                            }
+                        } else {
+                            selected.classList.add('error');
+                            item.classList.add('error');
+                            
+                            gameState.hearts--;
+                            UI.updateStats();
+                            
+                            AudioSystem.playEffect('incorrect');
+                            
+                            setTimeout(() => {
+                                selected.classList.remove('selected', 'error');
+                                item.classList.remove('error');
+                                selected = null;
+                            }, 500);
+                            
+                            if (gameState.hearts <= 0) {
+                                endLessonFailed();
+                                return;
+                            }
+                            
+                            return;
+                        }
+                        
+                        selected = null;
+                    }
+                });
+            });
+        }
+
+        // Stage 3: Sentence Building
+        function renderSentenceStage(stage) {
+            const shuffledWords = [...stage.words].sort(() => Math.random() - 0.5);
+            let placedWords = [];
+            
+            const html = `
+                <p class="stage-title">المرحلة الثالثة - بناء الجمل</p>
+                <h3 class="stage-instruction">رتّب الكلمات لتكوين الجملة الصحيحة</h3>
+                <div class="sentence-building">
+                    <div class="sentence-target" id="sentence-target"></div>
+                    <div class="word-bank" id="word-bank">
+                        ${shuffledWords.map((word, i) => `
+                            <div class="draggable-word" draggable="true" data-word="${word}" data-index="${i}">
+                                ${word}
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="continue-btn" id="check-sentence">تحقق</button>
+                </div>
+            `;
+            
+            UI.stageContainer.innerHTML = html;
+            
+            const target = document.getElementById('sentence-target');
+            const wordBank = document.getElementById('word-bank');
+            const wordElements = wordBank.querySelectorAll('.draggable-word');
+            
+            // Drag and Drop
+            wordElements.forEach(word => {
+                word.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', word.dataset.word);
+                    word.classList.add('dragging');
+                });
+                
+                word.addEventListener('dragend', () => {
+                    word.classList.remove('dragging');
+                });
+                
+                word.addEventListener('click', () => {
+                    AudioSystem.playEffect('click');
+                    
+                    if (word.classList.contains('placed')) {
+                        // Move back to bank
+                        word.classList.remove('placed');
+                        wordBank.appendChild(word);
+                        placedWords = placedWords.filter(w => w !== word.dataset.word);
+                    } else {
+                        // Move to target
+                        word.classList.add('placed');
+                        target.appendChild(word);
+                        placedWords.push(word.dataset.word);
+                    }
+                });
+            });
+            
+            target.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                target.classList.add('drag-over');
+            });
+            
+            target.addEventListener('dragleave', () => {
+                target.classList.remove('drag-over');
+            });
+            
+            target.addEventListener('drop', (e) => {
+                e.preventDefault();
+                target.classList.remove('drag-over');
+                
+                const wordText = e.dataTransfer.getData('text/plain');
+                const wordEl = Array.from(wordElements).find(w => w.dataset.word === wordText && !w.classList.contains('placed'));
+                
+                if (wordEl) {
+                    wordEl.classList.add('placed');
+                    target.appendChild(wordEl);
+                    placedWords.push(wordText);
+                    AudioSystem.playEffect('click');
+                }
+            });
+            
+            // Check button
+            document.getElementById('check-sentence').addEventListener('click', () => {
+                const targetWords = Array.from(target.querySelectorAll('.draggable-word'));
+                const currentSentence = targetWords.map(w => w.dataset.word).join(' ');
+                const correctSentence = stage.words.join(' ');
+                
+                gameState.totalQuestions++;
+                
+                if (currentSentence === correctSentence) {
+                    gameState.totalCorrect++;
+                    targetWords.forEach(w => w.classList.add('correct'));
+                    UI.showFeedback(true, 'الجملة صحيحة!');
+                    document.getElementById('feedback-btn').onclick = () => nextStage();
+                } else {
+                    gameState.hearts--;
+                    UI.updateStats();
+                    targetWords.forEach(w => w.classList.add('incorrect'));
+                    
+                    AudioSystem.playEffect('incorrect');
+                    
+                    if (gameState.hearts <= 0) {
+                        endLessonFailed();
+                        return;
+                    }
+                    
+                    setTimeout(() => {
+                        targetWords.forEach(w => {
+                            w.classList.remove('incorrect', 'placed');
+                            wordBank.appendChild(w);
+                        });
+                        placedWords = [];
+                    }, 1000);
+                }
+            });
+        }
+
+        // Stage 4: Audio Cloze
+        function renderAudioStage(stage) {
+            let selectedOption = null;
+            let isPlaying = false;
+            
+            const displayText = stage.text.replace(stage.blank, `<span class="cloze-blank" id="blank-space">_____</span>`);
+            
+            const html = `
+                <p class="stage-title">المرحلة الرابعة - الاستماع والكتابة</p>
+                <h3 class="stage-instruction">استمع واختر الكلمة الناقصة</h3>
+                <div class="audio-cloze">
+                    <div class="audio-player">
+                        <button class="play-btn" id="play-audio">🔊</button>
+                        <p>اضغط للاستماع</p>
+                    </div>
+                    <div class="cloze-sentence">${displayText}</div>
+                    <div class="cloze-options" id="cloze-options">
+                        ${stage.options.map(opt => `
+                            <button class="cloze-option" data-value="${opt}">${opt}</button>
+                        `).join('')}
+                    </div>
+                    <button class="continue-btn" id="check-cloze" disabled>تحقق</button>
+                </div>
+            `;
+            
+            UI.stageContainer.innerHTML = html;
+            
+            const playBtn = document.getElementById('play-audio');
+            const blankSpace = document.getElementById('blank-space');
+            const options = UI.stageContainer.querySelectorAll('.cloze-option');
+            const checkBtn = document.getElementById('check-cloze');
+            
+            playBtn.addEventListener('click', () => {
+                AudioSystem.speak(stage.text);
+                playBtn.classList.add('playing');
+                setTimeout(() => playBtn.classList.remove('playing'), 2000);
+            });
+            
+            // Auto-play
+            setTimeout(() => {
+                AudioSystem.speak(stage.text);
+                playBtn.classList.add('playing');
+                setTimeout(() => playBtn.classList.remove('playing'), 2000);
+            }, 500);
+            
+            options.forEach(opt => {
+                opt.addEventListener('click', () => {
+                    options.forEach(o => o.classList.remove('selected'));
+                    opt.classList.add('selected');
+                    selectedOption = opt.dataset.value;
+                    blankSpace.textContent = selectedOption;
+                    checkBtn.disabled = false;
+                    AudioSystem.playEffect('click');
+                });
+            });
+            
+            checkBtn.addEventListener('click', () => {
+                gameState.totalQuestions++;
+                
+                const selectedEl = UI.stageContainer.querySelector('.cloze-option.selected');
+                
+                if (selectedOption === stage.correct) {
+                    gameState.totalCorrect++;
+                    selectedEl.classList.add('correct');
+                    UI.showFeedback(true, 'إجابة صحيحة!');
+                    document.getElementById('feedback-btn').onclick = () => nextStage();
+                } else {
+                    gameState.hearts--;
+                    UI.updateStats();
+                    selectedEl.classList.add('incorrect');
+                    
+                    // Show correct answer
+                    options.forEach(o => {
+                        if (o.dataset.value === stage.correct) {
+                            o.classList.add('correct');
+                        }
+                    });
+                    
+                    if (gameState.hearts <= 0) {
+                        endLessonFailed();
+                        return;
+                    }
+                    
+                    UI.showFeedback(false, `الإجابة الصحيحة: ${stage.correct}`);
+                    document.getElementById('feedback-btn').onclick = () => nextStage();
+                }
+            });
+        }
+
+        // Stage 5: Contextual Stories
+        function renderStoryStage(stage) {
+            let messageIndex = 0;
+            let questionAnswered = false;
+            
+            const html = `
+                <p class="stage-title">المرحلة الخامسة - القصص</p>
+                <h3 class="stage-instruction">تعلم من خلال الحوار</h3>
+                <div class="story-container">
+                    <div class="chat-messages" id="chat-messages"></div>
+                    <div class="chat-options" id="chat-options"></div>
+                </div>
+            `;
+            
+            UI.stageContainer.innerHTML = html;
+            
+            const chatMessages = document.getElementById('chat-messages');
+            const chatOptions = document.getElementById('chat-options');
+            
+            function addMessage(message, isUser = false) {
+                const msgEl = document.createElement('div');
+                msgEl.className = `chat-message ${isUser ? 'user' : ''}`;
+                msgEl.innerHTML = `
+                    <div class="chat-avatar">${isUser ? '👤' : '👴'}</div>
+                    <div class="chat-bubble">${message}</div>
+                `;
+                chatMessages.appendChild(msgEl);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+                if (!isUser) {
+                    AudioSystem.speak(message);
+                }
+            }
+            
+            function showOptions(options, correct) {
+                chatOptions.innerHTML = '';
+                options.forEach(opt => {
+                    const btn = document.createElement('button');
+                    btn.className = 'chat-option';
+                    btn.textContent = opt;
+                    btn.addEventListener('click', () => handleAnswer(opt, correct, btn));
+                    chatOptions.appendChild(btn);
+                });
+            }
+            
+            function handleAnswer(selected, correct, btnEl) {
+                if (questionAnswered) return;
+                questionAnswered = true;
+                
+                const allBtns = chatOptions.querySelectorAll('.chat-option');
+                allBtns.forEach(b => b.classList.add('disabled'));
+                
+                gameState.totalQuestions++;
+                
+                if (selected === correct) {
+                    gameState.totalCorrect++;
+                    btnEl.classList.add('correct');
+                    AudioSystem.playEffect('correct');
+                    addMessage(selected, true);
+                } else {
+                    gameState.hearts--;
+                    UI.updateStats();
+                    btnEl.classList.add('incorrect');
+                    
+                    allBtns.forEach(b => {
+                        if (b.textContent === correct) {
+                            b.classList.add('correct');
+                        }
+                    });
+                    
+                    AudioSystem.playEffect('incorrect');
+                    addMessage(selected, true);
+                    
+                    if (gameState.hearts <= 0) {
+                        setTimeout(() => endLessonFailed(), 1000);
+                        return;
+                    }
+                }
+                
+                setTimeout(() => {
+                    chatOptions.innerHTML = '';
+                    questionAnswered = false;
+                    messageIndex++;
+                    processMessages();
+                }, 1500);
+            }
+            
+            function processMessages() {
+                if (messageIndex >= stage.messages.length) {
+                    // Story complete
+                    setTimeout(() => {
+                        const continueBtn = document.createElement('button');
+                        continueBtn.className = 'continue-btn';
+                        continueBtn.textContent = 'متابعة';
+                        continueBtn.onclick = () => nextStage();
+                        chatOptions.appendChild(continueBtn);
+                    }, 500);
+                    return;
+                }
+                
+                const msg = stage.messages[messageIndex];
+                
+                if (msg.speaker === 'question') {
+                    showOptions(msg.options, msg.correct);
+                } else {
+                    addMessage(msg.text);
+                    messageIndex++;
+                    setTimeout(processMessages, 1500);
+                }
+            }
+            
+            // Start the conversation
+            setTimeout(processMessages, 500);
+        }
+
+        // Stage 6: Quiz Questions
+        function renderQuizStage(stage) {
+            let selectedOption = null;
+            
+            const html = `
+                <p class="stage-title">اختبار المعلومات</p>
+                <h3 class="stage-instruction">${stage.question}</h3>
+                <div class="audio-cloze">
+                    <div class="cloze-options" id="quiz-options">
+                        ${stage.options.map(opt => `
+                            <button class="cloze-option" data-value="${opt}">${opt}</button>
+                        `).join('')}
+                    </div>
+                    <button class="continue-btn" id="check-quiz" disabled>تحقق</button>
+                </div>
+            `;
+            
+            UI.stageContainer.innerHTML = html;
+            
+            const options = UI.stageContainer.querySelectorAll('.cloze-option');
+            const checkBtn = document.getElementById('check-quiz');
+            
+            options.forEach(opt => {
+                opt.addEventListener('click', () => {
+                    options.forEach(o => o.classList.remove('selected'));
+                    opt.classList.add('selected');
+                    selectedOption = opt.dataset.value;
+                    checkBtn.disabled = false;
+                    AudioSystem.playEffect('click');
+                });
+            });
+            
+            checkBtn.addEventListener('click', () => {
+                gameState.totalQuestions++;
+                
+                const selectedEl = UI.stageContainer.querySelector('.cloze-option.selected');
+                
+                if (selectedOption === stage.correct) {
+                    gameState.totalCorrect++;
+                    selectedEl.classList.add('correct');
+                    UI.showFeedback(true, 'إجابة صحيحة!');
+                    document.getElementById('feedback-btn').onclick = () => nextStage();
+                } else {
+                    gameState.hearts--;
+                    UI.updateStats();
+                    selectedEl.classList.add('incorrect');
+                    
+                    // Show correct answer
+                    options.forEach(o => {
+                        if (o.dataset.value === stage.correct) {
+                            o.classList.add('correct');
+                        }
+                    });
+                    
+                    if (gameState.hearts <= 0) {
+                        endLessonFailed();
+                        return;
+                    }
+                    
+                    UI.showFeedback(false, `الإجابة الصحيحة: ${stage.correct}`);
+                    document.getElementById('feedback-btn').onclick = () => nextStage();
+                }
+            });
+        }
+
+        // ============================================
+        // GAME OVER
+        // ============================================
+        function endLessonFailed() {
+            UI.showFeedback(false, 'انتهت المحاولات! حاول مرة أخرى');
+            document.getElementById('feedback-btn').textContent = 'العودة';
+            document.getElementById('feedback-btn').onclick = () => {
+                UI.hideFeedback();
+                UI.showScreen('skillTree');
+                gameState.hearts = 5;
+                UI.updateStats();
+            };
+        }
+
+        // ============================================
+        // PERSISTENCE
+        // ============================================
+        function saveState() {
+            localStorage.setItem('jordanHistoryGame', JSON.stringify({
+                gems: gameState.gems,
+                completedLessons: gameState.completedLessons
+            }));
+        }
+
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+        document.getElementById('back-btn').addEventListener('click', () => {
+            AudioSystem.stop();
+            UI.hideFeedback();
+            UI.showScreen('skillTree');
+        });
+
+        document.getElementById('finish-btn').addEventListener('click', () => {
+            UI.showScreen('skillTree');
+            renderSkillTree();
+        });
+
+        document.getElementById('sound-btn').addEventListener('click', () => {
+            gameState.soundEnabled = !gameState.soundEnabled;
+            document.getElementById('sound-btn').textContent = gameState.soundEnabled ? '🔊' : '🔇';
+            if (!gameState.soundEnabled) {
+                AudioSystem.stop();
+            }
+        });
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        function init() {
+            // Add quiz lessons from questionsData
+            const quizLessons = generateQuizLessons();
+            lessonsData.push(...quizLessons);
+            
+            UI.updateStats();
+            renderSkillTree();
+        }
+
+        init();
+    </script>
+</body>
+</html>
