@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@200;300;400;500;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Tajawal', sans-serif;
+  background-color: #FDF8F3;
+  color: #1a1a1a;
+  direction: rtl;
+  overflow: hidden;
+}
+
+/* 3D Button Press Animation */
+@keyframes buttonPress {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(2px);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-2px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(2px);
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.btn-press {
+  transition: all 0.075s ease;
+}
+
+.btn-press:active {
+  transform: translateY(2px);
+  box-shadow: 0 0px 0px rgba(0, 90, 66, 1);
+}
+
+.game-container {
+  margin: 0 auto;
+  max-width: 480px;
+  width: 100%;
+  height: 100dvh;
+  background-color: #FDF8F3;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.stage-content {
+  flex: 1;
+  overflow: hidden;
+}

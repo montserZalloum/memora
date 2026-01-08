@@ -1,7 +1,6 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "prompt",
  "creation": "2026-01-08 14:22:32.491088",
  "doctype": "DocType",
  "editable_grid": 1,
@@ -9,7 +8,8 @@
  "field_order": [
   "title",
   "type",
-  "config"
+  "config",
+  "edit_content_btn"
  ],
  "fields": [
   {
@@ -30,15 +30,22 @@
   {
    "fieldname": "config",
    "fieldtype": "Code",
+   "hidden": 1,
    "label": "Config",
-   "options": "JSON"
+   "options": "JSON",
+   "read_only": 1
+  },
+  {
+   "fieldname": "edit_content_btn",
+   "fieldtype": "Button",
+   "label": "Edit Content"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-01-08 14:29:02.070707",
+ "modified": "2026-01-08 15:42:54.172876",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Stage",
