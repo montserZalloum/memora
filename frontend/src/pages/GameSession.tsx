@@ -8,10 +8,12 @@ import { HeartDisplay } from '../components/HeartDisplay';
 import { JuicyButton } from '../components/JuicyButton';
 import { RevealStage } from '../components/stages/RevealStage';
 import { MatchingStage } from '../components/stages/MatchingStage';
+import { LoginRequired } from './LoginRequired';
 import { Trophy, RotateCcw } from 'lucide-react';
 
 interface GameSessionProps {
-  lessonId?: string;
+  lessonId: string;
+  onExit?: () => void;
 }
 
 /**
@@ -21,7 +23,7 @@ interface GameSessionProps {
  * - Handles win/loss states
  * - Manages progression through stages
  */
-export const GameSession: React.FC<GameSessionProps> = ({ lessonId = 'sample' }) => {
+export const GameSession: React.FC<GameSessionProps> = ({ lessonId, onExit }) => {
   const {
     stageQueue,
     currentStageIndex,
@@ -32,63 +34,22 @@ export const GameSession: React.FC<GameSessionProps> = ({ lessonId = 'sample' })
     isGameActive,
     isGameWon,
     isGameOver,
+    isLoading,
+    error,
     submitAnswer,
     resetGame,
     loadLesson,
+    fetchLessonContent,
   } = useGameStore();
 
   const [lastHearts, setLastHearts] = useState(hearts);
   const [shouldShakeHearts, setShouldShakeHearts] = useState(false);
 
-  // Mock lesson data - replace with API call
+  // Load lesson data from API - NO MORE MOCK DATA
   useEffect(() => {
-    const mockLesson: GameStage[] = [
-      {
-        id: '1',
-        type: 'Reveal',
-        title: 'تعليم جديد',
-        config: {
-          image: '📚',
-          sentence: 'هذا كتاب جديد وممتع جداً للقراءة',
-          highlights: [
-            { word: 'كتاب', explanation: 'كتاب هو عمل مكتوب يحتوي على معلومات' },
-            { word: 'جديد', explanation: 'جديد يعني حديث الصنع أو لم يستخدم من قبل' },
-            { word: 'ممتع', explanation: 'ممتع يعني مثير للاهتمام والتسلية' },
-          ],
-        },
-      },
-      {
-        id: '2',
-        type: 'Matching',
-        title: 'طابق الكلمات',
-        config: {
-          instruction: 'طابق الكلمات مع معانيها',
-          pairs: [
-            { id: '1', left: 'ماء', right: 'سائل شفاف' },
-            { id: '2', left: 'نار', right: 'حرارة وضوء' },
-            { id: '3', left: 'أرض', right: 'كوكبنا' },
-            { id: '4', left: 'هواء', right: 'نتنفسه دائماً' },
-          ],
-        },
-      },
-      {
-        id: '3',
-        type: 'Reveal',
-        title: 'الحروف',
-        config: {
-          image: '🔤',
-          sentence: 'الحروف العربية جميلة وسهلة التعلم',
-          highlights: [
-            { word: 'الحروف', explanation: 'الحروف هي أساس أي لغة' },
-            { word: 'العربية', explanation: 'اللغة العربية من أغنى اللغات' },
-            { word: 'جميلة', explanation: 'جميلة تعني حسنة المظهر' },
-          ],
-        },
-      },
-    ];
-
-    loadLesson(mockLesson);
-  }, [lessonId, loadLesson]);
+    // Always fetch from real API
+    fetchLessonContent(lessonId);
+  }, [lessonId, fetchLessonContent]);
 
   // Monitor heart changes for shake animation
   useEffect(() => {
@@ -103,6 +64,14 @@ export const GameSession: React.FC<GameSessionProps> = ({ lessonId = 'sample' })
 
   const handleStageComplete = (isCorrect: boolean) => {
     submitAnswer(isCorrect);
+  };
+
+  const handleBackToHome = () => {
+    if (onExit) {
+      onExit();
+    } else {
+      window.location.href = '/';
+    }
   };
 
   const renderStage = () => {
@@ -125,6 +94,46 @@ export const GameSession: React.FC<GameSessionProps> = ({ lessonId = 'sample' })
         );
     }
   };
+
+  // Loading State
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="h-full flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-pulse-slow text-6xl mb-4">📖</div>
+            <p className="text-xl text-gray-600">جاري تحميل الدرس...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Error State
+  if (error) {
+    // Check if it's an authentication error
+    if (error.includes('EXPECTATION FAILED') ||
+        error.includes('UNAUTHORIZED') ||
+        error.includes('FORBIDDEN') ||
+        error.includes('401') ||
+        error.includes('403') ||
+        error.includes('417')) {
+      return <LoginRequired />;
+    }
+
+    return (
+      <Layout>
+        <div className="h-full flex flex-col items-center justify-center p-6">
+          <div className="text-6xl mb-6">⚠️</div>
+          <h2 className="text-2xl font-bold text-accent mb-4">حدث خطأ!</h2>
+          <p className="text-gray-600 mb-8 text-center">{error}</p>
+          <JuicyButton onClick={handleBackToHome} variant="primary" size="lg">
+            العودة للرئيسية
+          </JuicyButton>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -215,11 +224,11 @@ export const GameSession: React.FC<GameSessionProps> = ({ lessonId = 'sample' })
             fullWidth
             className="mb-4"
           >
-            درس جديد
+            إعادة المحاولة
           </JuicyButton>
 
           <JuicyButton
-            onClick={() => window.location.href = '/'}
+            onClick={handleBackToHome}
             variant="secondary"
             size="lg"
             fullWidth
@@ -266,7 +275,7 @@ export const GameSession: React.FC<GameSessionProps> = ({ lessonId = 'sample' })
           </JuicyButton>
 
           <JuicyButton
-            onClick={() => window.location.href = '/'}
+            onClick={handleBackToHome}
             variant="secondary"
             size="lg"
             fullWidth
