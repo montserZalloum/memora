@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Jordan Project - Play</title>
+	<meta name="description" content="Immersive gamified learning experience" />
+	<meta name="theme-color" content="#007D5B" />
+
+	<!-- Frappe CSS Base -->
+	<link rel="stylesheet" href="/assets/frappe/css/frappe-web.css" />
+
+	<!-- Vite CSS (Hashed) -->
+	{% if game_css %}
+	<link rel="stylesheet" href="{{ game_css }}" />
+	{% endif %}
+
+	<!-- Prevent default Frappe styles from interfering -->
+	<style>
+		/* Reset body styles to ensure game takes full viewport */
+		body {
+			margin: 0;
+			padding: 0;
+			background: #FDF8F3 !important;
+			overflow: hidden !important;
+			direction: rtl;
+		}
+
+		/* Ensure root container takes full height */
+		#root {
+			width: 100%;
+			height: 100vh;
+			overflow: hidden;
+		}
+
+		/* Hide any Frappe-specific elements that might show */
+		.frappe-control,
+		.navbar,
+		.sidebar,
+		.page-head,
+		.form-message {
+			display: none !important;
+		}
+	</style>
+</head>
+<body>
+	<!-- React Root -->
+	<div id="root"></div>
+
+	<!-- Frappe Session & CSRF Token -->
+	<script>
+		// Pass Frappe session data to React app
+		window.csrf_token = "{{ frappe.session.csrf_token }}";
+		window.frappe_user = "{{ frappe.session.user }}";
+		window.frappe_language = "{{ frappe.local.lang or 'ar' }}";
+
+		// Initialize Frappe context for API calls
+		if (window.frappe) {
+			frappe.csrf_token = window.csrf_token;
+		}
+	</script>
+
+	<!-- Vite JS Module (Hashed) -->
+	{% if game_js %}
+	<script type="module" src="{{ game_js }}"></script>
+	{% else %}
+	<script>
+		console.error("Game JS not found. Make sure to run 'npm run build' in the frontend folder.");
+	</script>
+	{% endif %}
+</body>
+</html>

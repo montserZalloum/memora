@@ -4,7 +4,8 @@
  */
 
 export type { StageType, GameStage, MatchingConfig, RevealConfig } from '../store/useGameStore';
-export type { GameState } from '../store/useGameStore';
+
+import type { GameStage } from '../store/useGameStore';
 
 /**
  * Example API Response Types (for Frappe Integration)
