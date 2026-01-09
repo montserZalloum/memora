@@ -7,7 +7,13 @@ from frappe import _
 def get_map_data():
     try:
         user = frappe.session.user
-        subjects = frappe.get_all("Game Subject", fields=["name", "title", "icon"], filters={"is_published": 1})
+        
+        # 1. Get Subjects in order of creation (First created = First in map)
+        subjects = frappe.get_all("Game Subject", 
+            fields=["name", "title", "icon"], 
+            filters={"is_published": 1},
+            order_by="creation asc" 
+        )
         
         completed_lessons = frappe.get_all("Gameplay Session", 
             filters={"player": user}, 
@@ -17,6 +23,7 @@ def get_map_data():
         
         full_map = []
         for subject in subjects:
+            # 2. Get Units ordered by your custom 'order' field
             units = frappe.get_all("Game Unit", 
                 filters={"subject": subject.name}, 
                 fields=["name", "title", "`order`"], 
@@ -24,15 +31,19 @@ def get_map_data():
             )
             
             for unit in units:
+                # 3. Get Lessons in order of creation (FIFO)
+                # If you add an 'order' field to Game Lesson later, change this to that field.
                 lessons = frappe.get_all("Game Lesson", 
                     filters={"unit": unit.name}, 
-                    fields=["name", "title", "xp_reward"]
+                    fields=["name", "title", "xp_reward"],
+                    order_by="creation asc" 
                 )
                 
                 for lesson in lessons:
                     status = "locked"
                     if lesson.name in completed_lessons:
                         status = "completed"
+                    # If it's the very first lesson in the whole map, or the one right after a completed one
                     elif not full_map or full_map[-1]["status"] == "completed":
                         status = "available"
                     
@@ -40,16 +51,16 @@ def get_map_data():
                         "id": lesson.name,
                         "title": lesson.title,
                         "unit_title": unit.title,
-                        "subject_title": subject.title, # <--- Add this line
+                        "subject_title": subject.title,
                         "subject_icon": subject.icon,
                         "status": status,
                         "xp": lesson.xp_reward
                     })
+                    
         return full_map
     except Exception as e:
         frappe.log_error(title="get_map_data failed", message=frappe.get_traceback())
         frappe.throw("Could not load journey map.")
-
 
 @frappe.whitelist()
 def get_lesson_details(lesson_id):

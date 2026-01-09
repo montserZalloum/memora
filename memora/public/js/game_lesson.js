@@ -29,6 +29,8 @@ frappe.ui.form.on('Game Stage', {
                 open_matching_dialog(frm, cdt, cdn, row, current_config);
             } else if (row.type === 'Reveal') {
                 open_reveal_dialog(frm, cdt, cdn, row, current_config);
+            } else if (row.type === 'Sentence Builder') {
+                open_sentence_builder_dialog(frm, cdt, cdn, row, current_config);
             } else {
                 frappe.msgprint("لا يوجد محرر لهذا النوع بعد");
             }
@@ -164,6 +166,77 @@ function open_reveal_dialog(frm, cdt, cdn, row, data) {
             frappe.model.set_value(cdt, cdn, 'config', JSON.stringify(config_payload, null, 2));
             d.hide();
             frappe.show_alert({message: 'تم الحفظ ✅', indicator: 'green'});
+        }
+    });
+
+    d.show();
+}
+
+// =================================================
+// 🏗️ 3. نافذة بناء الجملة (Sentence Builder)
+// =================================================
+function open_sentence_builder_dialog(frm, cdt, cdn, row, data) {
+    // تجهيز البيانات القديمة إذا كانت موجودة
+    let existing_data = (data.words || []).map(w => ({
+        item_1: w
+    }));
+
+    let d = new frappe.ui.Dialog({
+        title: 'إعدادات بناء الجملة (Sentence Builder)',
+        fields: [
+            {
+                label: 'التعليمات',
+                fieldname: 'instruction',
+                fieldtype: 'Data',
+                default: data.instruction || 'رتب الكلمات لتكوين جملة صحيحة',
+                description: 'مثال: رتب الكلمات التالية'
+            },
+            {
+                fieldtype: 'Section Break',
+                label: 'محتوى الجملة'
+            },
+            {
+                label: 'الجملة الكاملة (للمراجعة)',
+                fieldname: 'sentence',
+                fieldtype: 'Small Text',
+                default: data.sentence,
+                description: 'اكتب الجملة كاملة هنا كمرجع'
+            },
+            {
+                label: 'الكلمات/المقاطع مرتبة (Words Tokens)',
+                fieldname: 'words_table',
+                fieldtype: 'Table',
+                options: 'Game Content Builder Item',
+                description: 'أضف الكلمات بالترتيب الصحيح. ملاحظة: يمكنك إضافة عبارة كاملة في سطر واحد لتظهر كزر واحد (مثل: حق إصدار العملة)',
+                fields: [
+                    {
+                        label: 'الكلمة / العبارة',
+                        fieldname: 'item_1',
+                        fieldtype: 'Data',
+                        in_list_view: 1,
+                        reqd: 1
+                    }
+                ],
+                data: existing_data
+            }
+        ],
+        size: 'large',
+        primary_action_label: 'حفظ (Save)',
+        primary_action: function(values) {
+            // تحويل الجدول إلى مصفوفة نصوص بسيطة للـ React
+            let words_array = values.words_table.map(row => row.item_1);
+
+            let config_payload = {
+                instruction: values.instruction,
+                sentence: values.sentence,
+                words: words_array // سيتم إرسالها كـ Array من الكلمات
+            };
+
+            // حفظ الـ JSON في حقل الـ Config
+            frappe.model.set_value(cdt, cdn, 'config', JSON.stringify(config_payload, null, 2));
+            
+            d.hide();
+            frappe.show_alert({message: 'تم حفظ إعدادات الجملة ✅', indicator: 'green'});
         }
     });
 
