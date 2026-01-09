@@ -24,7 +24,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Type",
-   "options": "Reveal\nMatching\nSentence Builder\nQuiz",
+   "options": "Reveal\nMatching\nSentence Builder\nFill Blank\nQuiz",
    "reqd": 1
   },
   {
@@ -45,7 +45,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-01-09 12:18:20.703822",
+ "modified": "2026-01-09 14:23:32.252455",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Stage",

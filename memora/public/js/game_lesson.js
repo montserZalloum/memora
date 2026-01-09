@@ -31,6 +31,8 @@ frappe.ui.form.on('Game Stage', {
                 open_reveal_dialog(frm, cdt, cdn, row, current_config);
             } else if (row.type === 'Sentence Builder') {
                 open_sentence_builder_dialog(frm, cdt, cdn, row, current_config);
+            } else if (row.type === 'Fill Blank') {
+                open_fill_blank_dialog(frm, cdt, cdn, row, current_config);
             } else {
                 frappe.msgprint("لا يوجد محرر لهذا النوع بعد");
             }
@@ -237,6 +239,89 @@ function open_sentence_builder_dialog(frm, cdt, cdn, row, data) {
             
             d.hide();
             frappe.show_alert({message: 'تم حفظ إعدادات الجملة ✅', indicator: 'green'});
+        }
+    });
+
+    d.show();
+}
+
+// =================================================
+// 📝 4. نافذة ملء الفراغ (Fill Blank)
+// =================================================
+function open_fill_blank_dialog(frm, cdt, cdn, row, data) {
+    // تجهيز الكلمات المضللة القديمة
+    let existing_distractors = (data.distractors || []).map(d => ({
+        item_1: d
+    }));
+
+    let d = new frappe.ui.Dialog({
+        title: 'إعدادات ملء الفراغ (Fill Blank)',
+        fields: [
+            {
+                label: 'التعليمات',
+                fieldname: 'instruction',
+                fieldtype: 'Data',
+                default: data.instruction || 'اسحب الكلمة المناسبة إلى الفراغ'
+            },
+            {
+                label: 'الجملة مع الفراغات',
+                fieldname: 'sentence',
+                fieldtype: 'Small Text',
+                reqd: 1,
+                default: data.sentence,
+                description: 'ضع الكلمة المراد إخفاؤها بين أقواس متعرجة. مثال: تقع مدينة {البتراء} في جنوب {الأردن}.'
+            },
+            {
+                fieldtype: 'Section Break',
+                label: 'الخيارات الإضافية'
+            },
+            {
+                label: 'كلمات مضللة (Distractors)',
+                fieldname: 'distractors_table',
+                fieldtype: 'Table',
+                options: 'Game Content Builder Item',
+                description: 'أضف كلمات خاطئة لتظهر مع الخيارات (لتصعيب الحل)',
+                fields: [
+                    {
+                        label: 'الكلمة المضللة',
+                        fieldname: 'item_1',
+                        fieldtype: 'Data',
+                        in_list_view: 1,
+                        reqd: 1
+                    }
+                ],
+                data: existing_distractors
+            }
+        ],
+        size: 'large',
+        primary_action_label: 'حفظ (Save)',
+        primary_action: function(values) {
+            // 1. استخراج الكلمات الصحيحة من الجملة باستخدام Regex
+            // يبحث عن أي شيء بين { }
+            let blanks = [];
+            let regex = /\{(.*?)\}/g;
+            let match;
+            while ((match = regex.exec(values.sentence)) !== null) {
+                blanks.push(match[1]);
+            }
+
+            if (blanks.length === 0) {
+                frappe.msgprint("يجب وضع كلمة واحدة على الأقل بين أقواس { }");
+                return;
+            }
+
+            // 2. تجهيز البيانات للـ JSON
+            let config_payload = {
+                instruction: values.instruction,
+                sentence: values.sentence, // الجملة الخام: "تقع {البتراء} في {الأردن}"
+                blanks: blanks,           // الكلمات المستخرجة: ["البتراء", "الأردن"]
+                distractors: values.distractors_table.map(row => row.item_1)
+            };
+
+            frappe.model.set_value(cdt, cdn, 'config', JSON.stringify(config_payload, null, 2));
+            
+            d.hide();
+            frappe.show_alert({message: 'تم حفظ إعدادات الفراغات ✅', indicator: 'green'});
         }
     });
 
