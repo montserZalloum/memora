@@ -1,18 +1,14 @@
 import frappe
+import json
 from frappe import _
+
 
 @frappe.whitelist()
 def get_map_data():
     try:
         user = frappe.session.user
+        subjects = frappe.get_all("Game Subject", fields=["name", "title", "icon"], filters={"is_published": 1})
         
-        # 1. Fetch hierarchy (with safety check on sorting field)
-        subjects = frappe.get_all("Game Subject", 
-            fields=["name", "title", "icon"], 
-            filters={"is_published": 1}
-        )
-        
-        # 2. Get player progress
         completed_lessons = frappe.get_all("Gameplay Session", 
             filters={"player": user}, 
             fields=["lesson"], 
@@ -20,9 +16,7 @@ def get_map_data():
         )
         
         full_map = []
-        
         for subject in subjects:
-            # Use backticks around `order` to avoid SQL syntax errors
             units = frappe.get_all("Game Unit", 
                 filters={"subject": subject.name}, 
                 fields=["name", "title", "`order`"], 
@@ -46,18 +40,16 @@ def get_map_data():
                         "id": lesson.name,
                         "title": lesson.title,
                         "unit_title": unit.title,
+                        "subject_title": subject.title, # <--- Add this line
                         "subject_icon": subject.icon,
                         "status": status,
                         "xp": lesson.xp_reward
                     })
-                    
         return full_map
-
     except Exception as e:
-        # This logs the error to the 'Error Log' Doctype in Frappe Desk
         frappe.log_error(title="get_map_data failed", message=frappe.get_traceback())
-        # Throws a clean error message to the React frontend
-        frappe.throw(_("Could not load journey map. Please try again later."))
+        frappe.throw("Could not load journey map.")
+
 
 @frappe.whitelist()
 def get_lesson_details(lesson_id):
@@ -90,27 +82,38 @@ def get_lesson_details(lesson_id):
         frappe.log_error(title=f"get_lesson_details failed: {lesson_id}", message=frappe.get_traceback())
         frappe.throw(_("Failed to load lesson content."))
 
+
+
 @frappe.whitelist()
 def submit_session(session_meta, gamification_results, interactions):
     try:
-        # Validate input
-        lesson_id = session_meta.get('lesson_id')
-        if not lesson_id:
-            frappe.throw(_("Invalid session data"))
+        # 1. Handle potential stringified JSON (sometimes Axios/Frappe interaction does this)
+        if isinstance(session_meta, str):
+            session_meta = json.loads(session_meta)
+        if isinstance(interactions, str):
+            interactions = json.loads(interactions)
 
-        # Create the Gameplay Session record
-        new_session = frappe.get_doc({
+        lesson_id = session_meta.get('lesson_id')
+        
+        if not lesson_id:
+            frappe.throw("Missing lesson_id in session_meta")
+
+        # 2. Create the document
+        # Ensure 'player', 'lesson', and 'raw_data' are the exact field names in your Doctype
+        doc = frappe.get_doc({
             "doctype": "Gameplay Session",
             "player": frappe.session.user,
             "lesson": lesson_id,
-            "raw_data": frappe.as_json(interactions) # Save full history as JSON
+            "raw_data": json.dumps(interactions, ensure_ascii=False)
         })
-        new_session.insert(ignore_permissions=True)
         
-        # Logic to update Player Profile XP/Gems can go here...
-        
-        return {"status": "success"}
+        doc.insert(ignore_permissions=True)
+        # Ensure the database saves the change
+        frappe.db.commit() 
+
+        return {"status": "success", "name": doc.name}
 
     except Exception as e:
         frappe.log_error(title="submit_session failed", message=frappe.get_traceback())
-        frappe.throw(_("Failed to save progress."))
+        # Provide the real error message for debugging (remove in production)
+        frappe.throw(f"Failed to save progress: {str(e)}")
