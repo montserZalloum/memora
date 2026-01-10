@@ -18,7 +18,7 @@ def get_map_data():
         completed_lessons = frappe.get_all("Gameplay Session", 
             filters={"player": user}, 
             fields=["lesson"], 
-            pluck="lesson"
+            pluck="lesson",
         )
         
         full_map = []
@@ -27,7 +27,7 @@ def get_map_data():
             units = frappe.get_all("Game Unit", 
                 filters={"subject": subject.name}, 
                 fields=["name", "title", "`order`"], 
-                order_by="`order` asc"
+                order_by="`order` asc, creation asc"
             )
             
             for unit in units:

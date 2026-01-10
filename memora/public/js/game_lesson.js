@@ -1,6 +1,43 @@
 frappe.ui.form.on('Game Lesson', {
     refresh: function(frm) {
         // 
+    },
+    // This function runs before the document is saved
+    validate: function(frm) {
+        let missing_content = false;
+        let incomplete_rows = [];
+
+        // 1. Check if the child table itself is empty
+        if (!frm.doc.stages || frm.doc.stages.length === 0) {
+            frappe.throw({
+                title: __("خطأ في التحقق"),
+                message: __("يجب إضافة مرحلة واحدة على الأقل قبل حفظ الدرس."),
+                indicator: 'red'
+            });
+        }
+
+        // 2. Loop through each row in the child table (assumed fieldname is 'stages')
+        frm.doc.stages.forEach(row => {
+            // Check if 'config' is empty or just an empty JSON object
+            if (!row.config || row.config.trim() === "" || row.config === "{}") {
+                missing_content = true;
+                incomplete_rows.push(row.idx); // Keep track of the row index
+            }
+        });
+
+        if (missing_content) {
+            // Stop the saving process
+            frappe.validated = false;
+            
+            frappe.msgprint({
+                title: __("محتوى ناقص"),
+                indicator: 'red',
+                message: __("لا يمكن الحفظ: المراحل رقم ({0}) تفتقر إلى المحتوى. يرجى الضغط على 'Edit Content' وإعدادها أولاً.", [incomplete_rows.join(', ')])
+            });
+            
+            // Throwing an exception also stops the save and shows a red message
+            frappe.throw(__("يرجى إكمال إعدادات جميع المراحل قبل الحفظ."));
+        }
     }
 });
 
