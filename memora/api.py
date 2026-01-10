@@ -1,6 +1,7 @@
 import frappe
 import json
 from frappe import _
+from frappe.utils import now_datetime, add_days, get_datetime
 
 @frappe.whitelist()
 def get_subjects():
@@ -134,33 +135,160 @@ def get_lesson_details(lesson_id):
 @frappe.whitelist()
 def submit_session(session_meta, gamification_results, interactions):
     try:
-        # 1. Handle potential stringified JSON (sometimes Axios/Frappe interaction does this)
+        user = frappe.session.user
+        
+        # 1. معالجة البيانات القادمة وتحويلها من نصوص JSON إلى كائنات Python
         if isinstance(session_meta, str):
             session_meta = json.loads(session_meta)
+        
         if isinstance(interactions, str):
             interactions = json.loads(interactions)
+            
+        if isinstance(gamification_results, str):
+            gamification_results = json.loads(gamification_results)
 
         lesson_id = session_meta.get('lesson_id')
         
         if not lesson_id:
             frappe.throw("Missing lesson_id in session_meta")
 
-        # 2. Create the document
-        # Ensure 'player', 'lesson', and 'raw_data' are the exact field names in your Doctype
+        # 2. إنشاء مستند الجلسة (Gameplay Session)
+        # تأكد أن أسماء الحقول (player, lesson, raw_data) مطابقة تماماً للـ Doctype لديك
         doc = frappe.get_doc({
             "doctype": "Gameplay Session",
-            "player": frappe.session.user,
+            "player": user,
             "lesson": lesson_id,
             "raw_data": json.dumps(interactions, ensure_ascii=False)
         })
         
         doc.insert(ignore_permissions=True)
-        # Ensure the database saves the change
+        
+        # 3. معالجة نظام التكرار المتباعد (SRS)
+        # نستخدم متغير interactions مباشرة لأنه تم تعريفه في بداية الدالة
+        if interactions and isinstance(interactions, list):
+            process_srs_batch(user, interactions)
+
+        # 4. حفظ التغييرات نهائياً
         frappe.db.commit() 
 
-        return {"status": "success", "name": doc.name}
+        return {
+            "status": "success", 
+            "name": doc.name,
+            "message": "تم حفظ الجلسة وتحديث بيانات التكرار بنجاح ✅"
+        }
 
     except Exception as e:
+        # تسجيل الخطأ في Frappe Error Log لمراجعته لاحقاً
         frappe.log_error(title="submit_session failed", message=frappe.get_traceback())
-        # Provide the real error message for debugging (remove in production)
-        frappe.throw(f"Failed to save progress: {str(e)}")
+        
+        # إلقاء الخطأ ليظهر للمستخدم في الواجهة الأمامية
+        frappe.throw(f"فشل في حفظ التقدم: {str(e)}")
+
+# =========================================================
+# 🧠 THE BRAIN: SRS Algorithms
+# =========================================================
+
+def process_srs_batch(user, interactions):
+    """
+    Orchestrator: Takes raw interactions, calculates ratings, 
+    and updates the database for each atom.
+    """
+    for item in interactions:
+        atom_id = item.get("question_id")
+        
+        # Skip if no ID provided
+        if not atom_id: 
+            continue
+            
+        duration = item.get("duration_ms", 0)
+        attempts = item.get("attempts_count", 1)
+
+        # 1. INFERENCE: Convert behavior to a Score (1-4)
+        rating = infer_rating(duration, attempts)
+
+        # 2. SCHEDULING: Calculate the next review date
+        # We fetch the previous state to see if we should extend the interval
+        # (For MVP, we use static intervals, but this setup allows for growth)
+        next_review_date = calculate_next_review(rating)
+
+        # 3. STORAGE: Save to Database
+        update_memory_tracker(user, atom_id, rating, next_review_date)
+
+
+def infer_rating(duration_ms, attempts):
+    """
+    Logic: Converts Time + Accuracy into a Memory Score.
+    
+    Ratings:
+    1 = AGAIN (Fail) - Wrong answer, needs immediate drill.
+    2 = HARD         - Correct but slow (> 5s).
+    3 = GOOD         - Correct and steady (2s - 5s).
+    4 = EASY         - Correct and instant (< 2s).
+    """
+    # If the user made a mistake (attempts > 1), it's a FAIL regardless of time.
+    if attempts > 1:
+        return 1
+    
+    # If correct on first try, judge by speed:
+    if duration_ms < 2000: # Less than 2 seconds
+        return 4 # EASY
+    
+    if duration_ms < 5000: # Less than 5 seconds
+        return 3 # GOOD
+    
+    # More than 5 seconds
+    return 2 # HARD
+
+
+def calculate_next_review(rating):
+    """
+    Logic: Determines how many days to wait before the next review.
+    
+    Current Protocol (Fixed Intervals):
+    1 (Fail) -> 0 Days (Review Tomorrow/ASAP)
+    2 (Hard) -> 2 Days
+    3 (Good) -> 4 Days
+    4 (Easy) -> 7 Days
+    """
+    interval_map = {
+        1: 0, # Fail: Reset
+        2: 2, # Hard
+        3: 4, # Good
+        4: 7  # Easy
+    }
+    
+    days_to_add = interval_map.get(rating, 1) # Default to 1 day if error
+    
+    # Return the actual DateTime object
+    return add_days(now_datetime(), days_to_add)
+
+
+def update_memory_tracker(user, atom_id, rating, next_date):
+    """
+    Database Operator: Inserts or Updates the record in Frappe.
+    """
+    # 1. التأكد من اسم الحقل الصحيح (question_id بدلاً من question_atom)
+    existing_tracker = frappe.db.get_value(
+        "Player Memory Tracker", 
+        {"player": user, "question_id": atom_id},  # <--- تم التعديل هنا
+        "name"
+    )
+
+    if existing_tracker:
+        # Update existing record
+        frappe.db.set_value("Player Memory Tracker", existing_tracker, {
+            "stability": rating,
+            "last_review_date": now_datetime(),
+            "next_review_date": next_date
+        })
+    else:
+        # Create new record
+        doc = frappe.get_doc({
+            "doctype": "Player Memory Tracker",
+            "player": user,
+            "question_id": atom_id,  # <--- تم التعديل هنا أيضاً
+            "stability": rating,
+            "last_review_date": now_datetime(),
+            "next_review_date": next_date
+        })
+        doc.insert(ignore_permissions=True)
