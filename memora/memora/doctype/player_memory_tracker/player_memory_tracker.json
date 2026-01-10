@@ -10,7 +10,8 @@
   "player",
   "question_id",
   "stability",
-  "next_review_date"
+  "next_review_date",
+  "last_review_date"
  ],
  "fields": [
   {
@@ -19,6 +20,7 @@
    "in_list_view": 1,
    "label": "Player",
    "options": "User",
+   "read_only": 1,
    "reqd": 1
   },
   {
@@ -26,24 +28,33 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Question ID",
+   "read_only": 1,
    "reqd": 1
   },
   {
    "default": "0.0",
    "fieldname": "stability",
    "fieldtype": "Float",
-   "label": "Stability"
+   "label": "Stability",
+   "read_only": 1
   },
   {
    "fieldname": "next_review_date",
    "fieldtype": "Datetime",
-   "label": "Next Review Date"
+   "label": "Next Review Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_review_date",
+   "fieldtype": "Datetime",
+   "label": "Last Review Date",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-08 14:27:47.158972",
+ "modified": "2026-01-10 15:35:17.698655",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Player Memory Tracker",
