@@ -131,58 +131,63 @@ def get_lesson_details(lesson_id):
         frappe.throw(_("Failed to load lesson content."))
 
 
-
 @frappe.whitelist()
 def submit_session(session_meta, gamification_results, interactions):
     try:
         user = frappe.session.user
         
-        # 1. معالجة البيانات القادمة وتحويلها من نصوص JSON إلى كائنات Python
-        if isinstance(session_meta, str):
-            session_meta = json.loads(session_meta)
-        
-        if isinstance(interactions, str):
-            interactions = json.loads(interactions)
-            
-        if isinstance(gamification_results, str):
-            gamification_results = json.loads(gamification_results)
+        # 1. تحويل JSON إلى Python
+        if isinstance(session_meta, str): session_meta = json.loads(session_meta)
+        if isinstance(interactions, str): interactions = json.loads(interactions)
+        if isinstance(gamification_results, str): gamification_results = json.loads(gamification_results)
 
         lesson_id = session_meta.get('lesson_id')
-        
-        if not lesson_id:
-            frappe.throw("Missing lesson_id in session_meta")
+        if not lesson_id: frappe.throw("Missing lesson_id")
 
-        # 2. إنشاء مستند الجلسة (Gameplay Session)
-        # تأكد أن أسماء الحقول (player, lesson, raw_data) مطابقة تماماً للـ Doctype لديك
+        # استخراج الجوائز
+        xp_earned = gamification_results.get('xp_earned', 0)
+        gems_collected = gamification_results.get('gems_collected', 0)
+
+        # 2. أرشفة الجلسة (Log)
         doc = frappe.get_doc({
             "doctype": "Gameplay Session",
             "player": user,
             "lesson": lesson_id,
+            "xp_earned": xp_earned, # حفظنا الـ XP في السجل
             "raw_data": json.dumps(interactions, ensure_ascii=False)
         })
-        
         doc.insert(ignore_permissions=True)
         
-        # 3. معالجة نظام التكرار المتباعد (SRS)
-        # نستخدم متغير interactions مباشرة لأنه تم تعريفه في بداية الدالة
+        # =========================================================
+        # 🆕 3. تحديث المحفظة (Player Profile) - هذا هو الجديد
+        # =========================================================
+        # نقوم بتحديث رصيد اللاعب مباشرة باستخدام SQL لضمان الدقة والسرعة
+        if xp_earned > 0 or gems_collected > 0:
+            frappe.db.sql("""
+                UPDATE `tabPlayer Profile`
+                SET 
+                    total_xp = total_xp + %s,
+                    gems_balance = gems_balance + %s
+                WHERE user = %s
+            """, (xp_earned, gems_collected, user))
+
+        # =========================================================
+
+        # 4. تحديث الذاكرة (SRS)
         if interactions and isinstance(interactions, list):
             process_srs_batch(user, interactions)
 
-        # 4. حفظ التغييرات نهائياً
+        # 5. تثبيت الحفظ
         frappe.db.commit() 
 
         return {
             "status": "success", 
-            "name": doc.name,
-            "message": "تم حفظ الجلسة وتحديث بيانات التكرار بنجاح ✅"
+            "message": "تم حفظ الجلسة وتحديث النقاط والذاكرة ✅"
         }
 
     except Exception as e:
-        # تسجيل الخطأ في Frappe Error Log لمراجعته لاحقاً
         frappe.log_error(title="submit_session failed", message=frappe.get_traceback())
-        
-        # إلقاء الخطأ ليظهر للمستخدم في الواجهة الأمامية
-        frappe.throw(f"فشل في حفظ التقدم: {str(e)}")
+        frappe.throw(f"Error: {str(e)}")
 
 # =========================================================
 # 🧠 THE BRAIN: SRS Algorithms
@@ -292,3 +297,49 @@ def update_memory_tracker(user, atom_id, rating, next_date):
             "next_review_date": next_date
         })
         doc.insert(ignore_permissions=True)
+
+
+@frappe.whitelist()
+def get_player_profile():
+    try:
+        user = frappe.session.user
+        
+        # تجاهل الزوار (Guest) - لا ننشئ لهم بروفايلات
+        if user == "Guest":
+            return {"xp": 0, "gems": 0, "hearts": 5}
+
+        # 1. البحث عن بروفايل اللاعب
+        profile = frappe.db.get_value("Player Profile", {"user": user}, 
+            ["name", "total_xp", "gems_balance"], 
+            as_dict=True
+        )
+        
+        if not profile:
+            # 🐣 إنشاء بروفايل جديد
+            new_doc = frappe.get_doc({
+                "doctype": "Player Profile",
+                "user": user,
+                "total_xp": 0,
+                "gems_balance": 50
+            })
+            new_doc.insert(ignore_permissions=True)
+            
+            # 🚨 هذا هو السطر المفقود!
+            # بما أننا نستخدم GET request، يجب أن نجبر الداتابيز على الحفظ
+            frappe.db.commit()
+            
+            return {
+                "xp": 0,
+                "gems": 50,
+                "hearts": 5
+            }
+        
+        return {
+            "xp": profile.total_xp,
+            "gems": profile.gems_balance,
+            "hearts": 5
+        }
+
+    except Exception as e:
+        frappe.log_error(title="get_player_profile failed", message=frappe.get_traceback())
+        return {"xp": 0, "gems": 0, "hearts": 5}
