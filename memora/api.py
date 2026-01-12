@@ -612,8 +612,16 @@ def get_review_session():
             target_atom_index = None
             
             if ":" in raw_id:
-                base_id, atom_index_str = raw_id.split(":")
-                target_atom_index = int(atom_index_str)
+                parts = raw_id.rsplit(":", 1)
+                
+                # نتأكد أن الجزء الأخير هو رقم فعلاً
+                if len(parts) == 2 and parts[1].isdigit():
+                    base_id = parts[0]
+                    target_atom_index = int(parts[1])
+                else:
+                    # في هذه الحالة، النقطة هي جزء من الاسم وليست الفاصل
+                    base_id = raw_id
+                    target_atom_index = None
             else:
                 base_id = raw_id
                 
@@ -749,6 +757,8 @@ def submit_review_session(session_data):
     تم تحديثه ليدعم تحليل الوقت المستغرق (Duration).
     """
     try:
+        ensure_review_system_exists() 
+        
         user = frappe.session.user
         if isinstance(session_data, str):
             session_data = json.loads(session_data)
@@ -898,3 +908,44 @@ def create_memory_tracker(user, atom_id, rating):
     
     doc.insert(ignore_permissions=True)
     return doc.name
+
+
+def ensure_review_system_exists():
+    """
+    تتأكد من وجود مادة ووحدة ودرس خاص بالنظام (System)
+    لربط جلسات المراجعة بها ومنع أخطاء الروابط.
+    """
+    try:
+        # 1. إنشاء مادة للنظام (إذا لم توجد)
+        if not frappe.db.exists("Game Subject", "System"):
+            frappe.get_doc({
+                "doctype": "Game Subject",
+                "title": "System",
+                "name": "System", # ID يدوي
+                "is_published": 0 # مخفية عن الطلاب
+            }).insert(ignore_permissions=True)
+
+        # 2. إنشاء وحدة للمراجعات
+        if not frappe.db.exists("Game Unit", "System-Reviews"):
+            frappe.get_doc({
+                "doctype": "Game Unit",
+                "title": "System Reviews",
+                "name": "System-Reviews",
+                "subject": "System",
+                "order": 99999999999999999
+            }).insert(ignore_permissions=True)
+
+        # 3. إنشاء درس المراجعة (الذي نبحث عنه)
+        if not frappe.db.exists("Game Lesson", "REVIEW-SESSION"):
+            frappe.get_doc({
+                "doctype": "Game Lesson",
+                "title": "مراجعة الذاكرة",
+                "name": "REVIEW-SESSION", # 👈 هذا هو الـ ID المهم
+                "unit": "System-Reviews",
+                "xp_reward": 0
+            }).insert(ignore_permissions=True)
+            
+    except Exception as e:
+        # في حال كان هناك Naming Series يمنع الأسماء اليدوية،
+        # قد نحتاج لحل آخر، لكن هذا سيعمل في 99% من الحالات
+        frappe.log_error("Setup Review System Failed", str(e))
