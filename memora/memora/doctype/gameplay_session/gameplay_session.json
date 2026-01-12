@@ -9,7 +9,9 @@
  "field_order": [
   "player",
   "lesson",
-  "raw_data"
+  "raw_data",
+  "xp_earned",
+  "score"
  ],
  "fields": [
   {
@@ -33,12 +35,22 @@
    "fieldtype": "Code",
    "label": "Raw Data",
    "options": "JSON"
+  },
+  {
+   "fieldname": "xp_earned",
+   "fieldtype": "Int",
+   "label": "XP Earned"
+  },
+  {
+   "fieldname": "score",
+   "fieldtype": "Int",
+   "label": "Score"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-08 14:27:29.449039",
+ "modified": "2026-01-12 09:26:31.815956",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Gameplay Session",

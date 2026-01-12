@@ -54,10 +54,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-10 15:35:17.698655",
+ "modified": "2026-01-12 09:25:35.540542",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Player Memory Tracker",
+ "naming_rule": "Random",
  "owner": "Administrator",
  "permissions": [
   {

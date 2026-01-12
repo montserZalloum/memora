@@ -146,6 +146,7 @@ def submit_session(session_meta, gamification_results, interactions):
 
         # استخراج الجوائز
         xp_earned = gamification_results.get('xp_earned', 0)
+        score = gamification_results.get('score', 0)
         gems_collected = gamification_results.get('gems_collected', 0)
 
         # 2. أرشفة الجلسة (Log)
@@ -154,6 +155,7 @@ def submit_session(session_meta, gamification_results, interactions):
             "player": user,
             "lesson": lesson_id,
             "xp_earned": xp_earned, # حفظنا الـ XP في السجل
+            "score": score,
             "raw_data": json.dumps(interactions, ensure_ascii=False)
         })
         doc.insert(ignore_permissions=True)
@@ -343,3 +345,134 @@ def get_player_profile():
     except Exception as e:
         frappe.log_error(title="get_player_profile failed", message=frappe.get_traceback())
         return {"xp": 0, "gems": 0, "hearts": 5}
+
+
+from frappe.utils import add_days, getdate, nowdate, cint
+
+@frappe.whitelist()
+def get_full_profile_stats():
+    """
+    API شامل لجلب كل إحصائيات البروفايل دفعة واحدة.
+    يستخدم لتحليل أداء الطالب وعرضه في صفحة البروفايل.
+    """
+    try:
+        user = frappe.session.user
+        
+        # 1. جلب البيانات الأساسية (Basic Info)
+        # ---------------------------------------------------
+        user_doc = frappe.get_doc("User", user)
+        profile = frappe.db.get_value("Player Profile", {"user": user}, 
+            ["total_xp", "gems_balance"], as_dict=True) or {"total_xp": 0, "gems_balance": 0}
+        
+        # حساب المستوى (كل 1000 نقطة = مستوى)
+        current_xp = profile.get("total_xp", 0)
+        level = int(current_xp / 1000) + 1 # نبدأ من المستوى 1
+        xp_in_level = current_xp % 1000
+        next_level_progress = (xp_in_level / 1000) * 100
+
+        # تحديد اللقب بناءً على المستوى (Gamification)
+        titles = ["مستكشف مبتدئ", "مغامر تاريخي", "حارس الذاكرة", "أستاذ الزمان", "أسطورة الأردن"]
+        title_index = min(level - 1, len(titles) - 1)
+        level_title = titles[title_index]
+
+
+        # 2. حساب الـ Streak (الأيام المتتالية) 🔥
+        # ---------------------------------------------------
+        # نجلب كل الأيام التي لعب فيها الطالب (بدون تكرار)، مرتبة من الأحدث للأقدم
+        activity_dates = frappe.db.sql("""
+            SELECT DISTINCT DATE(creation) as activity_date
+            FROM `tabGameplay Session`
+            WHERE player = %s
+            ORDER BY activity_date DESC
+            LIMIT 30
+        """, (user,), as_list=True)
+
+        streak = 0
+        if activity_dates:
+            today = getdate(nowdate())
+            yesterday = add_days(today, -1)
+            
+            # تحويل النتائج إلى تواريخ Python للمقارنة
+            dates = [getdate(d[0]) for d in activity_dates]
+            
+            # هل لعب اليوم أو الأمس؟ (إذا لم يلعب الأمس أو اليوم، فالستريك انقطع)
+            if dates[0] == today or dates[0] == yesterday:
+                streak = 1
+                # نبدأ العد العكسي من ثاني تاريخ
+                for i in range(1, len(dates)):
+                    expected_date = add_days(dates[i-1], -1) # التاريخ المتوقع (أمس بالنسبة للي قبله)
+                    if dates[i] == expected_date:
+                        streak += 1
+                    else:
+                        break # انقطع التسلسل
+            else:
+                streak = 0
+
+
+        # 3. النشاط الأسبوعي (للرسم البياني) 📊
+        # ---------------------------------------------------
+        # نجلب مجموع XP لكل يوم في آخر 7 أيام
+        weekly_data_raw = frappe.db.sql("""
+            SELECT DATE(creation) as day, SUM(xp_earned) as daily_xp
+            FROM `tabGameplay Session`
+            WHERE player = %s AND creation >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            GROUP BY DATE(creation)
+        """, (user,), as_dict=True)
+
+        # تحويل البيانات إلى قاموس للسرعة (Date -> XP)
+        xp_map = {getdate(d.day): d.daily_xp for d in weekly_data_raw}
+        
+        weekly_activity = []
+        # ننشئ مصفوفة لآخر 7 أيام حتى لو كانت القيم صفراً
+        for i in range(6, -1, -1):
+            date_cursor = add_days(getdate(nowdate()), -i)
+            weekly_activity.append({
+                "day": date_cursor.strftime("%a"), # اسم اليوم (Mon, Tue...)
+                "full_date": date_cursor.strftime("%Y-%m-%d"),
+                "xp": xp_map.get(date_cursor, 0),
+                "isToday": date_cursor == getdate(nowdate())
+            })
+
+
+        # 4. حالة الذاكرة (Mastery Ring) 🧠
+        # ---------------------------------------------------
+        # نعد العناصر حسب قوتها (Stability)
+        # Stability: 1=Fail, 2=Hard, 3=Good, 4=Easy
+        mastery_raw = frappe.db.sql("""
+            SELECT stability, COUNT(*) as count
+            FROM `tabPlayer Memory Tracker`
+            WHERE player = %s
+            GROUP BY stability
+        """, (user,), as_dict=True)
+        
+        mastery_map = {row.stability: row.count for row in mastery_raw}
+        
+        # تصنيف النتائج للألوان
+        # New/Weak: < 2 | Learning: 2 | Mature: > 2
+        total_learned = sum(mastery_map.values())
+        stats_mastery = {
+            "new": mastery_map.get(1, 0),       # أحمر/رمادي
+            "learning": mastery_map.get(2, 0),  # برتقالي
+            "mature": mastery_map.get(3, 0) + mastery_map.get(4, 0) # أخضر
+        }
+
+
+        # 5. تجميع الـ JSON النهائي
+        # ---------------------------------------------------
+        return {
+            "fullName": user_doc.full_name or user_doc.username,
+            "avatarUrl": user_doc.user_image, # صورة المستخدم من Frappe
+            "level": level,
+            "levelTitle": level_title,
+            "nextLevelProgress": int(next_level_progress),
+            "streak": streak,
+            "gems": profile.get("gems_balance", 0),
+            "totalXP": current_xp,
+            "totalLearned": total_learned,
+            "weeklyActivity": weekly_activity,
+            "mastery": stats_mastery
+        }
+
+    except Exception as e:
+        frappe.log_error("Get Profile Stats Error", frappe.get_traceback())
+        return {} # Return empty object on error
