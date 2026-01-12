@@ -3,6 +3,7 @@ import json
 from frappe import _
 import math
 from frappe.utils import now_datetime, add_days, get_datetime, getdate, nowdate, cint
+import random
 
 @frappe.whitelist()
 def get_subjects():
@@ -568,3 +569,332 @@ def get_daily_quests():
     except Exception as e:
         frappe.log_error("Get Daily Quests Failed", frappe.get_traceback())
         return []
+
+
+
+import frappe
+import json
+import random
+
+@frappe.whitelist()
+def get_review_session():
+    """
+    يولد جلسة مراجعة ذكية (Lightning Round).
+    الميزات:
+    1. يحول الـ Reveal/Matching إلى أسئلة خيارات متعددة (Quiz).
+    2. يستخدم Atomic IDs (مثل :0, :1) لتتبع كل معلومة بدقة.
+    3. يولد خيارات خاطئة (Distractors) من نفس الدرس.
+    """
+    try:
+        user = frappe.session.user
+        
+        # 1. جلب العناصر المستحقة للمراجعة
+        # نطلب 15 بدلاً من 10 لأن بعض العناصر القديمة قد تتفكك لأكثر من سؤال
+        due_items = frappe.db.sql("""
+            SELECT question_id, stability 
+            FROM `tabPlayer Memory Tracker`
+            WHERE player = %s AND next_review_date <= NOW()
+            ORDER BY next_review_date ASC
+            LIMIT 15
+        """, (user,), as_dict=True)
+        
+        if not due_items:
+            return []
+
+        quiz_cards = []
+        lesson_map = {} # Cache لتقليل استعلامات الداتابيز
+        
+        for item in due_items:
+            # 2. تحليل الـ ID
+            # قد يكون ID قديم: "LESSON-1-STAGE-3"
+            # أو ID ذري جديد: "LESSON-1-STAGE-3:1"
+            raw_id = item.question_id
+            target_atom_index = None
+            
+            if ":" in raw_id:
+                base_id, atom_index_str = raw_id.split(":")
+                target_atom_index = int(atom_index_str)
+            else:
+                base_id = raw_id
+                
+            # تفكيك الـ Base ID لمعرفة الدرس والمرحلة
+            # المتوقع: {LESSON_ID}-STAGE-{INDEX}
+            if "-STAGE-" not in base_id: continue
+            
+            parts = base_id.split('-STAGE-')
+            lesson_id = parts[0]
+            try:
+                stage_index = int(parts[1])
+            except: continue
+            
+            # 3. جلب محتوى الدرس (مع الكاش)
+            if lesson_id not in lesson_map:
+                if frappe.db.exists("Game Lesson", lesson_id):
+                    lesson_map[lesson_id] = frappe.get_doc("Game Lesson", lesson_id)
+                else:
+                    continue
+            
+            lesson_doc = lesson_map[lesson_id]
+            
+            if stage_index >= len(lesson_doc.stages): continue
+            
+            stage = lesson_doc.stages[stage_index]
+            config = frappe.parse_json(stage.config)
+            
+            # =========================================================
+            # 🅰️ التحويل: REVEAL -> QUIZ
+            # =========================================================
+            if stage.type == 'Reveal':
+                highlights = config.get('highlights', [])
+                
+                # تجهيز "بنك المموهات" من نفس الدرس
+                lesson_distractor_pool = []
+                for s in lesson_doc.stages:
+                    if s.type == 'Reveal':
+                        s_conf = frappe.parse_json(s.config)
+                        for h in s_conf.get('highlights', []):
+                            lesson_distractor_pool.append(h['word'])
+                
+                # الدوران على كل كلمة في المرحلة
+                for idx, highlight in enumerate(highlights):
+                    # 🔴 الفلتر الذري:
+                    # إذا كان الـ Tracker يطلب الكلمة رقم 1 تحديداً، نتجاهل الباقي
+                    if target_atom_index is not None and target_atom_index != idx:
+                        continue
+                        
+                    correct_word = highlight['word']
+                    
+                    # إنشاء السؤال (استبدال الكلمة بفراغ)
+                    question_text = config.get('sentence', '').replace(correct_word, "____")
+                    
+                    # اختيار 3 خيارات خاطئة
+                    distractors = [w for w in lesson_distractor_pool if w != correct_word]
+                    # إزالة التكرار
+                    distractors = list(set(distractors))
+                    random.shuffle(distractors)
+                    selected_distractors = distractors[:3]
+                    
+                    # تعبئة النقص إذا لم نجد كلمات كافية
+                    while len(selected_distractors) < 3:
+                        selected_distractors.append("...") 
+
+                    options = selected_distractors + [correct_word]
+                    random.shuffle(options)
+                    
+                    # تحديد الـ ID الجديد (دائماً نستخدم الـ Suffix الآن)
+                    atom_id = f"{base_id}:{idx}"
+
+                    quiz_cards.append({
+                        "id": atom_id,
+                        "type": "quiz",
+                        "question": question_text,
+                        "correct_answer": correct_word,
+                        "options": options,
+                        "origin_type": "reveal"
+                    })
+
+            # =========================================================
+            # 🅱️ التحويل: MATCHING -> QUIZ
+            # =========================================================
+            elif stage.type == 'Matching':
+                pairs = config.get('pairs', [])
+                
+                for idx, pair in enumerate(pairs):
+                    # 🔴 الفلتر الذري
+                    if target_atom_index is not None and target_atom_index != idx:
+                        continue
+
+                    question_text = pair.get('right') # السؤال
+                    correct_answer = pair.get('left') # الجواب
+                    
+                    # المموهات: الإجابات الأخرى في نفس السؤال
+                    distractors = [p.get('left') for p in pairs if p.get('left') != correct_answer]
+                    
+                    random.shuffle(distractors)
+                    selected_distractors = distractors[:3]
+                    
+                    while len(selected_distractors) < 3:
+                         selected_distractors.append("...")
+
+                    options = selected_distractors + [correct_answer]
+                    random.shuffle(options)
+                    
+                    atom_id = f"{base_id}:{idx}"
+                    
+                    quiz_cards.append({
+                        "id": atom_id,
+                        "type": "quiz",
+                        "question": f"ما هو المرادف لـ: {question_text}؟",
+                        "correct_answer": correct_answer,
+                        "options": options,
+                        "origin_type": "matching"
+                    })
+
+    
+        # خلط الأسئلة النهائية
+        random.shuffle(quiz_cards)
+        
+        # إرجاع 10 فقط للجلسة السريعة
+        return quiz_cards[:10]
+
+    except Exception as e:
+        frappe.log_error("Get Review Session Failed", frappe.get_traceback())
+        return []
+
+
+@frappe.whitelist()
+def submit_review_session(session_data):
+    """
+    API خاص لاستلام نتائج المراجعة السريعة.
+    تم تحديثه ليدعم تحليل الوقت المستغرق (Duration).
+    """
+    try:
+        user = frappe.session.user
+        if isinstance(session_data, str):
+            session_data = json.loads(session_data)
+
+        # 1. استخراج البيانات
+        results = session_data.get('results', {})
+        # لاحظ: في الفرونت أسميناها interactions، تأكد أن الاسم متطابق
+        interactions = session_data.get('interactions', []) 
+        
+        # 2. حساب الجوائز (Gamification)
+        correct_count = results.get('correct_count', 0)
+        max_combo = results.get('max_combo', 0)
+        
+        base_xp = correct_count * 10
+        combo_bonus = max_combo * 2
+        total_xp = base_xp + combo_bonus
+        
+        # 3. تحديث الذاكرة (SRS with Time Logic) 🧠
+        for item in interactions:
+            question_id = item.get('question_id')
+            is_correct = item.get('is_correct')
+            # 👇 الجديد: قراءة الوقت (الافتراضي 3000ms إذا لم يرسل)
+            duration = item.get('duration_ms', 3000) 
+            
+            update_srs_after_review(user, question_id, is_correct, duration)
+
+        # 4. تسجيل الجلسة
+        doc = frappe.get_doc({
+            "doctype": "Gameplay Session",
+            "player": user,
+            "lesson": "REVIEW-SESSION",
+            "xp_earned": total_xp,
+            "score": total_xp,
+            "raw_data": json.dumps(session_data, ensure_ascii=False)
+        })
+        doc.insert(ignore_permissions=True)
+
+        # 5. تحديث الرصيد
+        if total_xp > 0:
+            frappe.db.sql("""
+                UPDATE `tabPlayer Profile`
+                SET total_xp = total_xp + %s
+                WHERE user = %s
+            """, (total_xp, user))
+
+        frappe.db.commit()
+
+        return {
+            "status": "success",
+            "xp_earned": total_xp,
+            "new_stability_counts": get_mastery_counts(user)
+        }
+
+    except Exception as e:
+        frappe.log_error("Submit Review Failed", frappe.get_traceback())
+        return {"status": "error", "message": str(e)}
+
+
+def update_srs_after_review(user, question_id, is_correct, duration_ms):
+    """
+    تحديث حالة الذاكرة بناءً على الدقة والسرعة.
+    """
+    # البحث عن السجل (الآن يدعم Atomic IDs مثل ...:1 تلقائياً لأنه مجرد نص)
+    tracker_name = frappe.db.get_value("Player Memory Tracker", 
+        {"player": user, "question_id": question_id}, "name")
+    
+    if not tracker_name: 
+        # حالة نادرة: إذا كان الـ ID جديداً (لم ينشأ من قبل)، ننشئه الآن
+        # هذا يحمي النظام في حال تغيرت طريقة توليد الـ IDs
+        create_memory_tracker(user, question_id, 1) # نبدأ بـ 1
+        return
+
+    current_data = frappe.db.get_value("Player Memory Tracker", tracker_name, 
+        ["stability"], as_dict=True)
+    
+    current_stability = cint(current_data.stability)
+    new_stability = current_stability
+    
+    if is_correct:
+        # ✅ الإجابة صحيحة: نحلل السرعة
+        
+        if duration_ms < 2000: 
+            # 🚀 سريع جداً (Easy) -> قفزة مزدوجة (بونص)
+            new_stability = min(current_stability + 2, 4)
+            
+        elif duration_ms > 6000:
+            # 🐢 بطيء (Hard) -> يبقى في مكانه (تثبيت)
+            # لا نزيد الـ stability لكن نحدث تاريخ المراجعة ليصبح أبعد قليلاً من "الآن"
+            new_stability = current_stability # لا تغيير في المستوى
+            
+        else:
+            # 👌 متوسط (Good) -> خطوة واحدة للأمام
+            new_stability = min(current_stability + 1, 4)
+            
+    else:
+        # ❌ خطأ (Fail) -> تصفير الذاكرة
+        new_stability = 1 
+    
+    # حساب الموعد القادم
+    # 1: غداً، 2: 3 أيام، 3: أسبوع، 4: أسبوعين
+    interval_map = {1: 1, 2: 3, 3: 7, 4: 14}
+    days_to_add = interval_map.get(new_stability, 1)
+    
+    new_date = add_days(nowdate(), days_to_add)
+    
+    # تنفيذ التحديث
+    frappe.db.set_value("Player Memory Tracker", tracker_name, {
+        "stability": new_stability,
+        "last_review_date": now_datetime(),
+        "next_review_date": new_date
+    })
+
+def get_mastery_counts(user):
+    data = frappe.db.sql("""
+        SELECT stability, COUNT(*) as count 
+        FROM `tabPlayer Memory Tracker` 
+        WHERE player = %s GROUP BY stability
+    """, (user,), as_dict=True)
+    
+    mastery_map = {row.stability: row.count for row in data}
+    
+    return {
+        "new": mastery_map.get(1, 0),
+        "learning": mastery_map.get(2, 0),
+        "mature": mastery_map.get(3, 0) + mastery_map.get(4, 0)
+    }
+
+
+def create_memory_tracker(user, atom_id, rating):
+    """
+    إنشاء سجل ذاكرة جديد لسؤال معين.
+    يتم استدعاؤها عندما يرى الطالب السؤال لأول مرة، أو عند اكتشاف ID جديد.
+    """
+    # تحديد موعد المراجعة القادم بناءً على التقييم الأولي
+    # 1: غداً، 2: 3 أيام، 3: أسبوع، 4: أسبوعين
+    interval_map = {1: 1, 2: 3, 3: 7, 4: 14}
+    days = interval_map.get(rating, 1) # الافتراضي يوم واحد
+    
+    doc = frappe.get_doc({
+        "doctype": "Player Memory Tracker",
+        "player": user,
+        "question_id": atom_id, # تأكد أن هذا يطابق اسم الحقل في الـ DocType
+        "stability": rating,
+        "last_review_date": now_datetime(),
+        "next_review_date": add_days(now_datetime(), days)
+    })
+    
+    doc.insert(ignore_permissions=True)
+    return doc.name
