@@ -1,7 +1,8 @@
 import frappe
 import json
 from frappe import _
-from frappe.utils import now_datetime, add_days, get_datetime
+import math
+from frappe.utils import now_datetime, add_days, get_datetime, getdate, nowdate, cint
 
 @frappe.whitelist()
 def get_subjects():
@@ -347,38 +348,45 @@ def get_player_profile():
         return {"xp": 0, "gems": 0, "hearts": 5}
 
 
-from frappe.utils import add_days, getdate, nowdate, cint
-
 @frappe.whitelist()
 def get_full_profile_stats():
     """
     API شامل لجلب كل إحصائيات البروفايل دفعة واحدة.
-    يستخدم لتحليل أداء الطالب وعرضه في صفحة البروفايل.
     """
     try:
         user = frappe.session.user
         
-        # 1. جلب البيانات الأساسية (Basic Info)
-        # ---------------------------------------------------
+        # 1. جلب البيانات الأساسية
         user_doc = frappe.get_doc("User", user)
         profile = frappe.db.get_value("Player Profile", {"user": user}, 
             ["total_xp", "gems_balance"], as_dict=True) or {"total_xp": 0, "gems_balance": 0}
         
-        # حساب المستوى (كل 1000 نقطة = مستوى)
+        # --- منطق المستوى (RPG Curve) ---
         current_xp = profile.get("total_xp", 0)
-        level = int(current_xp / 1000) + 1 # نبدأ من المستوى 1
-        xp_in_level = current_xp % 1000
-        next_level_progress = (xp_in_level / 1000) * 100
+        
+        if current_xp == 0:
+            level = 1
+        else:
+            level = int(0.07 * math.sqrt(current_xp)) + 1
 
-        # تحديد اللقب بناءً على المستوى (Gamification)
+        # حدود المستوى (للعرض في الواجهة: 150/500 XP)
+        xp_start_of_level = int(((level - 1) / 0.07) ** 2)
+        xp_next_level_goal = int((level / 0.07) ** 2)
+        
+        xp_needed = xp_next_level_goal - xp_start_of_level
+        xp_progress_in_level = current_xp - xp_start_of_level
+        
+        next_level_percentage = 0
+        if xp_needed > 0:
+            next_level_percentage = (xp_progress_in_level / xp_needed) * 100
+
+        # الألقاب
         titles = ["مستكشف مبتدئ", "مغامر تاريخي", "حارس الذاكرة", "أستاذ الزمان", "أسطورة الأردن"]
         title_index = min(level - 1, len(titles) - 1)
         level_title = titles[title_index]
 
 
-        # 2. حساب الـ Streak (الأيام المتتالية) 🔥
-        # ---------------------------------------------------
-        # نجلب كل الأيام التي لعب فيها الطالب (بدون تكرار)، مرتبة من الأحدث للأقدم
+        # 2. حساب الـ Streak 🔥
         activity_dates = frappe.db.sql("""
             SELECT DISTINCT DATE(creation) as activity_date
             FROM `tabGameplay Session`
@@ -391,27 +399,19 @@ def get_full_profile_stats():
         if activity_dates:
             today = getdate(nowdate())
             yesterday = add_days(today, -1)
-            
-            # تحويل النتائج إلى تواريخ Python للمقارنة
             dates = [getdate(d[0]) for d in activity_dates]
             
-            # هل لعب اليوم أو الأمس؟ (إذا لم يلعب الأمس أو اليوم، فالستريك انقطع)
             if dates[0] == today or dates[0] == yesterday:
                 streak = 1
-                # نبدأ العد العكسي من ثاني تاريخ
                 for i in range(1, len(dates)):
-                    expected_date = add_days(dates[i-1], -1) # التاريخ المتوقع (أمس بالنسبة للي قبله)
+                    expected_date = add_days(dates[i-1], -1)
                     if dates[i] == expected_date:
                         streak += 1
                     else:
-                        break # انقطع التسلسل
-            else:
-                streak = 0
+                        break
 
 
-        # 3. النشاط الأسبوعي (للرسم البياني) 📊
-        # ---------------------------------------------------
-        # نجلب مجموع XP لكل يوم في آخر 7 أيام
+        # 3. النشاط الأسبوعي (مع تعريب الأيام) 📊
         weekly_data_raw = frappe.db.sql("""
             SELECT DATE(creation) as day, SUM(xp_earned) as daily_xp
             FROM `tabGameplay Session`
@@ -419,25 +419,28 @@ def get_full_profile_stats():
             GROUP BY DATE(creation)
         """, (user,), as_dict=True)
 
-        # تحويل البيانات إلى قاموس للسرعة (Date -> XP)
         xp_map = {getdate(d.day): d.daily_xp for d in weekly_data_raw}
         
+        # قاموس لتعريب الأيام
+        days_ar = {
+            'Sat': 'سبت', 'Sun': 'أحد', 'Mon': 'إثنين', 
+            'Tue': 'ثلاثاء', 'Wed': 'أربعاء', 'Thu': 'خميس', 'Fri': 'جمعة'
+        }
+        
         weekly_activity = []
-        # ننشئ مصفوفة لآخر 7 أيام حتى لو كانت القيم صفراً
         for i in range(6, -1, -1):
             date_cursor = add_days(getdate(nowdate()), -i)
+            day_en = date_cursor.strftime("%a")
+            
             weekly_activity.append({
-                "day": date_cursor.strftime("%a"), # اسم اليوم (Mon, Tue...)
+                "day": days_ar.get(day_en, day_en), # الاسم العربي
                 "full_date": date_cursor.strftime("%Y-%m-%d"),
                 "xp": xp_map.get(date_cursor, 0),
                 "isToday": date_cursor == getdate(nowdate())
             })
 
 
-        # 4. حالة الذاكرة (Mastery Ring) 🧠
-        # ---------------------------------------------------
-        # نعد العناصر حسب قوتها (Stability)
-        # Stability: 1=Fail, 2=Hard, 3=Good, 4=Easy
+        # 4. حالة الذاكرة 🧠
         mastery_raw = frappe.db.sql("""
             SELECT stability, COUNT(*) as count
             FROM `tabPlayer Memory Tracker`
@@ -446,28 +449,26 @@ def get_full_profile_stats():
         """, (user,), as_dict=True)
         
         mastery_map = {row.stability: row.count for row in mastery_raw}
-        
-        # تصنيف النتائج للألوان
-        # New/Weak: < 2 | Learning: 2 | Mature: > 2
         total_learned = sum(mastery_map.values())
+        
         stats_mastery = {
-            "new": mastery_map.get(1, 0),       # أحمر/رمادي
-            "learning": mastery_map.get(2, 0),  # برتقالي
-            "mature": mastery_map.get(3, 0) + mastery_map.get(4, 0) # أخضر
+            "new": mastery_map.get(1, 0),
+            "learning": mastery_map.get(2, 0),
+            "mature": mastery_map.get(3, 0) + mastery_map.get(4, 0)
         }
 
-
-        # 5. تجميع الـ JSON النهائي
-        # ---------------------------------------------------
         return {
             "fullName": user_doc.full_name or user_doc.username,
-            "avatarUrl": user_doc.user_image, # صورة المستخدم من Frappe
+            "avatarUrl": user_doc.user_image,
             "level": level,
             "levelTitle": level_title,
-            "nextLevelProgress": int(next_level_progress),
+            "nextLevelProgress": int(next_level_percentage),
+            # أضفنا هذه القيم لكي تتمكن الواجهة من كتابة (150 / 500 XP)
+            "xpInLevel": int(xp_progress_in_level), 
+            "xpToNextLevel": int(xp_needed),
             "streak": streak,
             "gems": profile.get("gems_balance", 0),
-            "totalXP": current_xp,
+            "totalXP": int(current_xp),
             "totalLearned": total_learned,
             "weeklyActivity": weekly_activity,
             "mastery": stats_mastery
@@ -475,4 +476,95 @@ def get_full_profile_stats():
 
     except Exception as e:
         frappe.log_error("Get Profile Stats Error", frappe.get_traceback())
-        return {} # Return empty object on error
+        return {}
+
+@frappe.whitelist()
+def get_daily_quests():
+    """
+    يقوم بحساب المهام اليومية (Quests) وإرجاع حالتها.
+    (نسخة خالية من الجواهر - Gems Free)
+    """
+    try:
+        user = frappe.session.user
+        quests = []
+
+        # =================================================
+        # 1. الحسابات (Calculations) - ⚠️ هذا ما كان ناقصاً
+        # =================================================
+        
+        # أ. حساب عدد المراجعات المستحقة
+        due_reviews_count = frappe.db.sql("""
+            SELECT COUNT(*) 
+            FROM `tabPlayer Memory Tracker`
+            WHERE player = %s AND next_review_date <= NOW()
+        """, (user,))[0][0]
+
+        # ب. حساب هل لعب اليوم؟
+        played_today = frappe.db.sql("""
+            SELECT COUNT(*) 
+            FROM `tabGameplay Session`
+            WHERE player = %s AND DATE(creation) = CURDATE()
+        """, (user,))[0][0]
+
+        # ج. حساب مجموع XP اليوم
+        today_xp = frappe.db.sql("""
+            SELECT SUM(xp_earned) 
+            FROM `tabGameplay Session`
+            WHERE player = %s AND DATE(creation) = CURDATE()
+        """, (user,))[0][0] or 0
+
+        # =================================================
+        # 2. بناء المهام (Quest Building)
+        # =================================================
+
+        # --- المهمة الأولى: إنعاش الذاكرة (SRS) ---
+        # تظهر فقط إذا كان هناك مراجعات، أو إذا أنجزها (لتظهر كمكتملة)
+        # لكن للتبسيط سنظهرها فقط إذا كانت > 0 لتنبيه المستخدم
+        if due_reviews_count > 0:
+            quests.append({
+                "id": "quest_review",
+                "type": "review",
+                "title": "أنعش ذاكرتك",
+                "description": f"لديك {due_reviews_count} معلومة تحتاج للمراجعة!",
+                "icon": "brain",
+                "progress": 0,
+                "target": due_reviews_count,
+                "reward": {"type": "xp", "amount": due_reviews_count * 10}, 
+                "status": "active",
+                "isUrgent": True # 🔴 يشعل الضوء الأحمر
+            })
+
+        # --- المهمة الثانية: شعلة النشاط (Streak) ---
+        quests.append({
+            "id": "quest_streak",
+            "type": "streak",
+            "title": "شعلة النشاط",
+            "description": "أكمل درساً واحداً اليوم.",
+            "icon": "flame",
+            "progress": 1 if played_today > 0 else 0,
+            "target": 1,
+            "reward": {"type": "xp", "amount": 100}, # مكافأة XP بدلاً من الجواهر
+            "status": "completed" if played_today > 0 else "active",
+            "isUrgent": False
+        })
+
+        # --- المهمة الثالثة: تحدي النقاط (Daily XP) ---
+        target_xp = 200
+        quests.append({
+            "id": "quest_xp",
+            "type": "xp_goal",
+            "title": "تحدي النقاط اليومي",
+            "description": f"اجمع {target_xp} نقطة خبرة اليوم.",
+            "icon": "trophy",
+            "progress": int(today_xp),
+            "target": target_xp,
+            "reward": {"type": "xp", "amount": 150}, # مكافأة XP بدلاً من الجواهر
+            "status": "completed" if today_xp >= target_xp else "active",
+            "isUrgent": False
+        })
+
+        return quests
+
+    except Exception as e:
+        frappe.log_error("Get Daily Quests Failed", frappe.get_traceback())
+        return []
