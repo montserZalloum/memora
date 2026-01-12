@@ -479,77 +479,103 @@ def get_full_profile_stats():
         frappe.log_error("Get Profile Stats Error", frappe.get_traceback())
         return {}
 
+
+
 @frappe.whitelist()
 def get_daily_quests():
-    """
-    يقوم بحساب المهام اليومية (Quests) وإرجاع حالتها.
-    (نسخة خالية من الجواهر - Gems Free)
-    """
     try:
         user = frappe.session.user
         quests = []
 
-        # =================================================
-        # 1. الحسابات (Calculations) - ⚠️ هذا ما كان ناقصاً
-        # =================================================
-        
-        # أ. حساب عدد المراجعات المستحقة
+        # 1. الحسابات
+        # أ. عدد المراجعات المستحقة الآن
         due_reviews_count = frappe.db.sql("""
             SELECT COUNT(*) 
             FROM `tabPlayer Memory Tracker`
             WHERE player = %s AND next_review_date <= NOW()
         """, (user,))[0][0]
 
-        # ب. حساب هل لعب اليوم؟
-        played_today = frappe.db.sql("""
+        # ب. هل قام بجلسة مراجعة اليوم؟
+        played_review_today = frappe.db.sql("""
             SELECT COUNT(*) 
             FROM `tabGameplay Session`
+            WHERE player = %s 
+            AND lesson = 'مراجعة الذاكرة' 
+            AND DATE(creation) = CURDATE()
+        """, (user,))[0][0]
+
+        # ج. هل لعب أي شيء اليوم؟
+        played_today_any = frappe.db.sql("""
+            SELECT COUNT(*) FROM `tabGameplay Session`
             WHERE player = %s AND DATE(creation) = CURDATE()
         """, (user,))[0][0]
 
-        # ج. حساب مجموع XP اليوم
+        # د. نقاط اليوم
         today_xp = frappe.db.sql("""
-            SELECT SUM(xp_earned) 
-            FROM `tabGameplay Session`
+            SELECT SUM(xp_earned) FROM `tabGameplay Session`
             WHERE player = %s AND DATE(creation) = CURDATE()
         """, (user,))[0][0] or 0
 
         # =================================================
-        # 2. بناء المهام (Quest Building)
+        # 2. بناء المهام (المنطق المعدل)
         # =================================================
-
-        # --- المهمة الأولى: إنعاش الذاكرة (SRS) ---
-        # تظهر فقط إذا كان هناك مراجعات، أو إذا أنجزها (لتظهر كمكتملة)
-        # لكن للتبسيط سنظهرها فقط إذا كانت > 0 لتنبيه المستخدم
-        if due_reviews_count > 0:
+        
+        # --- المهمة الأولى: إنعاش الذاكرة ---
+        # الترتيب الجديد:
+        # 1. هل لعب اليوم؟ -> Completed ✅ (بغض النظر عن الباقي)
+        # 2. لم يلعب + يوجد مستحق؟ -> Active ⏳
+        # 3. لم يلعب + لا يوجد مستحق؟ -> لا تظهر المهمة 🙈
+        
+        quest_review_data = None
+        
+        if played_review_today > 0:
+            # الحالة: لعب اليوم (أنجز المهمة)
+            quest_review_data = {
+                "status": "completed",
+                "desc": "أنجزت مراجعاتك لليوم، أحسنت!",
+                "progress": 1,
+                "target": 1,
+                "isUrgent": False
+            }
+        elif due_reviews_count > 0:
+            # الحالة: لم يلعب ولديه واجبات
+            quest_review_data = {
+                "status": "active",
+                "desc": f"لديك {due_reviews_count} معلومة تحتاج للمراجعة!",
+                "progress": 0,
+                "target": due_reviews_count, # أو نضع التارجت 1 لتشجيعه على جلسة واحدة
+                "isUrgent": True
+            }
+            
+        if quest_review_data:
             quests.append({
                 "id": "quest_review",
                 "type": "review",
                 "title": "أنعش ذاكرتك",
-                "description": f"لديك {due_reviews_count} معلومة تحتاج للمراجعة!",
+                "description": quest_review_data["desc"],
                 "icon": "brain",
-                "progress": 0,
-                "target": due_reviews_count,
-                "reward": {"type": "xp", "amount": due_reviews_count * 10}, 
-                "status": "active",
-                "isUrgent": True # 🔴 يشعل الضوء الأحمر
+                "progress": quest_review_data["progress"],
+                "target": quest_review_data["target"],
+                "reward": {"type": "xp", "amount": 50}, 
+                "status": quest_review_data["status"],
+                "isUrgent": quest_review_data["isUrgent"]
             })
 
-        # --- المهمة الثانية: شعلة النشاط (Streak) ---
+        # --- المهمة الثانية: شعلة النشاط ---
         quests.append({
             "id": "quest_streak",
             "type": "streak",
             "title": "شعلة النشاط",
             "description": "أكمل درساً واحداً اليوم.",
             "icon": "flame",
-            "progress": 1 if played_today > 0 else 0,
+            "progress": 1 if played_today_any > 0 else 0,
             "target": 1,
-            "reward": {"type": "xp", "amount": 100}, # مكافأة XP بدلاً من الجواهر
-            "status": "completed" if played_today > 0 else "active",
+            "reward": {"type": "xp", "amount": 100},
+            "status": "completed" if played_today_any > 0 else "active",
             "isUrgent": False
         })
 
-        # --- المهمة الثالثة: تحدي النقاط (Daily XP) ---
+        # --- المهمة الثالثة: تحدي النقاط ---
         target_xp = 200
         quests.append({
             "id": "quest_xp",
@@ -559,7 +585,7 @@ def get_daily_quests():
             "icon": "trophy",
             "progress": int(today_xp),
             "target": target_xp,
-            "reward": {"type": "xp", "amount": 150}, # مكافأة XP بدلاً من الجواهر
+            "reward": {"type": "xp", "amount": 150},
             "status": "completed" if today_xp >= target_xp else "active",
             "isUrgent": False
         })
@@ -570,11 +596,6 @@ def get_daily_quests():
         frappe.log_error("Get Daily Quests Failed", frappe.get_traceback())
         return []
 
-
-
-import frappe
-import json
-import random
 
 @frappe.whitelist()
 def get_review_session():
@@ -833,56 +854,75 @@ def submit_review_session(session_data):
 def update_srs_after_review(user, question_id, is_correct, duration_ms):
     """
     تحديث حالة الذاكرة بناءً على الدقة والسرعة.
+    يتضمن منطقاً لتنظيف السجلات القديمة (Parent IDs) عند حل الأجزاء الذرية (Atomic IDs).
     """
-    # البحث عن السجل (الآن يدعم Atomic IDs مثل ...:1 تلقائياً لأنه مجرد نص)
+    # 1. البحث عن السجل (أو إنشاؤه إن لم يوجد)
     tracker_name = frappe.db.get_value("Player Memory Tracker", 
         {"player": user, "question_id": question_id}, "name")
     
     if not tracker_name: 
-        # حالة نادرة: إذا كان الـ ID جديداً (لم ينشأ من قبل)، ننشئه الآن
-        # هذا يحمي النظام في حال تغيرت طريقة توليد الـ IDs
-        create_memory_tracker(user, question_id, 1) # نبدأ بـ 1
-        return
+        # حالة نادرة: إذا كان الـ ID جديداً، ننشئه الآن لضمان حفظ التقدم
+        create_memory_tracker(user, question_id, 1)
+        # نعيد جلبه لنتمكن من تحديثه في الخطوات التالية
+        tracker_name = frappe.db.get_value("Player Memory Tracker", 
+            {"player": user, "question_id": question_id}, "name")
 
+    # 2. جلب البيانات الحالية
     current_data = frappe.db.get_value("Player Memory Tracker", tracker_name, 
         ["stability"], as_dict=True)
     
     current_stability = cint(current_data.stability)
     new_stability = current_stability
     
+    # 3. خوارزمية التقييم (SRS Logic)
     if is_correct:
-        # ✅ الإجابة صحيحة: نحلل السرعة
-        
+        # ✅ الإجابة صحيحة
         if duration_ms < 2000: 
             # 🚀 سريع جداً (Easy) -> قفزة مزدوجة (بونص)
             new_stability = min(current_stability + 2, 4)
-            
         elif duration_ms > 6000:
-            # 🐢 بطيء (Hard) -> يبقى في مكانه (تثبيت)
-            # لا نزيد الـ stability لكن نحدث تاريخ المراجعة ليصبح أبعد قليلاً من "الآن"
-            new_stability = current_stability # لا تغيير في المستوى
-            
+            # 🐢 بطيء (Hard) -> تثبيت المستوى (لا زيادة)
+            new_stability = current_stability 
         else:
             # 👌 متوسط (Good) -> خطوة واحدة للأمام
             new_stability = min(current_stability + 1, 4)
-            
     else:
-        # ❌ خطأ (Fail) -> تصفير الذاكرة
+        # ❌ خطأ (Fail) -> تصفير الذاكرة (إعادة من البداية)
         new_stability = 1 
     
-    # حساب الموعد القادم
+    # 4. حساب الموعد القادم
     # 1: غداً، 2: 3 أيام، 3: أسبوع، 4: أسبوعين
     interval_map = {1: 1, 2: 3, 3: 7, 4: 14}
     days_to_add = interval_map.get(new_stability, 1)
     
     new_date = add_days(nowdate(), days_to_add)
     
-    # تنفيذ التحديث
+    # 5. تحديث السجل الحالي (الابن / الذري)
     frappe.db.set_value("Player Memory Tracker", tracker_name, {
         "stability": new_stability,
         "last_review_date": now_datetime(),
         "next_review_date": new_date
     })
+
+    # =========================================================
+    # 🧹 CLEANUP: تنظيف السجلات الأب (Parent IDs)
+    # =========================================================
+    # المشكلة: عند حل سؤال فرعي (مثل LESSON-1:0)، يبقى السجل الأصلي (LESSON-1)
+    # مستحقاً للمراجعة، مما يسبب تكراراً في واجهة المهام اليومية حتى بعد الحل.
+    # الحل: نرحل موعد مراجعة "الأب" ليطابق موعد "الابن" (أو نؤجله للغد).
+    
+    if ":" in question_id:
+        # استخراج معرف الأب (ما قبل آخر نقطتين)
+        parent_id = question_id.rsplit(":", 1)[0]
+        
+        parent_tracker = frappe.db.get_value("Player Memory Tracker", 
+            {"player": user, "question_id": parent_id}, "name")
+            
+        if parent_tracker:
+            # تحديث موعد الأب ليختفي من قائمة "مستحق اليوم"
+            # وبذلك يختفي من الكويست اليومي بمجرد حل أحد أجزائه
+            frappe.db.set_value("Player Memory Tracker", parent_tracker, 
+                "next_review_date", new_date)
 
 def get_mastery_counts(user):
     data = frappe.db.sql("""
