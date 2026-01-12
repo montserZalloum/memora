@@ -753,50 +753,63 @@ def get_review_session():
 @frappe.whitelist()
 def submit_review_session(session_data):
     """
-    API خاص لاستلام نتائج المراجعة السريعة.
-    تم تحديثه ليدعم تحليل الوقت المستغرق (Duration).
+    النسخة المباشرة: تستخدم الـ ID "مراجعة الذاكرة" مباشرة كما هو في الداتابيز.
     """
     try:
-        ensure_review_system_exists() 
-
         user = frappe.session.user
-        if isinstance(session_data, str):
-            session_data = json.loads(session_data)
-
-        # 1. استخراج البيانات
-        results = session_data.get('results', {})
-        # لاحظ: في الفرونت أسميناها interactions، تأكد أن الاسم متطابق
-        interactions = session_data.get('interactions', []) 
         
-        # 2. حساب الجوائز (Gamification)
-        correct_count = results.get('correct_count', 0)
-        max_combo = results.get('max_combo', 0)
+        # 1. فك التغليف (Unpacking)
+        if isinstance(session_data, str):
+            data = json.loads(session_data)
+        else:
+            data = session_data
+            
+        # استخراج البيانات
+        interactions = data.get('answers', []) 
+        session_meta = data.get('session_meta', {})
+        total_combo = data.get('total_combo', 0)
+        completion_time_ms = data.get('completion_time_ms', 0)
+
+        # 2. حساب الجوائز
+        correct_count = sum(1 for item in interactions if item.get('is_correct'))
+        max_combo = int(total_combo)
         
         base_xp = correct_count * 10
         combo_bonus = max_combo * 2
         total_xp = base_xp + combo_bonus
         
-        # 3. تحديث الذاكرة (SRS with Time Logic) 🧠
+        # 3. تحديث الذاكرة (SRS)
         for item in interactions:
             question_id = item.get('question_id')
             is_correct = item.get('is_correct')
-            # 👇 الجديد: قراءة الوقت (الافتراضي 3000ms إذا لم يرسل)
-            duration = item.get('duration_ms', 3000) 
+            duration = item.get('time_spent_ms') or item.get('duration_ms') or 3000
             
-            update_srs_after_review(user, question_id, is_correct, duration)
+            if question_id:
+                # تأكد أن دالة update_srs_after_review موجودة في الملف
+                update_srs_after_review(user, question_id, is_correct, duration)
 
-        # 4. تسجيل الجلسة
+        # 4. تسجيل الجلسة (مباشرة بالـ ID العربي)
+        full_log_data = {
+            "meta": session_meta,
+            "interactions": interactions,
+            "stats": {
+                "correct": correct_count,
+                "combo": max_combo,
+                "time_ms": completion_time_ms
+            }
+        }
+
         doc = frappe.get_doc({
             "doctype": "Gameplay Session",
             "player": user,
-            "lesson": "REVIEW-SESSION",
+            "lesson": "مراجعة الذاكرة",  # ✅ استخدام الـ ID المباشر (اسم الدرس في الداتابيز)
             "xp_earned": total_xp,
             "score": total_xp,
-            "raw_data": json.dumps(session_data, ensure_ascii=False)
+            "raw_data": json.dumps(full_log_data, ensure_ascii=False)
         })
         doc.insert(ignore_permissions=True)
 
-        # 5. تحديث الرصيد
+        # 5. تحديث رصيد اللاعب
         if total_xp > 0:
             frappe.db.sql("""
                 UPDATE `tabPlayer Profile`
@@ -909,43 +922,3 @@ def create_memory_tracker(user, atom_id, rating):
     doc.insert(ignore_permissions=True)
     return doc.name
 
-
-def ensure_review_system_exists():
-    """
-    تتأكد من وجود مادة ووحدة ودرس خاص بالنظام (System)
-    لربط جلسات المراجعة بها ومنع أخطاء الروابط.
-    """
-    try:
-        # 1. إنشاء مادة للنظام (إذا لم توجد)
-        if not frappe.db.exists("Game Subject", "System"):
-            frappe.get_doc({
-                "doctype": "Game Subject",
-                "title": "System",
-                "name": "System", # ID يدوي
-                "is_published": 0 # مخفية عن الطلاب
-            }).insert(ignore_permissions=True)
-
-        # 2. إنشاء وحدة للمراجعات
-        if not frappe.db.exists("Game Unit", "System-Reviews"):
-            frappe.get_doc({
-                "doctype": "Game Unit",
-                "title": "System Reviews",
-                "name": "System-Reviews",
-                "subject": "System",
-                "order": 9999
-            }).insert(ignore_permissions=True)
-
-        # 3. إنشاء درس المراجعة (الذي نبحث عنه)
-        if not frappe.db.exists("Game Lesson", "REVIEW-SESSION"):
-            frappe.get_doc({
-                "doctype": "Game Lesson",
-                "title": "مراجعة الذاكرة",
-                "name": "REVIEW-SESSION", # 👈 هذا هو الـ ID المهم
-                "unit": "System-Reviews",
-                "xp_reward": 0
-            }).insert(ignore_permissions=True)
-            
-    except Exception as e:
-        # في حال كان هناك Naming Series يمنع الأسماء اليدوية،
-        # قد نحتاج لحل آخر، لكن هذا سيعمل في 99% من الحالات
-        frappe.log_error("Setup Review System Failed", str(e))

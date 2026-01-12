@@ -12,6 +12,10 @@ app_license = "mit"
 
 doctype_js = {"Game Lesson": "public/js/game_lesson.js"}
 
+after_migrate = [
+	"memora.setup.setup_review_system"
+]
+
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
 # 	{
