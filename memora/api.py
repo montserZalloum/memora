@@ -758,7 +758,7 @@ def submit_review_session(session_data):
     """
     try:
         ensure_review_system_exists() 
-        
+
         user = frappe.session.user
         if isinstance(session_data, str):
             session_data = json.loads(session_data)
@@ -932,7 +932,7 @@ def ensure_review_system_exists():
                 "title": "System Reviews",
                 "name": "System-Reviews",
                 "subject": "System",
-                "order": 99999999999999999
+                "order": 9999
             }).insert(ignore_permissions=True)
 
         # 3. إنشاء درس المراجعة (الذي نبحث عنه)
