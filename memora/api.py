@@ -79,6 +79,9 @@ def get_map_data(subject, track=None):
         # حماية إضافية: إذا لم يوجد أي مسار (حالة نادرة)، لا نكمل
         if not track:
              frappe.throw("لا يوجد مسار تعليمي متاح لهذه المادة.")
+
+        track_info = frappe.db.get_value("Game Learning Track", track, ["is_linear"], as_dict=True)
+        is_linear = track_info.is_linear if track_info else 1
         # ---------------------------------------------------------
 
         completed_lessons = frappe.get_all("Gameplay Session", 
@@ -111,8 +114,12 @@ def get_map_data(subject, track=None):
                 
                 if lesson.name in completed_lessons:
                     status = "completed"
+                # الحالة 2: المسار "حر" (Non-Linear) -> كل شيء متاح ما لم يكن مكتملاً
+                elif not is_linear:
+                    status = "available"
                 elif not full_map or full_map[-1]["status"] == "completed":
                     status = "available"
+                
                 
                 full_map.append({
                     "id": lesson.name,
