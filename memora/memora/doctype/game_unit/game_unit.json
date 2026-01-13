@@ -9,6 +9,7 @@
  "field_order": [
   "title",
   "subject",
+  "learning_track",
   "order"
  ],
  "fields": [
@@ -33,12 +34,18 @@
    "fieldname": "order",
    "fieldtype": "Int",
    "label": "Order"
+  },
+  {
+   "fieldname": "learning_track",
+   "fieldtype": "Link",
+   "label": "Learning Track",
+   "options": "Game Learning Track"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-08 14:28:28.965358",
+ "modified": "2026-01-13 09:02:57.710883",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Unit",
