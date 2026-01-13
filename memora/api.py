@@ -16,17 +16,17 @@ def get_subjects():
         )
         
         # 2. إضافة إحصائيات بسيطة لكل موضوع (اختياري لكنه رائع للواجهة)
-        for subject in subjects:
-            # حساب عدد الدروس الكلي في هذا الموضوع
-            # نقوم بالبحث عن الوحدات التابعة للموضوع، ثم الدروس التابعة لتلك الوحدات
-            units = frappe.get_all("Game Unit", filters={"subject": subject.name}, pluck="name")
+        # for subject in subjects:
+        #     # حساب عدد الدروس الكلي في هذا الموضوع
+        #     # نقوم بالبحث عن الوحدات التابعة للموضوع، ثم الدروس التابعة لتلك الوحدات
+        #     units = frappe.get_all("Game Unit", filters={"subject": subject.name}, pluck="name")
             
-            if units:
-                lesson_count = frappe.db.count("Game Lesson", filters={"unit": ["in", units]})
-            else:
-                lesson_count = 0
+        #     if units:
+        #         lesson_count = frappe.db.count("Game Lesson", filters={"unit": ["in", units]})
+        #     else:
+        #         lesson_count = 0
                 
-            subject["total_lessons"] = lesson_count
+        #     subject["total_lessons"] = lesson_count
             
         return subjects
 
@@ -34,44 +34,72 @@ def get_subjects():
         frappe.log_error(title="get_subjects failed", message=frappe.get_traceback())
         frappe.throw("تعذر تحميل المواضيع حالياً.")
 
+
 @frappe.whitelist()
-def get_map_data(subject):
+def get_game_tracks(subject):
+    try:
+        if not subject: return []
+        
+        # جلب المسارات المرتبطة بالمادة
+        # الترتيب: الافتراضي أولاً، ثم حسب الترتيب أو الإنشاء
+        tracks = frappe.get_all("Game Learning Track", 
+            filters={"subject": subject},
+            fields=["name", "track_name", "is_default", "unlock_level", "icon", "description"],
+            order_by="is_default desc, creation asc"
+        )
+        
+        return tracks
+    except Exception as e:
+        return []
+        
+
+@frappe.whitelist()
+def get_map_data(subject, track=None):
     try:
         if not subject:
             frappe.throw("الرجاء تحديد الموضوع (Subject)")
 
         user = frappe.session.user
         
-        # 1. التأكد من وجود الموضوع وأنه منشور
         subject_info = frappe.db.get_value("Game Subject", 
             {"name": subject, "is_published": 1}, 
             ["name", "title", "icon"], as_dict=True)
             
         if not subject_info:
-            frappe.throw("الموضوع غير موجود أو غير منشور")
+            frappe.throw("الموضوع غير موجود")
 
-        # 2. جلب الدروس المكتملة للمستخدم (نحتاجها لتحديد حالة القفل)
+        # ---------------------------------------------------------
+        # 🆕 منطق اختيار المسار
+        # ---------------------------------------------------------
+        # إذا لم يرسل الفرونت اند المسار، نأتي بالمسار الافتراضي
+        if not track:
+            track = frappe.db.get_value("Game Learning Track", 
+                {"subject": subject, "is_default": 1}, "name")
+        
+        # حماية إضافية: إذا لم يوجد أي مسار (حالة نادرة)، لا نكمل
+        if not track:
+             frappe.throw("لا يوجد مسار تعليمي متاح لهذه المادة.")
+        # ---------------------------------------------------------
+
         completed_lessons = frappe.get_all("Gameplay Session", 
             filters={"player": user}, 
             fields=["lesson"], 
             pluck="lesson",
         )
         
-        # جلب جميع الوحدات التابعة لهذا الموضوع فقط مرتبة حسب حقل order
+        # 🆕 الفلترة بناءً على المسار المختار
         units = frappe.get_all("Game Unit", 
-            filters={"subject": subject}, 
+            filters={
+                "subject": subject,
+                "learning_track": track # <--- الفلتر هنا
+            }, 
             fields=["name", "title", "`order`"], 
             order_by="`order` asc, creation asc"
         )
         
         full_map = []
         
-        # متغير لتتبع إذا كان الدرس السابق مكتمل (لفتح الدرس الحالي)
-        # ملاحظة: إذا كان هذا أول درس في الموضوع، سنحتاج لمنطق إضافي إذا أردت ربطه بالمواضيع السابقة
-        # لكن حالياً سنعتمد أن أول درس في الموضوع المختار متاح دائماً ما لم يكن مكتملاً
-        
         for unit in units:
-            # جلب دروس الوحدة مرتبة حسب تاريخ الإنشاء
             lessons = frappe.get_all("Game Lesson", 
                 filters={"unit": unit.name}, 
                 fields=["name", "title", "xp_reward"],
@@ -83,7 +111,6 @@ def get_map_data(subject):
                 
                 if lesson.name in completed_lessons:
                     status = "completed"
-                # إذا كان أول درس في القائمة أو الدرس السابق كان مكتملاً
                 elif not full_map or full_map[-1]["status"] == "completed":
                     status = "available"
                 
@@ -92,15 +119,18 @@ def get_map_data(subject):
                     "title": lesson.title,
                     "unit_title": unit.title,
                     "subject_title": subject_info.title,
-                    "subject_icon": subject_info.icon,
                     "status": status,
-                    "xp": lesson.xp_reward
+                    "xp": lesson.xp_reward,
+                    "track": track # مفيد للفرونت اند للتأكد
                 })
                     
         return full_map
+
     except Exception as e:
         frappe.log_error(title="get_map_data failed", message=frappe.get_traceback())
         frappe.throw("تعذر تحميل خريطة الدروس.")
+
+
 @frappe.whitelist()
 def get_lesson_details(lesson_id):
     try:
