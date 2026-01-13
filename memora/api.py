@@ -547,88 +547,91 @@ def get_full_profile_stats(subject=None):
 
 @frappe.whitelist()
 def get_daily_quests(subject=None):
+    """
+    إرجاع المهام اليومية.
+    التحديث: يقوم بإرجاع مهام مراجعة منفصلة لكل مادة مستحقة.
+    """
     try:
         user = frappe.session.user
         quests = []
 
-        # 1. الحسابات
-        # أ. عدد المراجعات المستحقة (مفلترة حسب المادة)
-        conditions = "player = %s AND next_review_date <= NOW()"
+        # =================================================
+        # 1. مهام المراجعة (مفصلة حسب المادة) 🧠
+        # =================================================
+        
+        # بناء شرط إضافي في حال أردنا فلترة مادة محددة (اختياري)
+        subject_condition = ""
         params = [user]
+        
         if subject:
-            conditions += " AND subject = %s"
+            subject_condition = "AND subject = %s"
             params.append(subject)
 
-        due_reviews_count = frappe.db.sql(f"""
-            SELECT COUNT(*) 
+        # استعلام ذكي يجمع المراجعات لكل مادة
+        reviews_by_subject = frappe.db.sql(f"""
+            SELECT subject, COUNT(*) as count 
             FROM `tabPlayer Memory Tracker`
-            WHERE {conditions}
-        """, tuple(params))[0][0]
+            WHERE player = %s AND next_review_date <= NOW() {subject_condition}
+            GROUP BY subject
+        """, tuple(params), as_dict=True)
 
-        # ب. هل قام بجلسة مراجعة اليوم؟
-        # (نعتبره أنجز مراجعة المادة إذا لعب مراجعة مرتبطة بها، أو مراجعة عامة)
-        # حالياً بما أننا نخزن اسم الدرس "مراجعة الذاكرة" بشكل ثابت،
-        # سنعتمد على اللعب العام، أو نحتاج لتخزين المادة في الـ Log.
-        # للتبسيط الآن: إذا لعب أي مراجعة، تعتبر المهمة منجزة.
+        # هل لعب مراجعة اليوم؟ (بشكل عام)
+        # ملاحظة: لتحسين الدقة مستقبلاً، يمكننا تخزين المادة في الـ Session للتحقق بدقة
         played_review_today = frappe.db.sql("""
-            SELECT COUNT(*) 
-            FROM `tabGameplay Session`
-            WHERE player = %s 
-            AND lesson = 'مراجعة الذاكرة' 
-            AND DATE(creation) = CURDATE()
+            SELECT COUNT(*) FROM `tabGameplay Session`
+            WHERE player = %s AND lesson = 'مراجعة الذاكرة' AND DATE(creation) = CURDATE()
         """, (user,))[0][0]
 
-        # ج. هل لعب أي شيء اليوم؟
+        # بناء كروت المراجعة
+        if played_review_today > 0 and not reviews_by_subject:
+            # حالة: أنهى كل شيء لليوم
+            quests.append({
+                "id": "quest_review_done",
+                "type": "review",
+                "title": "أنعش ذاكرتك",
+                "description": "أنجزت مراجعاتك لليوم، أحسنت!",
+                "icon": "brain",
+                "progress": 1, "target": 1,
+                "status": "completed",
+                "isUrgent": False
+            })
+        else:
+            # عرض كارد لكل مادة مستحقة
+            for row in reviews_by_subject:
+                # التعامل مع المواد القديمة التي ليس لها Subject (نسميها "عام")
+                subj_name = row.subject if row.subject else "عام"
+                
+                quests.append({
+                    "id": f"quest_review_{subj_name}", # ID فريد لكل مادة
+                    "type": "review",
+                    "title": f"مراجعة {subj_name}",
+                    "description": f"لديك {row.count} معلومة تحتاج للتثبيت!",
+                    "icon": "brain",
+                    "progress": 0,
+                    "target": row.count,
+                    "reward": {"type": "xp", "amount": row.count * 10},
+                    "status": "active",
+                    "isUrgent": True,
+                    "meta": { "subject": row.subject } # 👈 نرسل اسم المادة ليسهل على الفرونت استخدامه
+                })
+
+        # =================================================
+        # 2. المهام العامة (الستريك + النقاط) 🔥🏆
+        # =================================================
+        
+        # هل لعب أي شيء اليوم؟
         played_today_any = frappe.db.sql("""
             SELECT COUNT(*) FROM `tabGameplay Session`
             WHERE player = %s AND DATE(creation) = CURDATE()
         """, (user,))[0][0]
 
-        # د. نقاط اليوم
+        # نقاط اليوم
         today_xp = frappe.db.sql("""
             SELECT SUM(xp_earned) FROM `tabGameplay Session`
             WHERE player = %s AND DATE(creation) = CURDATE()
         """, (user,))[0][0] or 0
 
-        # =================================================
-        # 2. بناء المهام
-        # =================================================
-        
-        quest_review_data = None
-        
-        if played_review_today > 0:
-            quest_review_data = {
-                "status": "completed",
-                "desc": "أنجزت مراجعاتك لليوم، أحسنت!",
-                "progress": 1,
-                "target": 1,
-                "isUrgent": False
-            }
-        elif due_reviews_count > 0:
-            title_text = f"مراجعة {subject}" if subject else "أنعش ذاكرتك"
-            quest_review_data = {
-                "status": "active",
-                "desc": f"لديك {due_reviews_count} معلومة تحتاج للمراجعة!",
-                "progress": 0,
-                "target": due_reviews_count,
-                "isUrgent": True
-            }
-            
-        if quest_review_data:
-            quests.append({
-                "id": "quest_review",
-                "type": "review",
-                "title": title_text if 'title_text' in locals() else "أنعش ذاكرتك",
-                "description": quest_review_data["desc"],
-                "icon": "brain",
-                "progress": quest_review_data["progress"],
-                "target": quest_review_data["target"],
-                "reward": {"type": "xp", "amount": 50}, 
-                "status": quest_review_data["status"],
-                "isUrgent": quest_review_data["isUrgent"]
-            })
-
-        # المهام العامة (لا تتأثر بالمادة)
+        # مهمة الستريك
         quests.append({
             "id": "quest_streak",
             "type": "streak",
@@ -642,6 +645,7 @@ def get_daily_quests(subject=None):
             "isUrgent": False
         })
 
+        # مهمة النقاط
         target_xp = 200
         quests.append({
             "id": "quest_xp",
