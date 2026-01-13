@@ -10,6 +10,7 @@
   "title",
   "unit",
   "xp_reward",
+  "is_published",
   "stages"
  ],
  "fields": [
@@ -40,15 +41,23 @@
    "fieldtype": "Table",
    "label": "Stages",
    "options": "Game Stage"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_published",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Published"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-08 14:28:15.784396",
+ "modified": "2026-01-13 12:02:21.539043",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Lesson",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {

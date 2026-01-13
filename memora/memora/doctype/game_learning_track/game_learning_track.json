@@ -10,9 +10,10 @@
   "track_name",
   "subject",
   "column_break_1",
+  "unlock_level",
   "is_default",
   "is_linear",
-  "unlock_level",
+  "is_published",
   "section_break_1",
   "description",
   "icon"
@@ -71,12 +72,18 @@
    "fieldname": "is_linear",
    "fieldtype": "Check",
    "label": "Is Linear Progression?"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_published",
+   "fieldtype": "Check",
+   "label": "Is Published"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-13 10:53:18.869274",
+ "modified": "2026-01-13 11:58:49.899163",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Learning Track",

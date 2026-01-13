@@ -8,6 +8,7 @@
  "engine": "InnoDB",
  "field_order": [
   "player",
+  "subject",
   "question_id",
   "stability",
   "next_review_date",
@@ -49,12 +50,19 @@
    "fieldtype": "Datetime",
    "label": "Last Review Date",
    "read_only": 1
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Link",
+   "in_filter": 1,
+   "label": "Subject",
+   "options": "Game Subject"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-12 09:25:35.540542",
+ "modified": "2026-01-13 12:21:01.217580",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Player Memory Tracker",

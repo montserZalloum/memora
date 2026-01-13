@@ -149,7 +149,7 @@ function open_reveal_dialog(frm, cdt, cdn, row, data) {
         item_1: h.word,
         item_2: h.explanation
     }));
-
+debugger
     let d = new frappe.ui.Dialog({
         title: 'إعدادات الكشف (Reveal)',
         fields: [

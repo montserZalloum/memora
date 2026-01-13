@@ -10,7 +10,8 @@
   "title",
   "subject",
   "learning_track",
-  "order"
+  "order",
+  "is_published"
  ],
  "fields": [
   {
@@ -40,12 +41,18 @@
    "fieldtype": "Link",
    "label": "Learning Track",
    "options": "Game Learning Track"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_published",
+   "fieldtype": "Check",
+   "label": "Is Published"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-13 10:52:22.507771",
+ "modified": "2026-01-13 11:59:37.682733",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Unit",

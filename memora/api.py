@@ -144,8 +144,9 @@ def get_lesson_details(lesson_id):
         if not lesson_id:
             frappe.throw(_("Lesson ID is missing"))
             
-        if not frappe.db.exists("Game Lesson", lesson_id):
-            return None
+        if not frappe.db.exists({"doctype": "Game Lesson", "name": lesson_id, "is_published": 1}):
+            # يمكنك إرجاع خطأ أو Null حسب رغبتك في التعامل مع الفرونت
+            frappe.throw(_("Lesson not found or access denied."))
 
         doc = frappe.get_doc("Game Lesson", lesson_id)
         
@@ -155,6 +156,7 @@ def get_lesson_details(lesson_id):
             "xp_reward": doc.xp_reward,
             "stages": [
                 {
+                    "id": s.name,
                     "title": s.title,
                     "type": s.type.lower(),
                     "config": frappe.parse_json(s.config) if s.config else {}
@@ -634,22 +636,22 @@ def get_daily_quests():
         return []
 
 
+
 @frappe.whitelist()
 def get_review_session():
     """
     يولد جلسة مراجعة ذكية (Lightning Round).
-    الميزات:
-    1. يحول الـ Reveal/Matching إلى أسئلة خيارات متعددة (Quiz).
-    2. يستخدم Atomic IDs (مثل :0, :1) لتتبع كل معلومة بدقة.
-    3. يولد خيارات خاطئة (Distractors) من نفس الدرس.
+    التحديثات المعمارية:
+    1. يعتمد على ID السطر (Child Row Name) بدلاً من الترتيب، لمنع مشاكل الحذف والترتيب.
+    2. يقوم بالتنظيف الذاتي (Self-Healing) للسجلات اليتيمة.
+    3. يتحقق من أن الدرس منشور (is_published).
     """
     try:
         user = frappe.session.user
         
         # 1. جلب العناصر المستحقة للمراجعة
-        # نطلب 15 بدلاً من 10 لأن بعض العناصر القديمة قد تتفكك لأكثر من سؤال
         due_items = frappe.db.sql("""
-            SELECT question_id, stability 
+            SELECT name, question_id, stability 
             FROM `tabPlayer Memory Tracker`
             WHERE player = %s AND next_review_date <= NOW()
             ORDER BY next_review_date ASC
@@ -660,95 +662,91 @@ def get_review_session():
             return []
 
         quiz_cards = []
-        lesson_map = {} # Cache لتقليل استعلامات الداتابيز
-        
+        # قائمة لتعقب السجلات الفاسدة لحذفها دفعة واحدة
+        corrupt_tracker_ids = []
+
         for item in due_items:
-            # 2. تحليل الـ ID
-            # قد يكون ID قديم: "LESSON-1-STAGE-3"
-            # أو ID ذري جديد: "LESSON-1-STAGE-3:1"
             raw_id = item.question_id
             target_atom_index = None
             
+            # 2. تحليل الـ ID (نتوقع: STAGE_ROW_NAME:ATOM_INDEX)
+            # مثال: a1b2c3d4:0
             if ":" in raw_id:
+                # نستخدم rsplit للفصل من اليمين لضمان أخذ الرقم الأخير
                 parts = raw_id.rsplit(":", 1)
-                
-                # نتأكد أن الجزء الأخير هو رقم فعلاً
-                if len(parts) == 2 and parts[1].isdigit():
-                    base_id = parts[0]
+                stage_row_name = parts[0]
+                if parts[1].isdigit():
                     target_atom_index = int(parts[1])
                 else:
-                    # في هذه الحالة، النقطة هي جزء من الاسم وليست الفاصل
-                    base_id = raw_id
                     target_atom_index = None
             else:
-                base_id = raw_id
+                stage_row_name = raw_id
+                target_atom_index = None
+
+            # 3. البحث عن المرحلة مباشرة (Direct Lookup)
+            # نبحث في جدول المراحل الفرعي باستخدام الـ Hash الخاص بها
+            stage_data = frappe.db.get_value("Game Lesson Stage", stage_row_name, 
+                ["config", "type", "parent"], as_dict=True)
+            
+            if not stage_data:
+                # 🚨 المرحلة غير موجودة! (ربما حُذفت أو الـ ID قديم بتنسيق Lesson-Stage)
+                corrupt_tracker_ids.append(item.name)
+                continue
                 
-            # تفكيك الـ Base ID لمعرفة الدرس والمرحلة
-            # المتوقع: {LESSON_ID}-STAGE-{INDEX}
-            if "-STAGE-" not in base_id: continue
+            # 4. جلب الدرس الأب (Parent Lesson)
+            # الحقل parent في الجدول الفرعي يحتوي على اسم الدرس
+            lesson_id = stage_data.parent
             
-            parts = base_id.split('-STAGE-')
-            lesson_id = parts[0]
-            try:
-                stage_index = int(parts[1])
-            except: continue
+            # التحقق من وجود الدرس ونشره
+            lesson_status = frappe.db.get_value("Game Lesson", lesson_id, "is_published")
+            if lesson_status is None:
+                # الدرس الأب محذوف
+                corrupt_tracker_ids.append(item.name)
+                continue
             
-            # 3. جلب محتوى الدرس (مع الكاش)
-            if lesson_id not in lesson_map:
-                if frappe.db.exists("Game Lesson", lesson_id):
-                    lesson_map[lesson_id] = frappe.get_doc("Game Lesson", lesson_id)
-                else:
-                    continue
-            
-            lesson_doc = lesson_map[lesson_id]
-            
-            if stage_index >= len(lesson_doc.stages): continue
-            
-            stage = lesson_doc.stages[stage_index]
-            config = frappe.parse_json(stage.config)
+            if lesson_status == 0:
+                # الدرس موجود لكنه غير منشور (Draft)، نتجاوزه ولا نحذفه
+                continue
+
+            # 5. تجهيز البيانات
+            # نحتاج وثيقة الدرس كاملة لجلب "المموهات" (Distractors) من مراحل أخرى
+            lesson_doc = frappe.get_doc("Game Lesson", lesson_id)
+            config = frappe.parse_json(stage_data.config)
             
             # =========================================================
             # 🅰️ التحويل: REVEAL -> QUIZ
             # =========================================================
-            if stage.type == 'Reveal':
+            if stage_data.type == 'Reveal':
                 highlights = config.get('highlights', [])
                 
-                # تجهيز "بنك المموهات" من نفس الدرس
+                # تجميع بنك المموهات من نفس الدرس
                 lesson_distractor_pool = []
                 for s in lesson_doc.stages:
                     if s.type == 'Reveal':
-                        s_conf = frappe.parse_json(s.config)
+                        s_conf = frappe.parse_json(s.config) if s.config else {}
                         for h in s_conf.get('highlights', []):
                             lesson_distractor_pool.append(h['word'])
                 
-                # الدوران على كل كلمة في المرحلة
                 for idx, highlight in enumerate(highlights):
-                    # 🔴 الفلتر الذري:
-                    # إذا كان الـ Tracker يطلب الكلمة رقم 1 تحديداً، نتجاهل الباقي
+                    # الفلتر الذري: هل هذا هو السؤال المطلوب؟
                     if target_atom_index is not None and target_atom_index != idx:
                         continue
                         
                     correct_word = highlight['word']
-                    
-                    # إنشاء السؤال (استبدال الكلمة بفراغ)
                     question_text = config.get('sentence', '').replace(correct_word, "____")
                     
-                    # اختيار 3 خيارات خاطئة
                     distractors = [w for w in lesson_distractor_pool if w != correct_word]
-                    # إزالة التكرار
-                    distractors = list(set(distractors))
+                    distractors = list(set(distractors)) # إزالة التكرار
                     random.shuffle(distractors)
                     selected_distractors = distractors[:3]
                     
-                    # تعبئة النقص إذا لم نجد كلمات كافية
-                    while len(selected_distractors) < 3:
-                        selected_distractors.append("...") 
+                    while len(selected_distractors) < 3: selected_distractors.append("...") 
 
                     options = selected_distractors + [correct_word]
                     random.shuffle(options)
                     
-                    # تحديد الـ ID الجديد (دائماً نستخدم الـ Suffix الآن)
-                    atom_id = f"{base_id}:{idx}"
+                    # الـ ID الجديد
+                    atom_id = f"{stage_row_name}:{idx}"
 
                     quiz_cards.append({
                         "id": atom_id,
@@ -762,30 +760,26 @@ def get_review_session():
             # =========================================================
             # 🅱️ التحويل: MATCHING -> QUIZ
             # =========================================================
-            elif stage.type == 'Matching':
+            elif stage_data.type == 'Matching':
                 pairs = config.get('pairs', [])
                 
                 for idx, pair in enumerate(pairs):
-                    # 🔴 الفلتر الذري
                     if target_atom_index is not None and target_atom_index != idx:
                         continue
 
-                    question_text = pair.get('right') # السؤال
-                    correct_answer = pair.get('left') # الجواب
+                    question_text = pair.get('right')
+                    correct_answer = pair.get('left')
                     
-                    # المموهات: الإجابات الأخرى في نفس السؤال
                     distractors = [p.get('left') for p in pairs if p.get('left') != correct_answer]
-                    
                     random.shuffle(distractors)
                     selected_distractors = distractors[:3]
                     
-                    while len(selected_distractors) < 3:
-                         selected_distractors.append("...")
+                    while len(selected_distractors) < 3: selected_distractors.append("...")
 
                     options = selected_distractors + [correct_answer]
                     random.shuffle(options)
                     
-                    atom_id = f"{base_id}:{idx}"
+                    atom_id = f"{stage_row_name}:{idx}"
                     
                     quiz_cards.append({
                         "id": atom_id,
@@ -796,11 +790,12 @@ def get_review_session():
                         "origin_type": "matching"
                     })
 
-    
-        # خلط الأسئلة النهائية
+        # 🧹 تنفيذ التنظيف الذاتي
+        if corrupt_tracker_ids:
+            # حذف السجلات الفاسدة دفعة واحدة
+            frappe.db.delete("Player Memory Tracker", {"name": ["in", corrupt_tracker_ids]})
+
         random.shuffle(quiz_cards)
-        
-        # إرجاع 10 فقط للجلسة السريعة
         return quiz_cards[:10]
 
     except Exception as e:
