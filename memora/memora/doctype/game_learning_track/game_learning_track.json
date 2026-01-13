@@ -11,6 +11,7 @@
   "subject",
   "column_break_1",
   "is_default",
+  "is_linear",
   "unlock_level",
   "section_break_1",
   "description",
@@ -64,12 +65,18 @@
    "fieldname": "icon",
    "fieldtype": "Data",
    "label": "Icon Class"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_linear",
+   "fieldtype": "Check",
+   "label": "Is Linear Progression?"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-13 08:59:56.783076",
+ "modified": "2026-01-13 10:53:18.869274",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Learning Track",
