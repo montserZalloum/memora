@@ -1041,3 +1041,117 @@ def update_subject_progression(user, subject_name, xp_earned):
             "level": 1,
             "name": record_name
         }).insert(ignore_permissions=True)
+
+
+@frappe.whitelist()
+def get_leaderboard(subject=None, period='all_time'):
+    """
+    جلب قائمة المتصدرين.
+    - subject: اسم المادة (اختياري). إذا فارغ، يجلب الترتيب العام.
+    - period: 'all_time' (حالياً سندعم التراكمي فقط).
+    """
+    try:
+        user = frappe.session.user
+        limit = 50 # عدد المتصدرين للعرض
+        
+        leaderboard = []
+        user_rank_info = {}
+
+        # ============================================
+        # 1. تحديد الجدول والشرط بناءً على الفلتر
+        # ============================================
+        if subject:
+            # ترتيب مادة محددة
+            table = "`tabPlayer Subject Score`"
+            condition = "subject = %s"
+            params = [subject]
+            user_field = "player"
+        else:
+            # ترتيب عام (Global XP)
+            table = "`tabPlayer Profile`"
+            condition = "1=1" # شرط وهمي لجلب الكل
+            params = []
+            user_field = "user"
+
+        # ============================================
+        # 2. جلب قائمة الأبطال (Top 50) 🏅
+        # ============================================
+        # نحتاج لعمل Join مع جدول User لجلب الاسم والصورة
+        query = f"""
+            SELECT 
+                t.{user_field} as user_id, 
+                t.total_xp, 
+                u.full_name, 
+                u.user_image 
+            FROM {table} t
+            JOIN `tabUser` u ON t.{user_field} = u.name
+            WHERE {condition} AND t.total_xp > 0
+            ORDER BY t.total_xp DESC
+            LIMIT %s
+        """
+        # نضيف الـ limit للباراميترات
+        query_params = params + [limit]
+        
+        top_players = frappe.db.sql(query, tuple(query_params), as_dict=True)
+
+        # تنسيق النتيجة
+        for idx, player in enumerate(top_players):
+            leaderboard.append({
+                "rank": idx + 1,
+                "name": player.full_name or "Unknown Hero",
+                "avatar": player.user_image,
+                "xp": int(player.total_xp),
+                "isCurrentUser": (player.user_id == user)
+            })
+
+        # ============================================
+        # 3. معرفة ترتيب المستخدم الحالي 📍
+        # ============================================
+        # إذا كان المستخدم ضمن الـ 50 الأوائل، نعرف ترتيبه
+        current_user_in_top = next((item for item in leaderboard if item["isCurrentUser"]), None)
+        
+        if current_user_in_top:
+            user_rank_info = current_user_in_top
+        else:
+            # إذا لم يكن في القائمة، نحتاج لحساب ترتيبه باستعلام منفصل
+            # (نعد كم شخص لديه نقاط أكثر منه)
+            
+            # أولاً نجلب نقاطه
+            if subject:
+                my_xp = frappe.db.get_value("Player Subject Score", {"player": user, "subject": subject}, "total_xp") or 0
+            else:
+                my_xp = frappe.db.get_value("Player Profile", {"user": user}, "total_xp") or 0
+            
+            if my_xp > 0:
+                count_query = f"""
+                    SELECT COUNT(*) FROM {table} 
+                    WHERE {condition} AND total_xp > %s
+                """
+                count_params = params + [my_xp]
+                higher_rank_count = frappe.db.sql(count_query, tuple(count_params))[0][0]
+                
+                user_doc = frappe.get_doc("User", user)
+                user_rank_info = {
+                    "rank": higher_rank_count + 1,
+                    "name": user_doc.full_name,
+                    "avatar": user_doc.user_image,
+                    "xp": int(my_xp),
+                    "isCurrentUser": True
+                }
+            else:
+                # ليس لديه نقاط بعد
+                user_rank_info = {
+                    "rank": "-",
+                    "name": frappe.session.user,
+                    "xp": 0,
+                    "isCurrentUser": True
+                }
+
+        return {
+            "leaderboard": leaderboard,
+            "userRank": user_rank_info
+        }
+
+    except Exception as e:
+        frappe.log_error("Leaderboard Error", frappe.get_traceback())
+        return {"leaderboard": [], "userRank": {}}
