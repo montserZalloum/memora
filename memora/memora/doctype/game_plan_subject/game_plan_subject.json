@@ -40,10 +40,11 @@
    "options": "All Units\nSelected Units Only"
   },
   {
+   "depends_on": "eval:doc.inclusion_mode=='Selected Units Only'",
    "fieldname": "allowed_units",
-   "fieldtype": "Link",
+   "fieldtype": "Table",
    "label": "Allowed Units",
-   "options": "Game Unit"
+   "options": "Game Plan Allowed Unit"
   }
  ],
  "grid_page_length": 50,
