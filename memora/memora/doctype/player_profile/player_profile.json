@@ -9,7 +9,11 @@
  "field_order": [
   "user",
   "total_xp",
-  "gems_balance"
+  "gems_balance",
+  "current_grade",
+  "current_stream",
+  "academic_year",
+  "devices"
  ],
  "fields": [
   {
@@ -32,12 +36,35 @@
    "fieldname": "gems_balance",
    "fieldtype": "Int",
    "label": "Gems Balance"
+  },
+  {
+   "fieldname": "current_grade",
+   "fieldtype": "Link",
+   "label": "Current Grade",
+   "options": "Game Academic Grade"
+  },
+  {
+   "fieldname": "current_stream",
+   "fieldtype": "Link",
+   "label": "Current Stream",
+   "options": "Game Academic Stream"
+  },
+  {
+   "fieldname": "academic_year",
+   "fieldtype": "Data",
+   "label": "Academic Year"
+  },
+  {
+   "fieldname": "devices",
+   "fieldtype": "Table",
+   "label": "Devices",
+   "options": "Game Player Device"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-08 14:28:03.257784",
+ "modified": "2026-01-15 22:18:51.920017",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Player Profile",

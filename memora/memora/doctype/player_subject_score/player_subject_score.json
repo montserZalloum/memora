@@ -13,7 +13,8 @@
   "total_xp",
   "level",
   "section_break_1",
-  "last_updated"
+  "last_updated",
+  "season"
  ],
  "fields": [
   {
@@ -62,12 +63,18 @@
    "fieldtype": "Datetime",
    "label": "Last Updated",
    "read_only": 1
+  },
+  {
+   "fieldname": "season",
+   "fieldtype": "Link",
+   "label": "Season",
+   "options": "Game Subscription Season"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-13 12:31:44.324470",
+ "modified": "2026-01-15 22:18:52.747671",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Player Subject Score",

@@ -11,7 +11,8 @@
   "subject",
   "learning_track",
   "order",
-  "is_published"
+  "is_published",
+  "is_free_preview"
  ],
  "fields": [
   {
@@ -47,12 +48,18 @@
    "fieldname": "is_published",
    "fieldtype": "Check",
    "label": "Is Published"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_free_preview",
+   "fieldtype": "Check",
+   "label": "Is Free Preview"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-13 11:59:37.682733",
+ "modified": "2026-01-15 22:18:52.531597",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Unit",

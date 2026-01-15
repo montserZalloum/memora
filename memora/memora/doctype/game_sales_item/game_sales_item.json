@@ -1,63 +1,65 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:title",
- "creation": "2026-01-08 14:22:32.974039",
+ "creation": "2026-01-15 22:18:51.609895",
  "doctype": "DocType",
+ "document_type": "Setup",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "title",
-  "icon",
-  "is_published",
-  "is_paid",
-  "full_price",
-  "discounted_price"
+  "item_name",
+  "description",
+  "image",
+  "price",
+  "discounted_price",
+  "bundle_contents",
+  "sku"
  ],
  "fields": [
   {
-   "fieldname": "title",
+   "fieldname": "item_name",
    "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Title",
-   "reqd": 1,
-   "unique": 1
+   "label": "Item Name"
   },
   {
-   "fieldname": "icon",
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "label": "Description"
+  },
+  {
+   "fieldname": "image",
    "fieldtype": "Attach Image",
-   "label": "Icon"
+   "label": "Image"
   },
   {
-   "default": "0",
-   "fieldname": "is_published",
-   "fieldtype": "Check",
-   "label": "Is Published"
-  },
-  {
-   "default": "1",
-   "fieldname": "is_paid",
-   "fieldtype": "Check",
-   "label": "Is Paid"
-  },
-  {
-   "fieldname": "full_price",
+   "fieldname": "price",
    "fieldtype": "Currency",
-   "label": "Full Price"
+   "label": "Price"
   },
   {
    "fieldname": "discounted_price",
    "fieldtype": "Currency",
    "label": "Discounted Price"
+  },
+  {
+   "fieldname": "bundle_contents",
+   "fieldtype": "Table",
+   "label": "Bundle Contents",
+   "options": "Game Bundle Content"
+  },
+  {
+   "fieldname": "sku",
+   "fieldtype": "Data",
+   "label": "SKU"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-15 22:18:52.125133",
+ "modified": "2026-01-15 22:41:24.787352",
  "modified_by": "Administrator",
  "module": "Memora",
- "name": "Game Subject",
+ "name": "Game Sales Item",
  "owner": "Administrator",
  "permissions": [
   {
@@ -77,5 +79,6 @@
  "rows_threshold_for_grid_search": 20,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "track_changes": 1
 }

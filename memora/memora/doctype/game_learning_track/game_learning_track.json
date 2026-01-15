@@ -16,7 +16,11 @@
   "is_published",
   "section_break_1",
   "description",
-  "icon"
+  "icon",
+  "is_paid",
+  "is_sold_separately",
+  "standalone_price",
+  "discounted_price"
  ],
  "fields": [
   {
@@ -78,12 +82,34 @@
    "fieldname": "is_published",
    "fieldtype": "Check",
    "label": "Is Published"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_paid",
+   "fieldtype": "Check",
+   "label": "Is Paid"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_sold_separately",
+   "fieldtype": "Check",
+   "label": "Is Sold Separately"
+  },
+  {
+   "fieldname": "standalone_price",
+   "fieldtype": "Currency",
+   "label": "Standalone Price"
+  },
+  {
+   "fieldname": "discounted_price",
+   "fieldtype": "Currency",
+   "label": "Discounted Price"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-13 11:58:49.899163",
+ "modified": "2026-01-15 22:18:52.332145",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Learning Track",
