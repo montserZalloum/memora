@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "creation": "2026-01-15 22:18:50.824851",
+ "creation": "2026-01-16 00:05:46.391358",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
@@ -10,7 +10,8 @@
   "display_name",
   "is_mandatory",
   "inclusion_mode",
-  "allowed_units"
+  "allowed_units",
+  "subject_allowed_units_table"
  ],
  "fields": [
   {
@@ -42,8 +43,14 @@
   {
    "depends_on": "eval:doc.inclusion_mode=='Selected Units Only'",
    "fieldname": "allowed_units",
-   "fieldtype": "Table",
+   "fieldtype": "Link",
    "label": "Allowed Units",
+   "options": "Game Plan Allowed Unit"
+  },
+  {
+   "fieldname": "subject_allowed_units_table",
+   "fieldtype": "Table",
+   "label": "Subject Allowed Units",
    "options": "Game Plan Allowed Unit"
   }
  ],
@@ -51,7 +58,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-01-15 22:18:50.824851",
+ "modified": "2026-01-16 00:12:36.996031",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Plan Subject",

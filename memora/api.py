@@ -55,364 +55,87 @@ def get_game_tracks(subject):
 
 @frappe.whitelist()
 def get_map_data(subject, track=None):
-    """
-    🎓 Academic-Driven & Freemium Map API
-
-    Filters content based on:
-    1. Student's Grade/Stream (Academic Plan)
-    2. Active Subscriptions (Freemium/Paywall)
-
-    Returns a hierarchical JSON tree of Units & Lessons with lock status.
-    """
     try:
         if not subject:
             frappe.throw("الرجاء تحديد الموضوع (Subject)")
 
         user = frappe.session.user
-
-        # Verify subject exists and is published
-        subject_info = frappe.db.get_value("Game Subject",
-            {"name": subject, "is_published": 1},
+        
+        subject_info = frappe.db.get_value("Game Subject", 
+            {"name": subject, "is_published": 1}, 
             ["name", "title", "icon"], as_dict=True)
-
+            
         if not subject_info:
             frappe.throw("الموضوع غير موجود")
 
-        # ================================================================
-        # 🔹 PHASE 1: CONTENT FILTERING (Academic Context)
-        # ================================================================
-
-        # 1.1 Fetch Player Profile (Grade/Stream/Year)
-        profile = frappe.db.get_value("Player Profile",
-            {"user": user},
-            ["current_grade", "current_stream", "academic_year"],
-            as_dict=True)
-
-        # Handle Demo Mode: If no profile or incomplete profile data
-        if not profile or not profile.current_grade or not profile.current_stream:
-            # Demo Mode: Show only first unit as free preview
-            return _get_demo_mode_map(subject, track, subject_info)
-
-        # 1.2 Find matching Academic Plan
-        academic_plan = frappe.db.get_value("Game Academic Plan",
-            {
-                "grade": profile.current_grade,
-                "stream": profile.current_stream,
-                "year": profile.academic_year or nowdate()[:4]  # Default to current year
-            },
-            ["name"], as_dict=True)
-
-        if not academic_plan:
-            # No plan found - fallback to demo mode
-            return _get_demo_mode_map(subject, track, subject_info)
-
-        # 1.3 Check if subject is in the plan
-        plan_subject = frappe.db.sql("""
-            SELECT name, subject, display_name, inclusion_mode
-            FROM `tabGame Plan Subject`
-            WHERE parent = %s AND subject = %s
-            LIMIT 1
-        """, (academic_plan.name, subject), as_dict=True)
-
-        if not plan_subject:
-            frappe.throw("هذه المادة غير مشمولة في خطتك الأكاديمية")
-
-        plan_subject = plan_subject[0]
-
-        # 1.4 Override subject title if display_name is set
-        subject_title = plan_subject.display_name or subject_info.title
-
-        # 1.5 Determine track
+        # ---------------------------------------------------------
+        # 🆕 منطق اختيار المسار
+        # ---------------------------------------------------------
+        # إذا لم يرسل الفرونت اند المسار، نأتي بالمسار الافتراضي
         if not track:
-            track = frappe.db.get_value("Game Learning Track",
+            track = frappe.db.get_value("Game Learning Track", 
                 {"subject": subject, "is_default": 1}, "name")
-
+        
+        # حماية إضافية: إذا لم يوجد أي مسار (حالة نادرة)، لا نكمل
         if not track:
-            frappe.throw("لا يوجد مسار تعليمي متاح لهذه المادة.")
+             frappe.throw("لا يوجد مسار تعليمي متاح لهذه المادة.")
 
-        # 1.6 Fetch Units based on inclusion mode
-        units_filter = {
-            "subject": subject,
-            "learning_track": track,
-            "is_published": 1  # Only published units
-        }
+        track_info = frappe.db.get_value("Game Learning Track", track, ["is_linear"], as_dict=True)
+        is_linear = track_info.is_linear if track_info else 1
+        # ---------------------------------------------------------
 
-        # Apply "Selected Units Only" filter if applicable
-        if plan_subject.inclusion_mode == "Selected Units Only":
-            # Query the child table for allowed units
-            allowed_unit_ids = frappe.get_all("Game Plan Allowed Unit",
-                filters={"parent": plan_subject.name},
-                pluck="unit"
-            )
-
-            if allowed_unit_ids:
-                # Filter to only include allowed units
-                units_filter["name"] = ["in", allowed_unit_ids]
-            else:
-                # No units specified - return empty (safer than showing all)
-                units = []
-
-        # Only fetch units if we haven't already determined it should be empty
-        if plan_subject.inclusion_mode != "Selected Units Only" or ("name" in units_filter and units_filter["name"]):
-            units = frappe.get_all("Game Unit",
-                filters=units_filter,
-                fields=["name", "title", "`order`", "is_free_preview"],
-                order_by="`order` asc, creation asc"
-            )
-        else:
-            units = []
-
-        if not units:
-            frappe.throw("لا توجد وحدات متاحة لهذه المادة في خطتك الأكاديمية")
-
-        # ================================================================
-        # 🔹 PHASE 2: ACCESS CONTROL (Freemium Locking)
-        # ================================================================
-
-        # 2.1 Get completed lessons for progress tracking
-        completed_lessons = frappe.get_all("Gameplay Session",
-            filters={"player": user},
-            pluck="lesson"
+        completed_lessons = frappe.get_all("Gameplay Session", 
+            filters={"player": user}, 
+            fields=["lesson"], 
+            pluck="lesson",
         )
-
-        # 2.2 Build the map with lock status
-        result = {
-            "subject_title": subject_title,
-            "units": []
-        }
-
+        
+        # 🆕 الفلترة بناءً على المسار المختار
+        units = frappe.get_all("Game Unit", 
+            filters={
+                "subject": subject,
+                "learning_track": track # <--- الفلتر هنا
+            }, 
+            fields=["name", "title", "`order`"], 
+            order_by="`order` asc, creation asc"
+        )
+        
+        full_map = []
+        
         for unit in units:
-            # Check if unit is unlocked
-            unit_unlocked = _check_unit_access(user, unit, subject, track)
-
-            # Fetch lessons for this unit
-            lessons = frappe.get_all("Game Lesson",
-                filters={
-                    "unit": unit.name,
-                    "is_published": 1  # Only published lessons
-                },
+            lessons = frappe.get_all("Game Lesson", 
+                filters={"unit": unit.name}, 
                 fields=["name", "title", "xp_reward"],
-                order_by="creation asc"
+                order_by="creation asc" 
             )
-
-            lesson_list = []
+            
             for lesson in lessons:
-                # Determine lesson status
+                status = "locked"
+                
                 if lesson.name in completed_lessons:
-                    lesson_status = "completed"
-                elif unit_unlocked:
-                    lesson_status = "available"
-                else:
-                    lesson_status = "locked"
-
-                lesson_list.append({
+                    status = "completed"
+                # الحالة 2: المسار "حر" (Non-Linear) -> كل شيء متاح ما لم يكن مكتملاً
+                elif not is_linear:
+                    status = "available"
+                elif not full_map or full_map[-1]["status"] == "completed":
+                    status = "available"
+                
+                
+                full_map.append({
                     "id": lesson.name,
                     "title": lesson.title,
-                    "status": lesson_status,
-                    "is_published": 1,
-                    "xp": lesson.xp_reward
+                    "unit_title": unit.title,
+                    "subject_title": subject_info.title,
+                    "status": status,
+                    "xp": lesson.xp_reward,
+                    "track": track # مفيد للفرونت اند للتأكد
                 })
-
-            # Determine unit status (for visual indicator)
-            if unit_unlocked:
-                unit_status = "available"
-            else:
-                unit_status = "locked"
-
-            result["units"].append({
-                "id": unit.name,
-                "title": unit.title,
-                "status": unit_status,
-                "is_free": unit.is_free_preview == 1,
-                "lessons": lesson_list
-            })
-
-        return result
+                    
+        return full_map
 
     except Exception as e:
         frappe.log_error(title="get_map_data failed", message=frappe.get_traceback())
         frappe.throw("تعذر تحميل خريطة الدروس.")
-
-
-def _check_unit_access(user, unit, subject, track):
-    """
-    Helper function to determine if a unit should be unlocked.
-
-    Unlock Logic (OR condition):
-    1. Free Preview: unit.is_free_preview == 1
-    2. Active Subscription: User has active subscription covering this subject/track
-
-    Args:
-        user: Current user
-        unit: Unit dict with is_free_preview field
-        subject: Subject name
-        track: Track name
-
-    Returns:
-        bool: True if unlocked, False if locked
-    """
-    # Check 1: Is it a free preview unit?
-    if unit.get("is_free_preview") == 1:
-        return True
-
-    # Check 2: Does user have active subscription?
-    has_subscription = _check_player_subscription(user, subject, track)
-    if has_subscription:
-        return True
-
-    # Default: Locked
-    return False
-
-
-def _check_player_subscription(user, subject, track=None):
-    """
-    Check if user has an active subscription that grants access to the subject/track.
-
-    Subscription Logic:
-    - Status must be "Active"
-    - Expiry date must be >= NOW
-    - If type is "Global Access": grants access to everything
-    - If type is "Specific Access": check access_items for matching subject or track
-
-    Args:
-        user: Current user
-        subject: Subject name to check
-        track: Track name to check (optional)
-
-    Returns:
-        bool: True if user has active subscription, False otherwise
-    """
-    try:
-        # Find player profile
-        profile_name = frappe.db.get_value("Player Profile", {"user": user}, "name")
-        if not profile_name:
-            return False
-
-        # Query for active subscriptions
-        # Note: expiry_date is a Date field, so we use CURDATE() for comparison
-        subscriptions = frappe.db.sql("""
-            SELECT name, type
-            FROM `tabGame Player Subscription`
-            WHERE player = %s
-              AND status = 'Active'
-              AND (expiry_date IS NULL OR expiry_date >= CURDATE())
-        """, (profile_name,), as_dict=True)
-
-        if not subscriptions:
-            return False
-
-        # Check each subscription
-        for sub in subscriptions:
-            # Global Access grants access to everything
-            if sub.type == "Global Access":
-                return True
-
-            # Specific Access: check access_items
-            if sub.type == "Specific Access":
-                # Check if subject or track is in access_items
-                access_items = frappe.db.sql("""
-                    SELECT type, subject, track
-                    FROM `tabGame Subscription Access`
-                    WHERE parent = %s
-                """, (sub.name,), as_dict=True)
-
-                for item in access_items:
-                    # Check subject access
-                    if item.type == "Subject" and item.subject == subject:
-                        return True
-
-                    # Check track access
-                    if item.type == "Track" and track and item.track == track:
-                        return True
-
-        return False
-
-    except Exception as e:
-        frappe.log_error("Check Subscription Error", frappe.get_traceback())
-        return False
-
-
-def _get_demo_mode_map(subject, track, subject_info):
-    """
-    Fallback mode when user has no profile or academic plan.
-    Shows only the first unit with first lesson unlocked.
-
-    Args:
-        subject: Subject name
-        track: Track name (optional)
-        subject_info: Subject info dict
-
-    Returns:
-        dict: Demo mode map structure
-    """
-    try:
-        # Determine track
-        if not track:
-            track = frappe.db.get_value("Game Learning Track",
-                {"subject": subject, "is_default": 1}, "name")
-
-        if not track:
-            return {
-                "subject_title": subject_info.title + " (Demo)",
-                "units": []
-            }
-
-        # Get first unit only
-        first_unit = frappe.db.get_value("Game Unit",
-            {
-                "subject": subject,
-                "learning_track": track,
-                "is_published": 1
-            },
-            ["name", "title", "is_free_preview"],
-            as_dict=True,
-            order_by="`order` asc, creation asc"
-        )
-
-        if not first_unit:
-            return {
-                "subject_title": subject_info.title + " (Demo)",
-                "units": []
-            }
-
-        # Get first lesson only
-        first_lesson = frappe.db.get_value("Game Lesson",
-            {
-                "unit": first_unit.name,
-                "is_published": 1
-            },
-            ["name", "title", "xp_reward"],
-            as_dict=True,
-            order_by="creation asc"
-        )
-
-        lessons = []
-        if first_lesson:
-            lessons.append({
-                "id": first_lesson.name,
-                "title": first_lesson.title,
-                "status": "available",  # First lesson is unlocked in demo mode
-                "is_published": 1,
-                "xp": first_lesson.xp_reward
-            })
-
-        return {
-            "subject_title": subject_info.title + " (Demo)",
-            "units": [{
-                "id": first_unit.name,
-                "title": first_unit.title,
-                "status": "available",
-                "is_free": True,
-                "lessons": lessons
-            }]
-        }
-
-    except Exception as e:
-        frappe.log_error("Demo Mode Error", frappe.get_traceback())
-        return {
-            "subject_title": subject_info.title + " (Demo)",
-            "units": []
-        }
 
 
 @frappe.whitelist()
