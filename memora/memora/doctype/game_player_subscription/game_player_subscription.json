@@ -13,8 +13,6 @@
   "linked_season",
   "type",
   "status",
-  "start_date",
-  "expiry_date",
   "access_items"
  ],
  "fields": [
@@ -38,7 +36,8 @@
    "fieldname": "linked_season",
    "fieldtype": "Link",
    "label": "Linked Season",
-   "options": "Game Subscription Season"
+   "options": "Game Subscription Season",
+   "read_only": 1
   },
   {
    "fieldname": "type",
@@ -55,16 +54,6 @@
    "options": "Active\nSuspended\nExpired"
   },
   {
-   "fieldname": "start_date",
-   "fieldtype": "Date",
-   "label": "Start Date"
-  },
-  {
-   "fieldname": "expiry_date",
-   "fieldtype": "Date",
-   "label": "Expiry Date"
-  },
-  {
    "depends_on": "eval:doc.type=='Specific Access'",
    "fieldname": "access_items",
    "fieldtype": "Table",
@@ -75,7 +64,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-17 13:30:08.946683",
+ "modified": "2026-01-17 13:57:40.704981",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Player Subscription",

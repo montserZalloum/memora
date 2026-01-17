@@ -10,6 +10,7 @@
   "item_name",
   "target_grade",
   "target_streams",
+  "linked_season",
   "description",
   "image",
   "price",
@@ -65,12 +66,20 @@
    "fieldtype": "Table MultiSelect",
    "label": "Target Streams",
    "options": "Game Item Target Stream"
+  },
+  {
+   "fieldname": "linked_season",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Linked Season",
+   "options": "Game Subscription Season",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-17 11:49:02.821352",
+ "modified": "2026-01-17 13:56:12.670858",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Sales Item",
