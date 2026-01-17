@@ -1452,3 +1452,67 @@ def set_academic_profile(grade_id, stream_id=None):
     except Exception as e:
         frappe.log_error(title="set_academic_profile failed", message=frappe.get_traceback())
         frappe.throw(_("Failed to update academic profile."))
+
+
+# =========================================================
+# 🛒 STORE APIs
+# =========================================================
+
+@frappe.whitelist()
+def get_store_items():
+    """
+    جلب المنتجات المتاحة للشراء في المتجر.
+    يستثني المواد التي اشتراها الطالب بالفعل (Logic ذكي).
+    """
+    try:
+        user = frappe.session.user
+        
+        # 1. جلب كل المنتجات المنشورة
+        items = frappe.get_all("Game Sales Item", 
+            fields=["name", "item_name", "description", "price", "discounted_price", "image", "sku"],
+            order_by="price asc"
+        )
+        
+        # 2. (مستقبلاً) يمكننا إضافة منطق هنا لإخفاء ما تم شراؤه
+        # حالياً سنعيد الكل والفرونت يقرر
+        
+        return items
+    except Exception as e:
+        return []
+
+@frappe.whitelist()
+def buy_item_mock(item_id):
+    """
+    دالة وهمية (Mock) لمحاكاة الشراء (لأغراض التيست حالياً).
+    تقوم بإنشاء اشتراك فوراً بدون دفع.
+    """
+    try:
+        user = frappe.session.user
+        
+        # 1. جلب تفاصيل الباقة
+        item = frappe.get_doc("Game Sales Item", item_id)
+        
+        # 2. إنشاء اشتراك جديد
+        sub = frappe.get_doc({
+            "doctype": "Game Player Subscription",
+            "player": user,
+            "status": "Active",
+            "type": "Specific Access", # أو حسب الباقة
+            "start_date": frappe.utils.nowdate(),
+            "expiry_date": frappe.utils.add_months(frappe.utils.nowdate(), 12), # سنة كاملة
+            "access_items": []
+        })
+        
+        # 3. نسخ محتويات الباقة إلى الاشتراك
+        for content in item.bundle_contents:
+            sub.append("access_items", {
+                "type": content.type,
+                "subject": content.target_subject,
+                "track": content.target_track
+            })
+            
+        sub.insert(ignore_permissions=True)
+        return {"status": "success", "message": "Fake purchase successful! Subscription active."}
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
