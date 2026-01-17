@@ -1585,68 +1585,106 @@ def set_academic_profile(grade, stream=None):
 @frappe.whitelist()
 def get_store_items():
     """
-    جلب منتجات المتجر مع فلترة ذكية حسب الصف والتخصص.
-    المنطق:
-    1. إذا كان المنتج مرتبطاً بصف معين، يجب أن يطابق صف الطالب.
-    2. إذا كان المنتج مرتبطاً بتخصصات معينة (قائمة)، يجب أن يكون تخصص الطالب من ضمنها.
-    3. إذا كانت الحقول فارغة، يعتبر المنتج عاماً ويظهر للجميع.
+    جلب المنتجات المتاحة للشراء.
+    التحديث: يخفي المنتجات التي تم شراؤها أو التي لها طلب معلق.
     """
     try:
         user = frappe.session.user
         
-        # 1. جلب سياق الطالب (الصف والتخصص)
+        # 1. جلب سياق الطالب (للفلترة حسب الصف والتخصص)
         profile = frappe.db.get_value("Player Profile", {"user": user}, 
             ["current_grade", "current_stream"], as_dict=True)
         
         user_grade = profile.get("current_grade") if profile else None
         user_stream = profile.get("current_stream") if profile else None
 
-        # 2. جلب كل المنتجات (Master Data)
+        # -------------------------------------------------------
+        # 🕵️‍♂️ الفلترة الذكية (Smart Filtering)
+        # -------------------------------------------------------
+        
+        # أ. قائمة المنتجات التي لها طلبات معلقة (Pending Requests)
+        pending_item_ids = frappe.get_all("Game Purchase Request", 
+            filters={"user": user, "docstatus": 0}, # 0 = Draft/Pending
+            pluck="sales_item"
+        )
+
+        # ب. قائمة المواد التي يملك الطالب اشتراكاً فعالاً بها
+        # (نستخدم الدالة المساعدة التي كتبناها سابقاً)
+        active_subs = get_user_active_subscriptions(user) # ترجع قائمة [{'type': 'Subject', 'subject': 'Math'}, ...]
+
+        # تحويل الاشتراكات لمجموعة سهلة البحث (Set of Subjects/Tracks)
+        subscribed_subjects = {s['subject'] for s in active_subs if s['type'] == 'Subject'}
+        subscribed_tracks = {s['track'] for s in active_subs if s['type'] == 'Track'}
+        is_global_subscriber = any(s['type'] == 'Global' for s in active_subs)
+
+        if is_global_subscriber:
+            return [] # المشترك الشامل لا يحتاج لشراء شيء!
+
+        # -------------------------------------------------------
+        # 2. جلب المنتجات ومعالجتها
+        # -------------------------------------------------------
         items = frappe.get_all("Game Sales Item", 
             fields=["name", "item_name", "description", "price", "discounted_price", "image", "sku", "target_grade"],
             order_by="price asc"
         )
         
-        if not items:
-            return []
-
-        # 3. جلب قواعد التخصصات (Child Table Data) دفعة واحدة 🚀
-        # هذا أسرع بكثير من الاستعلام داخل الـ loop
+        # جلب قواعد التخصصات (كما فعلنا سابقاً)
         item_names = [item.name for item in items]
-        
-        stream_rules = {} # { 'item_id': ['Scientific', 'Literary'] }
-        
-        # نجلب كل التخصصات المستهدفة لكل المنتجات الموجودة
-        all_targets = frappe.get_all("Game Item Target Stream", 
-            filters={"parent": ["in", item_names]}, 
-            fields=["parent", "stream"]
-        )
-        
-        # تجميع البيانات
+        stream_rules = {}
+        all_targets = frappe.get_all("Game Item Target Stream", filters={"parent": ["in", item_names]}, fields=["parent", "stream"])
         for t in all_targets:
-            if t.parent not in stream_rules:
-                stream_rules[t.parent] = []
+            if t.parent not in stream_rules: stream_rules[t.parent] = []
             stream_rules[t.parent].append(t.stream)
 
-        # 4. عملية الفلترة (The Filtering Engine) 🛡️
+        # جلب محتويات الباقات (لنعرف ماذا تبيع كل باقة)
+        # هذا ضروري لنعرف هل الطالب يملك محتوى الباقة أم لا
+        bundle_contents = frappe.get_all("Game Bundle Content", 
+            filters={"parent": ["in", item_names]}, 
+            fields=["parent", "type", "target_subject", "target_track"]
+        )
+        
+        # تنظيم المحتويات: { 'item_id': [{'type': 'Subject', 'id': 'Math'}, ...] }
+        item_contents_map = {}
+        for c in bundle_contents:
+            if c.parent not in item_contents_map: item_contents_map[c.parent] = []
+            item_contents_map[c.parent].append(c)
+
+        # -------------------------------------------------------
+        # 3. حلقة الفلترة النهائية
+        # -------------------------------------------------------
         filtered_items = []
         
         for item in items:
-            # أ. فحص الصف (Grade Check)
-            # إذا كان المنتج محدداً لصف، ولم يطابق صف الطالب -> استبعاد
+            # 1. فلترة الطلبات المعلقة
+            if item.name in pending_item_ids:
+                continue # إخفاء ما تم طلبه
+
+            # 2. فلترة الملكية (Ownership Check)
+            # إذا كانت الباقة تحتوي على مادة، والطالب يملك هذه المادة -> نخفي الباقة
+            # (للتبسيط: نخفي الباقة إذا كان الطالب يملك *أي* جزء منها لتجنب الشراء المزدوج)
+            is_owned = False
+            contents = item_contents_map.get(item.name, [])
+            
+            for content in contents:
+                if content.type == 'Subject' and content.target_subject in subscribed_subjects:
+                    is_owned = True
+                    break
+                if content.type == 'Track' and content.target_track in subscribed_tracks:
+                    is_owned = True
+                    break
+            
+            if is_owned:
+                continue # إخفاء ما يملكه الطالب
+
+            # 3. فلترة الصف والتخصص (الكود القديم)
             if item.target_grade and item.target_grade != user_grade:
                 continue
 
-            # ب. فحص التخصص (Stream Check)
             allowed_streams = stream_rules.get(item.name, [])
+            if allowed_streams and (not user_stream or user_stream not in allowed_streams):
+                continue
             
-            # إذا كان المنتج محدداً لتخصصات معينة (القائمة ليست فارغة)
-            if allowed_streams:
-                # إذا الطالب ليس لديه تخصص، أو تخصصه غير موجود في القائمة -> استبعاد
-                if not user_stream or user_stream not in allowed_streams:
-                    continue
-            
-            # إذا نجح في الاختبارات، نضيفه للقائمة النهائية
+            # نجح في كل الاختبارات
             filtered_items.append(item)
 
         return filtered_items
@@ -1655,39 +1693,47 @@ def get_store_items():
         frappe.log_error("Get Store Items Failed", frappe.get_traceback())
         return []
 
+
 @frappe.whitelist()
-def buy_item_mock(item_id):
+def request_purchase(item_id, transaction_id=None):
     """
-    دالة وهمية (Mock) لمحاكاة الشراء (لأغراض التيست حالياً).
-    تقوم بإنشاء اشتراك فوراً بدون دفع.
+    يقوم الطالب بإرسال طلب شراء.
+    الحالة الافتراضية: Pending.
+    لن يفتح المحتوى إلا بعد موافقة الآدمن.
     """
     try:
         user = frappe.session.user
         
-        # 1. جلب تفاصيل الباقة
-        item = frappe.get_doc("Game Sales Item", item_id)
-        
-        # 2. إنشاء اشتراك جديد
-        sub = frappe.get_doc({
-            "doctype": "Game Player Subscription",
-            "player": user,
-            "status": "Active",
-            "type": "Specific Access", # أو حسب الباقة
-            "start_date": frappe.utils.nowdate(),
-            "expiry_date": frappe.utils.add_months(frappe.utils.nowdate(), 12), # سنة كاملة
-            "access_items": []
+        # التأكد من عدم وجود طلب معلق لنفس الباقة (منع التكرار)
+        existing = frappe.db.exists("Game Purchase Request", {
+            "user": user,
+            "sales_item": item_id,
+            "docstatus": 0 # 0 means Draft/Pending
         })
         
-        # 3. نسخ محتويات الباقة إلى الاشتراك
-        for content in item.bundle_contents:
-            sub.append("access_items", {
-                "type": content.type,
-                "subject": content.target_subject,
-                "track": content.target_track
-            })
-            
-        sub.insert(ignore_permissions=True)
-        return {"status": "success", "message": "Fake purchase successful! Subscription active."}
+        if existing:
+            return {"status": "pending", "message": "لديك طلب قيد المراجعة لهذه الباقة بالفعل."}
+
+        # جلب السعر للحفظ
+        item_price = frappe.db.get_value("Game Sales Item", item_id, "discounted_price") or \
+                     frappe.db.get_value("Game Sales Item", item_id, "price")
+
+        # إنشاء الطلب
+        doc = frappe.get_doc({
+            "doctype": "Game Purchase Request",
+            "user": user,          # تأكد من تطابق اسم الحقل مع الـ DocType
+            "sales_item": item_id, # تأكد من تطابق اسم الحقل
+            "status": "Pending",
+            "price": item_price,
+            "transaction_id": transaction_id # لو أرسله من الفرونت
+        })
+        doc.insert(ignore_permissions=True)
         
+        return {
+            "status": "success", 
+            "message": "تم إرسال طلبك! سيتم تفعيل الاشتراك بعد مراجعة الإدارة."
+        }
+
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        frappe.log_error("Purchase Request Failed", frappe.get_traceback())
+        return {"status": "error", "message": "حدث خطأ أثناء الطلب."}
