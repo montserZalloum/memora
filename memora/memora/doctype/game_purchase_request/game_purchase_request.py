@@ -28,7 +28,7 @@ class GamePurchaseRequest(Document):
         # 2. إنشاء اشتراك جديد
         sub = frappe.get_doc({
             "doctype": "Game Player Subscription",
-            "player": self.user,
+            "player": "PROFILE-"+self.user,
             "status": "Active",
             "type": "Specific Access", 
             "start_date": nowdate(),
