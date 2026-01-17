@@ -53,6 +53,12 @@ class GamePurchaseRequest(Document):
             self.create_subscription()
 
     def create_subscription(self):
+
+        profile_name = frappe.db.get_value("Player Profile", {"user": self.user}, "name")
+        
+        if not profile_name:
+            frappe.throw(f"خطأ فادح: لم يتم العثور على بروفايل لاعب للمستخدم {self.user}")
+
         # 1. جلب تفاصيل الباقة الأصلية
         if not self.sales_item:
             frappe.throw("لا يوجد باقة مختارة في هذا الطلب")
@@ -66,7 +72,7 @@ class GamePurchaseRequest(Document):
         # 2. إنشاء اشتراك جديد (بدون تواريخ يدوية)
         sub = frappe.get_doc({
             "doctype": "Game Player Subscription",
-            "player": "PROFILE-"+self.user,
+            "player": profile_name,
             "status": "Active",
             "type": "Specific Access", 
             "linked_season": sales_item.linked_season, # 👈 الربط الجوهري هنا
