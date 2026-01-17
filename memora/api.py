@@ -1341,117 +1341,98 @@ def get_leaderboard(subject=None, period='all_time'):
 # 🎓 STUDENT ONBOARDING APIS
 # =========================================================
 
-@frappe.whitelist(methods=['GET'])
+@frappe.whitelist()
 def get_academic_masters():
     """
-    Get available grades, streams, and current academic year for student onboarding.
-    Returns: {grades: [...], streams: [...], current_year: "2025"}
+    جلب البيانات الرئيسية للتسجيل.
+    التحديث: يربط التخصصات بالصفوف (Nested Streams).
+    يرجع JSON يحتوي على الصفوف، وكل صف يحتوي على قائمة IDs للتخصصات المسموحة له.
     """
     try:
-        # Fetch all Game Academic Grade records
-        grades = frappe.get_all("Game Academic Grade",
+        # 1. جلب التخصصات (كمرجع كامل - Master Data)
+        # نحتاج هذا لكي يعرف الفرونت اسم التخصص ورقمه
+        all_streams = frappe.get_all("Game Academic Stream", 
+            fields=["name", "stream_name"], 
+            order_by="creation asc"
+        )
+        
+        # 2. جلب الصفوف مع تخصصاتها المسموحة
+        # نستخدم get_all للجلب السريع، ثم loop بسيط
+        grades_list = frappe.get_all("Game Academic Grade", 
             fields=["name", "grade_name"],
             order_by="creation asc"
         )
+        
+        enriched_grades = []
+        for g in grades_list:
+            # نحتاج للدخول للجدول الفرعي، لذا نستخدم get_doc أو استعلام مخصص
+            # هنا نستخدم استعلام مباشر للأداء الأفضل (بدل تحميل كامل الدوكيومنت)
+            allowed_streams = frappe.get_all("Game Grade Valid Stream", 
+                filters={"parent": g.name}, 
+                pluck="stream" # يرجع قائمة IDs مباشرة ['Scientific', 'Literary']
+            )
+            
+            enriched_grades.append({
+                "id": g.name,
+                "name": g.grade_name,
+                "allowed_streams": allowed_streams # 👈 القائمة المفلترة
+            })
 
-        # Fetch all Game Academic Stream records
-        streams = frappe.get_all("Game Academic Stream",
-            fields=["name", "stream_name"],
-            order_by="creation asc"
-        )
-
-        # Fetch the active Game Subscription Season
-        active_season = frappe.db.get_value("Game Subscription Season",
-            {"is_active": 1},
-            "season_name"
-        )
-
-        # Transform the data to match frontend expectations
-        grades_list = [{"id": grade.name, "name": grade.grade_name} for grade in grades]
-        streams_list = [{"id": stream.name, "name": stream.stream_name} for stream in streams]
+        # 3. الموسم الحالي
+        active_season = frappe.db.get_value("Game Subscription Season", 
+            {"is_active": 1}, "name") or "2025"
 
         return {
-            "grades": grades_list,
-            "streams": streams_list,
-            "current_year": active_season or "2025"
+            "grades": enriched_grades,
+            "streams": all_streams,
+            "current_season": active_season
         }
-
+        
     except Exception as e:
-        frappe.log_error(title="get_academic_masters failed", message=frappe.get_traceback())
-        frappe.throw(_("Failed to load academic masters data."))
+        frappe.log_error("Get Masters Failed", frappe.get_traceback())
+        return {"grades": [], "streams": [], "current_season": "2025"}
 
 
-@frappe.whitelist(methods=['POST'])
-def set_academic_profile(grade_id, stream_id=None):
+@frappe.whitelist()
+def set_academic_profile(grade, stream=None):
     """
-    Update the player's academic profile with selected grade and stream.
-    Args:
-        grade_id: The Game Academic Grade ID
-        stream_id: The Game Academic Stream ID (optional)
-    Returns: {status: "success", message: "Profile updated"}
+    حفظ خيارات الطالب (الصف والتخصص).
+    التحديث: يتحقق من أن التخصص المختار مسموح به لهذا الصف.
     """
     try:
         user = frappe.session.user
+        
+        # 1. التحقق من الصف
+        if not frappe.db.exists("Game Academic Grade", grade):
+            frappe.throw("Invalid Grade Selected")
 
-        # Validate that grade_id exists
-        if not frappe.db.exists("Game Academic Grade", grade_id):
-            frappe.throw(_("Invalid grade selected."))
-
-        # Validate stream_id if provided
-        if stream_id and not frappe.db.exists("Game Academic Stream", stream_id):
-            frappe.throw(_("Invalid stream selected."))
-
-        # Get the active Game Subscription Season
-        active_season = frappe.db.get_value("Game Subscription Season",
-            {"is_active": 1},
-            "season_name"
-        )
-
-        if not active_season:
-            frappe.log_error(title="No active season", message="No active Game Subscription Season found")
-            active_season = "2025"  # Fallback to default
-
-        # Get or create Player Profile
-        profile_name = frappe.db.get_value("Player Profile", {"user": user}, "name")
-
-        if profile_name:
-            # Update existing profile
-            profile_doc = frappe.get_doc("Player Profile", profile_name)
-            profile_doc.current_grade = grade_id
-            profile_doc.current_stream = stream_id if stream_id else None
-            profile_doc.academic_year = active_season
-            profile_doc.save(ignore_permissions=True)
-        else:
-            # Create new profile if it doesn't exist
-            profile_doc = frappe.get_doc({
-                "doctype": "Player Profile",
-                "user": user,
-                "total_xp": 0,
-                "gems_balance": 50,
-                "current_grade": grade_id,
-                "current_stream": stream_id if stream_id else None,
-                "academic_year": active_season
+        # 2. التحقق من التخصص (Validation Logic) 🛡️
+        if stream:
+            # هل هذا التخصص موجود في قائمة المسموحات لهذا الصف؟
+            is_allowed = frappe.db.exists("Game Grade Valid Stream", {
+                "parent": grade,
+                "stream": stream
             })
-            profile_doc.insert(ignore_permissions=True)
+            
+            if not is_allowed:
+                # محاولة اختراق أو خطأ في البيانات
+                frappe.throw(f"Stream '{stream}' is not valid for Grade '{grade}'")
+            
+        # 3. جلب الموسم الفعال
+        season = frappe.db.get_value("Game Subscription Season", {"is_active": 1}, "name")
 
-        # Clear caches (optional but good practice)
-        frappe.cache().delete_value(f"player_profile_{user}")
+        # 4. تحديث البروفايل
+        frappe.db.set_value("Player Profile", {"user": user}, {
+            "current_grade": grade,
+            "current_stream": stream if stream else None,
+            "academic_year": season
+        })
 
-        # Clear any existing Player Subject Score or Player Memory Tracker caches if necessary
-        # This ensures fresh data for the new academic profile
-        frappe.cache().delete_value(f"subject_scores_{user}")
-        frappe.cache().delete_value(f"memory_tracker_{user}")
-
-        frappe.db.commit()
-
-        return {
-            "status": "success",
-            "message": _("Profile updated successfully")
-        }
+        return {"status": "success", "message": "Academic profile updated"}
 
     except Exception as e:
-        frappe.log_error(title="set_academic_profile failed", message=frappe.get_traceback())
-        frappe.throw(_("Failed to update academic profile."))
+        frappe.log_error("Set Profile Failed", frappe.get_traceback())
+        return {"status": "error", "message": str(e)}
 
 
 # =========================================================
