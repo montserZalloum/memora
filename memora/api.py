@@ -8,35 +8,78 @@ import random
 @frappe.whitelist()
 def get_subjects():
     """
-    Get all published subjects (general listing).
-    For subjects specific to a student's academic plan, use get_my_subjects instead.
+    جلب المواد الخاصة بالطالب بناءً على خطته الدراسية (صفه وتخصصه).
+    المنطق:
+    1. نحدد صف وتخصص الطالب.
+    2. نجلب الخطة الدراسية (Academic Plan) المطابقة.
+    3. نعرض المواد المذكورة في الخطة فقط.
+    4. نستخدم "اسم العرض" (Display Name) من الخطة إذا وجد (مثلاً: عرض "رياضيات" بدلاً من "رياضيات أدبي").
     """
     try:
-        # 1. جلب المواضيع المنشورة فقط
-        subjects = frappe.get_all("Game Subject",
-            fields=["name", "title", "icon"],
-            filters={"is_published": 1},
-            order_by="creation asc"
+        user = frappe.session.user
+        
+        # 1. جلب بيانات الطالب (Context)
+        profile = frappe.db.get_value("Player Profile", {"user": user}, 
+            ["current_grade", "current_stream", "academic_year"], as_dict=True)
+            
+        if not profile or not profile.current_grade:
+            # حالة خاصة: لم يقم الطالب بالتسجيل (Onboarding) بعد
+            # يمكننا إرجاع "كل المواد" كعرض تجريبي، أو قائمة فارغة لتوجيهه للإعدادات
+            # سنرجع فارغ ليقوم الفرونت بتحويله لصفحة Onboarding
+            return []
+
+        # 2. البحث عن الخطة الدراسية (The Plan)
+        # نبحث عن خطة تطابق الصف + التخصص + السنة
+        filters = {
+            "grade": profile.current_grade,
+            "year": profile.academic_year or "2025" # Fallback year
+        }
+        
+        # التخصص قد يكون فارغاً (للصفوف الأساسية)، لذا نتحقق منه
+        if profile.current_stream:
+            filters["stream"] = profile.current_stream
+            
+        plan_name = frappe.db.get_value("Game Academic Plan", filters, "name")
+        
+        if not plan_name:
+            # لم نجد خطة لهذا التخصص! (خطأ في إدخال البيانات من الأدمن)
+            return []
+
+        # 3. جلب المواد من داخل الخطة
+        # نستخرج المواد من الجدول الفرعي (Game Plan Subject)
+        plan_subjects = frappe.get_all("Game Plan Subject", 
+            filters={"parent": plan_name}, 
+            fields=["subject", "display_name"],
+            order_by="idx asc" # الترتيب حسب ما وضعه الأدمن في الخطة
         )
+        
+        final_list = []
+        
+        for item in plan_subjects:
+            # جلب تفاصيل المادة الأصلية (الأيقونة، اللون، إلخ)
+            original_subject = frappe.db.get_value("Game Subject", item.subject, 
+                ["name", "title", "icon", "is_paid"], as_dict=True)
+            
+            if not original_subject: continue
 
-        # 2. إضافة إحصائيات بسيطة لكل موضوع (اختياري لكنه رائع للواجهة)
-        # for subject in subjects:
-        #     # حساب عدد الدروس الكلي في هذا الموضوع
-        #     # نقوم بالبحث عن الوحدات التابعة للموضوع، ثم الدروس التابعة لتلك الوحدات
-        #     units = frappe.get_all("Game Unit", filters={"subject": subject.name}, pluck="name")
+            # المنطق الذكي للتسمية 🧠
+            # إذا كان هناك "display_name" في الخطة، نستخدمه (مثلاً: "إنجليزي")
+            # وإلا نستخدم الاسم الأصلي (مثلاً: "إنجليزي مستوى ثالث")
+            title_to_show = item.display_name if item.display_name else original_subject.title
+            
+            final_list.append({
+                "name": original_subject.name,   # الـ ID الحقيقي
+                "title": title_to_show,          # الاسم المخصص للطالب
+                "icon": original_subject.icon,
+                "is_paid": original_subject.is_paid
+                # لا نرسل "locked" هنا، لأننا نريد السماح له بالدخول لرؤية الـ Free Preview
+            })
 
-        #     if units:
-        #         lesson_count = frappe.db.count("Game Lesson", filters={"unit": ["in", units]})
-        #     else:
-        #         lesson_count = 0
-
-        #     subject["total_lessons"] = lesson_count
-
-        return subjects
+        return final_list
 
     except Exception as e:
-        frappe.log_error(title="get_subjects failed", message=frappe.get_traceback())
-        frappe.throw("تعذر تحميل المواضيع حالياً.")
+        frappe.log_error("Get Subjects Failed", frappe.get_traceback())
+        return []
 
 
 @frappe.whitelist()
@@ -126,173 +169,269 @@ def get_game_tracks(subject):
         return []
         
 
+import frappe
+from frappe import _
+from frappe.utils import nowdate, cint
+
+# =========================================================
+# 🗺️ MAP ENGINE: The Core Logic
+# =========================================================
+
 @frappe.whitelist()
 def get_map_data(subject=None, track=None):
     """
-    Fetch the learning map for a student based on their Academic Plan.
-    New Logic:
-    - Uses the student's Player Profile (grade, stream, year) to find their Game Academic Plan
-    - Processes the flat list of subject selections (All Units vs Specific Units)
-    - Aggregates and returns the lesson map accordingly
-
-    If 'subject' parameter is provided, filters to that subject only (legacy support).
+    محرك الخريطة الدراسي (The Academic Map Engine).
+    يقوم بجلب المحتوى، فلترته حسب الخطة الدراسية، وتطبيق قواعد القفل المالي والتقدم.
     """
     try:
         user = frappe.session.user
 
         # ---------------------------------------------------------
-        # 1. Fetch Player Profile to get academic info
+        # 1. تحديد هوية الطالب (Academic Context)
         # ---------------------------------------------------------
-        profile = frappe.db.get_value("Player Profile",
-            {"user": user},
-            ["current_grade", "current_stream", "academic_year"],
-            as_dict=True)
+        profile = frappe.db.get_value("Player Profile", {"user": user}, 
+            ["current_grade", "current_stream", "academic_year"], as_dict=True)
 
         if not profile or not profile.current_grade:
-            frappe.throw(_("Please complete your academic profile first. Grade and Stream are required."))
-
-        current_grade = profile.current_grade
-        current_stream = profile.current_stream
-        academic_year = profile.academic_year or "2025"
+            # لم يقم بالتسجيل بعد، نرجع قائمة فارغة ليقوم الفرونت بتوجيهه
+            return []
 
         # ---------------------------------------------------------
-        # 2. Fetch the Game Academic Plan matching the profile
+        # 2. جلب الخطة الدراسية (Fetch Plan)
         # ---------------------------------------------------------
         plan_filters = {
-            "grade": current_grade,
-            "year": academic_year
+            "grade": profile.current_grade,
+            "year": profile.academic_year or "2025"
         }
-
-        # Only filter by stream if it's set in the profile
-        if current_stream:
-            plan_filters["stream"] = current_stream
+        if profile.current_stream:
+            plan_filters["stream"] = profile.current_stream
 
         plan_name = frappe.db.get_value("Game Academic Plan", plan_filters, "name")
-
         if not plan_name:
-            frappe.throw(_("No Academic Plan found for your grade, stream, and year. Please contact administrator."))
+            # لا توجد خطة مطابقة (حالة نادرة)
+            return []
 
-        plan = frappe.get_doc("Game Academic Plan", plan_name)
-
-        # ---------------------------------------------------------
-        # 3. Process the flat list to build plan_rules
-        # ---------------------------------------------------------
-        # Structure: { subject_name: { 'include_all': False, 'units': [], 'display_name': '', 'subject_info': {} } }
-        plan_rules = {}
-
-        for row in plan.subjects:
-            subject_name = row.subject
-
-            # Initialize if this is the first time we see this subject
-            if subject_name not in plan_rules:
-                plan_rules[subject_name] = {
-                    'include_all': False,
-                    'units': [],
-                    'display_name': row.display_name or subject_name,
-                    'subject_info': None  # Will be populated later
-                }
-
-            # Process selection type
-            if row.selection_type == 'All Units':
-                plan_rules[subject_name]['include_all'] = True
-            elif row.selection_type == 'Specific Unit' and row.specific_unit:
-                # Only add if not already in the list
-                if row.specific_unit not in plan_rules[subject_name]['units']:
-                    plan_rules[subject_name]['units'].append(row.specific_unit)
+        plan_doc = frappe.get_doc("Game Academic Plan", plan_name)
 
         # ---------------------------------------------------------
-        # 4. Filter by subject if provided (legacy support)
+        # 3. معالجة قواعد الخطة (Aggregation Rules)
         # ---------------------------------------------------------
-        if subject:
-            if subject not in plan_rules:
-                frappe.throw(_("This subject is not part of your academic plan."))
-            # Filter to only the requested subject
-            plan_rules = {subject: plan_rules[subject]}
+        # نقوم بتجميع الأسطر المتفرقة في الخطة لتكوين "قواعد" لكل مادة
+        # Structure: { subject_id: { 'include_all': Bool, 'units': Set(), 'display_name': Str } }
+        subject_rules = {}
 
-        # ---------------------------------------------------------
-        # 5. Fetch completed lessons for the user
-        # ---------------------------------------------------------
-        completed_lessons = frappe.get_all("Gameplay Session",
-            filters={"player": user},
-            fields=["lesson"],
-            pluck="lesson",
-        )
-
-        # ---------------------------------------------------------
-        # 6. Build the lesson map
-        # ---------------------------------------------------------
-        full_map = []
-
-        for subject_name, rules in plan_rules.items():
-            # Fetch subject info
-            subject_info = frappe.db.get_value("Game Subject",
-                {"name": subject_name, "is_published": 1},
-                ["name", "title", "icon"], as_dict=True)
-
-            if not subject_info:
-                # Skip unpublished subjects
+        for row in plan_doc.subjects:
+            # فلترة: إذا طلب الـ API مادة معينة، نتجاهل الباقي
+            if subject and row.subject != subject:
                 continue
 
-            # Determine which units to fetch
-            unit_filters = {}
+            if row.subject not in subject_rules:
+                subject_rules[row.subject] = {
+                    'include_all': False,
+                    'units': set(),
+                    'display_name': row.display_name or None
+                }
+            
+            rule = subject_rules[row.subject]
+            
+            # تحديث الاسم إذا وجد
+            if row.display_name: rule['display_name'] = row.display_name
 
-            if rules['include_all']:
-                # Include all units for this subject
-                # Note: We're not filtering by learning_track anymore as per new design
-                unit_filters = {"subject": subject_name}
-            else:
-                # Include only specific units
-                if not rules['units']:
-                    # No units specified, skip this subject
-                    continue
-                unit_filters = {"name": ["in", rules['units']]}
+            # منطق الدمج (All Units تغلب Specific Units)
+            if row.selection_type == 'All Units':
+                rule['include_all'] = True
+            elif row.selection_type == 'Specific Unit' and row.specific_unit:
+                rule['units'].add(row.specific_unit)
 
-            # Fetch units
-            units = frappe.get_all("Game Unit",
+        # ---------------------------------------------------------
+        # 4. جلب الاشتراكات الفعالة (Caching Subscriptions)
+        # ---------------------------------------------------------
+        # نجلب الاشتراكات مرة واحدة لتجنب الاستعلام داخل الـ Loop
+        active_subs = get_user_active_subscriptions(user)
+
+        # ---------------------------------------------------------
+        # 5. جلب الدروس المكتملة (Progress)
+        # ---------------------------------------------------------
+        completed_lessons = set(frappe.get_all("Gameplay Session", 
+            filters={"player": user}, pluck="lesson"))
+
+        # ---------------------------------------------------------
+        # 6. بناء الخريطة الهرمية (Building the Tree)
+        # ---------------------------------------------------------
+        final_map = []
+
+        for sub_id, rule in subject_rules.items():
+            # أ. بيانات المادة
+            subject_doc = frappe.db.get_value("Game Subject", sub_id, 
+                ["name", "title", "is_paid"], as_dict=True)
+            if not subject_doc: continue
+
+            # ب. جلب الوحدات (مع الترتيب)
+            unit_filters = {"subject": sub_id}
+            if not rule['include_all']:
+                if not rule['units']: continue # لا يوجد وحدات مختارة
+                unit_filters["name"] = ["in", list(rule['units'])]
+
+            # نحتاج لمعرفة التراك لكل وحدة لفحص الـ is_paid الخاص به
+            units = frappe.get_all("Game Unit", 
                 filters=unit_filters,
-                fields=["name", "title", "`order`"],
+                fields=["name", "title", "learning_track", "is_free_preview", "`order`"],
                 order_by="`order` asc, creation asc"
             )
 
-            # Determine if linear progression (for now, assume linear by default)
-            # You can add this as a field to Game Academic Plan or Game Plan Subject later
-            is_linear = True
+            # هيكلية المادة في الرد
+            subject_data = {
+                "subject_id": sub_id,
+                "title": rule['display_name'] or subject_doc.title,
+                "units": []
+            }
 
-            # Process each unit
+            # تتبع آخر درس مفتوح (للتقدم الخطي)
+            # نفترض أن كل وحدة تبدأ مفتوحة خطياً إذا أنهينا الوحدة السابقة
+            # (للتبسيط: التقدم الخطي يتم داخل الوحدة، وبين الوحدات)
+            previous_lesson_completed = True 
+
             for unit in units:
-                lessons = frappe.get_all("Game Lesson",
+                # جلب حالة التراك (Track)
+                track_is_paid = 0
+                if unit.learning_track:
+                    track_is_paid = frappe.db.get_value("Game Learning Track", unit.learning_track, "is_paid") or 0
+
+                # جلب الدروس
+                lessons = frappe.get_all("Game Lesson", 
                     filters={"unit": unit.name, "is_published": 1},
                     fields=["name", "title", "xp_reward"],
                     order_by="creation asc"
                 )
 
+                if not lessons: continue
+
+                unit_data = {
+                    "id": unit.name,
+                    "title": unit.title,
+                    "is_free_preview": unit.is_free_preview,
+                    "status": "locked", # الافتراضي
+                    "lessons": []
+                }
+
+                # تحديد الصلاحية المالية للوحدة (Financial Access) 💰
+                # هل يملك الحق في دخول هذه الوحدة؟
+                has_financial_access = False
+                
+                # 1. معاينة مجانية؟
+                if unit.is_free_preview:
+                    has_financial_access = True
+                # 2. اشتراك فعال؟
+                elif check_subscription_access(active_subs, sub_id, unit.learning_track):
+                    has_financial_access = True
+                # 3. المادة والتراك مجانيان؟
+                elif (not subject_doc.is_paid) and (not track_is_paid):
+                    has_financial_access = True
+                
+                # بناء الدروس وحالتها
+                is_unit_completed = True # افتراض، سنفحصه
+                unit_has_available_lesson = False
+
                 for lesson in lessons:
-                    status = "locked"
+                    lesson_status = "locked"
+                    
+                    is_completed = lesson.name in completed_lessons
+                    if not is_completed: is_unit_completed = False
 
-                    if lesson.name in completed_lessons:
-                        status = "completed"
-                    elif not is_linear:
-                        # Non-linear: all lessons available
-                        status = "available"
-                    elif not full_map or full_map[-1]["status"] == "completed":
-                        # Linear: unlock next lesson only if previous is completed
-                        status = "available"
+                    if is_completed:
+                        lesson_status = "completed"
+                    else:
+                        # إذا لم يكتمل، نفحص هل يمكن فتحه؟
+                        if not has_financial_access:
+                            lesson_status = "locked_premium" # 🔒 قفل مالي
+                        elif previous_lesson_completed:
+                            lesson_status = "available"      # 🔓 مفتوح للعب
+                            previous_lesson_completed = False # الدرس التالي سيغلق حتى ننهي هذا
+                        else:
+                            lesson_status = "locked"         # ⛓️ قفل تقدم (يجب إنهاء السابق)
 
-                    full_map.append({
+                    if lesson_status == "available":
+                        unit_has_available_lesson = True
+
+                    unit_data["lessons"].append({
                         "id": lesson.name,
                         "title": lesson.title,
-                        "unit_title": unit.title,
-                        "subject_title": subject_info.title,
-                        "subject_id": subject_name,
-                        "status": status,
+                        "status": lesson_status,
                         "xp": lesson.xp_reward
                     })
+                
+                # حالة الوحدة العامة للعرض
+                if is_unit_completed:
+                    unit_data["status"] = "completed"
+                    previous_lesson_completed = True # نسمح بفتح الدرس الأول في الوحدة التالية
+                elif unit_has_available_lesson:
+                    unit_data["status"] = "available"
+                elif not has_financial_access:
+                    unit_data["status"] = "locked_premium"
+                else:
+                    unit_data["status"] = "locked"
 
-        return full_map
+                subject_data["units"].append(unit_data)
+
+            final_map.append(subject_data)
+
+        # إذا طلب الفرونت القائمة المسطحة القديمة (Flat List) لسبب ما، يمكن تعديل الرد هنا
+        # لكن الهيكلية الهرمية أفضل: [ {Subject, Units: [ {Unit, Lessons: []} ]} ]
+        return final_map
 
     except Exception as e:
-        frappe.log_error(title="get_map_data failed", message=frappe.get_traceback())
-        frappe.throw(_("Failed to load learning map."))
+        frappe.log_error("Get Map Failed", frappe.get_traceback())
+        return []
+
+# =========================================================
+# 🛠️ HELPER: Subscription Checker
+# =========================================================
+
+def get_user_active_subscriptions(user):
+    """جلب كل الاشتراكات الفعالة دفعة واحدة"""
+    subs = frappe.get_all("Game Player Subscription", 
+        filters={
+            "player": user,
+            "status": "Active",
+            "expiry_date": [">=", nowdate()]
+        },
+        fields=["type", "name"]
+    )
+    
+    # نحتاج لمعرفة تفاصيل الـ Specific Access
+    active_access_list = []
+    
+    for sub in subs:
+        if sub.type == 'Global Access':
+            active_access_list.append({"type": "Global"})
+        else:
+            # جلب المواد المسموحة في هذا الاشتراك
+            items = frappe.get_all("Game Subscription Access", 
+                filters={"parent": sub.name}, 
+                fields=["type", "subject", "track"]
+            )
+            active_access_list.extend(items)
+            
+    return active_access_list
+
+def check_subscription_access(active_subs, subject_id, track_id=None):
+    """
+    فحص هل تغطي الاشتراكات هذه المادة أو التراك.
+    """
+    for access in active_access_list:
+        # 1. اشتراك شامل
+        if access.get("type") == "Global":
+            return True
+            
+        # 2. اشتراك مادة
+        if access.get("type") == "Subject" and access.get("subject") == subject_id:
+            return True
+            
+        # 3. اشتراك تراك (إذا وجد)
+        if track_id and access.get("type") == "Track" and access.get("track") == track_id:
+            return True
+            
+    return False
 
 
 @frappe.whitelist()
