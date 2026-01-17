@@ -7,32 +7,105 @@ import random
 
 @frappe.whitelist()
 def get_subjects():
+    """
+    Get all published subjects (general listing).
+    For subjects specific to a student's academic plan, use get_my_subjects instead.
+    """
     try:
         # 1. جلب المواضيع المنشورة فقط
-        subjects = frappe.get_all("Game Subject", 
-            fields=["name", "title", "icon"], 
+        subjects = frappe.get_all("Game Subject",
+            fields=["name", "title", "icon"],
             filters={"is_published": 1},
             order_by="creation asc"
         )
-        
+
         # 2. إضافة إحصائيات بسيطة لكل موضوع (اختياري لكنه رائع للواجهة)
         # for subject in subjects:
         #     # حساب عدد الدروس الكلي في هذا الموضوع
         #     # نقوم بالبحث عن الوحدات التابعة للموضوع، ثم الدروس التابعة لتلك الوحدات
         #     units = frappe.get_all("Game Unit", filters={"subject": subject.name}, pluck="name")
-            
+
         #     if units:
         #         lesson_count = frappe.db.count("Game Lesson", filters={"unit": ["in", units]})
         #     else:
         #         lesson_count = 0
-                
+
         #     subject["total_lessons"] = lesson_count
-            
+
         return subjects
 
     except Exception as e:
         frappe.log_error(title="get_subjects failed", message=frappe.get_traceback())
         frappe.throw("تعذر تحميل المواضيع حالياً.")
+
+
+@frappe.whitelist()
+def get_my_subjects():
+    """
+    Get subjects specific to the current user's Academic Plan.
+    Returns subjects with their display names and additional metadata.
+    """
+    try:
+        user = frappe.session.user
+
+        # 1. Fetch Player Profile
+        profile = frappe.db.get_value("Player Profile",
+            {"user": user},
+            ["current_grade", "current_stream", "academic_year"],
+            as_dict=True)
+
+        if not profile or not profile.current_grade:
+            return []  # No profile set up yet
+
+        current_grade = profile.current_grade
+        current_stream = profile.current_stream
+        academic_year = profile.academic_year or "2025"
+
+        # 2. Fetch the Game Academic Plan
+        plan_filters = {
+            "grade": current_grade,
+            "year": academic_year
+        }
+
+        if current_stream:
+            plan_filters["stream"] = current_stream
+
+        plan_name = frappe.db.get_value("Game Academic Plan", plan_filters, "name")
+
+        if not plan_name:
+            return []  # No plan configured
+
+        plan = frappe.get_doc("Game Academic Plan", plan_name)
+
+        # 3. Extract unique subjects from the plan
+        subject_map = {}
+
+        for row in plan.subjects:
+            subject_name = row.subject
+
+            if subject_name not in subject_map:
+                # Fetch subject details
+                subject_info = frappe.db.get_value("Game Subject",
+                    {"name": subject_name, "is_published": 1},
+                    ["name", "title", "icon"], as_dict=True)
+
+                if subject_info:
+                    subject_map[subject_name] = {
+                        "id": subject_info.name,
+                        "name": subject_info.title,
+                        "icon": subject_info.icon,
+                        "display_name": row.display_name or subject_info.title,
+                        "is_mandatory": row.is_mandatory
+                    }
+
+        # Convert to list
+        subjects = list(subject_map.values())
+
+        return subjects
+
+    except Exception as e:
+        frappe.log_error(title="get_my_subjects failed", message=frappe.get_traceback())
+        return []
 
 
 @frappe.whitelist()
@@ -54,88 +127,172 @@ def get_game_tracks(subject):
         
 
 @frappe.whitelist()
-def get_map_data(subject, track=None):
+def get_map_data(subject=None, track=None):
+    """
+    Fetch the learning map for a student based on their Academic Plan.
+    New Logic:
+    - Uses the student's Player Profile (grade, stream, year) to find their Game Academic Plan
+    - Processes the flat list of subject selections (All Units vs Specific Units)
+    - Aggregates and returns the lesson map accordingly
+
+    If 'subject' parameter is provided, filters to that subject only (legacy support).
+    """
     try:
-        if not subject:
-            frappe.throw("الرجاء تحديد الموضوع (Subject)")
-
         user = frappe.session.user
-        
-        subject_info = frappe.db.get_value("Game Subject", 
-            {"name": subject, "is_published": 1}, 
-            ["name", "title", "icon"], as_dict=True)
-            
-        if not subject_info:
-            frappe.throw("الموضوع غير موجود")
 
         # ---------------------------------------------------------
-        # 🆕 منطق اختيار المسار
+        # 1. Fetch Player Profile to get academic info
         # ---------------------------------------------------------
-        # إذا لم يرسل الفرونت اند المسار، نأتي بالمسار الافتراضي
-        if not track:
-            track = frappe.db.get_value("Game Learning Track", 
-                {"subject": subject, "is_default": 1}, "name")
-        
-        # حماية إضافية: إذا لم يوجد أي مسار (حالة نادرة)، لا نكمل
-        if not track:
-             frappe.throw("لا يوجد مسار تعليمي متاح لهذه المادة.")
+        profile = frappe.db.get_value("Player Profile",
+            {"user": user},
+            ["current_grade", "current_stream", "academic_year"],
+            as_dict=True)
 
-        track_info = frappe.db.get_value("Game Learning Track", track, ["is_linear"], as_dict=True)
-        is_linear = track_info.is_linear if track_info else 1
+        if not profile or not profile.current_grade:
+            frappe.throw(_("Please complete your academic profile first. Grade and Stream are required."))
+
+        current_grade = profile.current_grade
+        current_stream = profile.current_stream
+        academic_year = profile.academic_year or "2025"
+
         # ---------------------------------------------------------
+        # 2. Fetch the Game Academic Plan matching the profile
+        # ---------------------------------------------------------
+        plan_filters = {
+            "grade": current_grade,
+            "year": academic_year
+        }
 
-        completed_lessons = frappe.get_all("Gameplay Session", 
-            filters={"player": user}, 
-            fields=["lesson"], 
+        # Only filter by stream if it's set in the profile
+        if current_stream:
+            plan_filters["stream"] = current_stream
+
+        plan_name = frappe.db.get_value("Game Academic Plan", plan_filters, "name")
+
+        if not plan_name:
+            frappe.throw(_("No Academic Plan found for your grade, stream, and year. Please contact administrator."))
+
+        plan = frappe.get_doc("Game Academic Plan", plan_name)
+
+        # ---------------------------------------------------------
+        # 3. Process the flat list to build plan_rules
+        # ---------------------------------------------------------
+        # Structure: { subject_name: { 'include_all': False, 'units': [], 'display_name': '', 'subject_info': {} } }
+        plan_rules = {}
+
+        for row in plan.subjects:
+            subject_name = row.subject
+
+            # Initialize if this is the first time we see this subject
+            if subject_name not in plan_rules:
+                plan_rules[subject_name] = {
+                    'include_all': False,
+                    'units': [],
+                    'display_name': row.display_name or subject_name,
+                    'subject_info': None  # Will be populated later
+                }
+
+            # Process selection type
+            if row.selection_type == 'All Units':
+                plan_rules[subject_name]['include_all'] = True
+            elif row.selection_type == 'Specific Unit' and row.specific_unit:
+                # Only add if not already in the list
+                if row.specific_unit not in plan_rules[subject_name]['units']:
+                    plan_rules[subject_name]['units'].append(row.specific_unit)
+
+        # ---------------------------------------------------------
+        # 4. Filter by subject if provided (legacy support)
+        # ---------------------------------------------------------
+        if subject:
+            if subject not in plan_rules:
+                frappe.throw(_("This subject is not part of your academic plan."))
+            # Filter to only the requested subject
+            plan_rules = {subject: plan_rules[subject]}
+
+        # ---------------------------------------------------------
+        # 5. Fetch completed lessons for the user
+        # ---------------------------------------------------------
+        completed_lessons = frappe.get_all("Gameplay Session",
+            filters={"player": user},
+            fields=["lesson"],
             pluck="lesson",
         )
-        
-        # 🆕 الفلترة بناءً على المسار المختار
-        units = frappe.get_all("Game Unit", 
-            filters={
-                "subject": subject,
-                "learning_track": track # <--- الفلتر هنا
-            }, 
-            fields=["name", "title", "`order`"], 
-            order_by="`order` asc, creation asc"
-        )
-        
+
+        # ---------------------------------------------------------
+        # 6. Build the lesson map
+        # ---------------------------------------------------------
         full_map = []
-        
-        for unit in units:
-            lessons = frappe.get_all("Game Lesson", 
-                filters={"unit": unit.name}, 
-                fields=["name", "title", "xp_reward"],
-                order_by="creation asc" 
+
+        for subject_name, rules in plan_rules.items():
+            # Fetch subject info
+            subject_info = frappe.db.get_value("Game Subject",
+                {"name": subject_name, "is_published": 1},
+                ["name", "title", "icon"], as_dict=True)
+
+            if not subject_info:
+                # Skip unpublished subjects
+                continue
+
+            # Determine which units to fetch
+            unit_filters = {}
+
+            if rules['include_all']:
+                # Include all units for this subject
+                # Note: We're not filtering by learning_track anymore as per new design
+                unit_filters = {"subject": subject_name}
+            else:
+                # Include only specific units
+                if not rules['units']:
+                    # No units specified, skip this subject
+                    continue
+                unit_filters = {"name": ["in", rules['units']]}
+
+            # Fetch units
+            units = frappe.get_all("Game Unit",
+                filters=unit_filters,
+                fields=["name", "title", "`order`"],
+                order_by="`order` asc, creation asc"
             )
-            
-            for lesson in lessons:
-                status = "locked"
-                
-                if lesson.name in completed_lessons:
-                    status = "completed"
-                # الحالة 2: المسار "حر" (Non-Linear) -> كل شيء متاح ما لم يكن مكتملاً
-                elif not is_linear:
-                    status = "available"
-                elif not full_map or full_map[-1]["status"] == "completed":
-                    status = "available"
-                
-                
-                full_map.append({
-                    "id": lesson.name,
-                    "title": lesson.title,
-                    "unit_title": unit.title,
-                    "subject_title": subject_info.title,
-                    "status": status,
-                    "xp": lesson.xp_reward,
-                    "track": track # مفيد للفرونت اند للتأكد
-                })
-                    
+
+            # Determine if linear progression (for now, assume linear by default)
+            # You can add this as a field to Game Academic Plan or Game Plan Subject later
+            is_linear = True
+
+            # Process each unit
+            for unit in units:
+                lessons = frappe.get_all("Game Lesson",
+                    filters={"unit": unit.name, "is_published": 1},
+                    fields=["name", "title", "xp_reward"],
+                    order_by="creation asc"
+                )
+
+                for lesson in lessons:
+                    status = "locked"
+
+                    if lesson.name in completed_lessons:
+                        status = "completed"
+                    elif not is_linear:
+                        # Non-linear: all lessons available
+                        status = "available"
+                    elif not full_map or full_map[-1]["status"] == "completed":
+                        # Linear: unlock next lesson only if previous is completed
+                        status = "available"
+
+                    full_map.append({
+                        "id": lesson.name,
+                        "title": lesson.title,
+                        "unit_title": unit.title,
+                        "subject_title": subject_info.title,
+                        "subject_id": subject_name,
+                        "status": status,
+                        "xp": lesson.xp_reward
+                    })
+
         return full_map
 
     except Exception as e:
         frappe.log_error(title="get_map_data failed", message=frappe.get_traceback())
-        frappe.throw("تعذر تحميل خريطة الدروس.")
+        frappe.throw(_("Failed to load learning map."))
 
 
 @frappe.whitelist()
@@ -1053,7 +1210,7 @@ def get_leaderboard(subject=None, period='all_time'):
     try:
         user = frappe.session.user
         limit = 50
-        
+
         leaderboard = []
         user_rank_info = {}
 
@@ -1064,7 +1221,7 @@ def get_leaderboard(subject=None, period='all_time'):
             if subject:
                 # مادة محددة
                 query = """
-                    SELECT t.player as user_id, t.total_xp, u.full_name, u.user_image 
+                    SELECT t.player as user_id, t.total_xp, u.full_name, u.user_image
                     FROM `tabPlayer Subject Score` t
                     JOIN `tabUser` u ON t.player = u.name
                     WHERE t.subject = %s AND t.total_xp > 0
@@ -1074,7 +1231,7 @@ def get_leaderboard(subject=None, period='all_time'):
             else:
                 # عام (Global)
                 query = """
-                    SELECT t.user as user_id, t.total_xp, u.full_name, u.user_image 
+                    SELECT t.user as user_id, t.total_xp, u.full_name, u.user_image
                     FROM `tabPlayer Profile` t
                     JOIN `tabUser` u ON t.user = u.name
                     WHERE t.total_xp > 0
@@ -1089,19 +1246,19 @@ def get_leaderboard(subject=None, period='all_time'):
             # هنا نجمع النقاط من سجل الجلسات لآخر 7 أيام
             # نستخدم Monday كبداية الأسبوع، أو آخر 7 أيام متحركة (الأسهل)
             date_condition = "creation >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
-            
+
             # فلترة المادة للجلسات
             # ملاحظة: الجلسة لا تحتوي على Subject مباشر في التصميم القديم،
             # لكننا نعتمد على أنك قد ترغب بإضافته، أو نستخدم Join مع الدرس.
             # للتبسيط والسرعة الآن: سنفترض الأسبوعي "عام" فقط أو يحتاج تعديل Log
             # ** الحل الذكي:** سنعتمد الأسبوعي "عام" (Global) حالياً.
-            
+
             subject_join = ""
             subject_filter = ""
             if subject:
                  # هذا يتطلب أن يكون Gameplay Session يحتوي على Subject أو Join معقد
                  # سنتركه للمستقبل لتجنب البطء، وسنرجع العام مؤقتاً أو فارغ
-                 pass 
+                 pass
 
             query = f"""
                 SELECT t.player as user_id, SUM(t.xp_earned) as total_xp, u.full_name, u.user_image
@@ -1117,12 +1274,12 @@ def get_leaderboard(subject=None, period='all_time'):
         # تنفيذ الاستعلام
         top_players = frappe.db.sql(query, tuple(params), as_dict=True)
 
-        
+
         for idx, player in enumerate(top_players):
             current_xp = int(player.total_xp)
             # حساب المستوى بنفس المعادلة
             level = int(0.07 * math.sqrt(current_xp)) + 1 if current_xp > 0 else 1
-            
+
             leaderboard.append({
                 "rank": idx + 1,
                 "name": player.full_name or "Unknown Hero",
@@ -1137,13 +1294,13 @@ def get_leaderboard(subject=None, period='all_time'):
         # ============================================
         # البحث في القائمة أولاً
         current_user_in_top = next((item for item in leaderboard if item["isCurrentUser"]), None)
-        
+
         if current_user_in_top:
             user_rank_info = current_user_in_top
         else:
             # إذا لم يكن في الـ 50 الأوائل، نعيد بياناته الشخصية لكن بدون Rank دقيق (للسرعة)
             # أو نعيد Rank = "+50"
-            
+
             # جلب نقاطي
             my_xp = 0
             if period == 'all_time':
@@ -1157,10 +1314,10 @@ def get_leaderboard(subject=None, period='all_time'):
                     SELECT SUM(xp_earned) FROM `tabGameplay Session`
                     WHERE player = %s AND {date_condition}
                  """, (user,))[0][0] or 0
-            
+
             my_level = int(0.07 * math.sqrt(my_xp)) + 1 if my_xp > 0 else 1
             user_doc = frappe.get_doc("User", user)
-            
+
             user_rank_info = {
                 "rank": "50+",
                 "name": user_doc.full_name,
@@ -1178,3 +1335,120 @@ def get_leaderboard(subject=None, period='all_time'):
     except Exception as e:
         frappe.log_error("Leaderboard Error", frappe.get_traceback())
         return {"leaderboard": [], "userRank": {}}
+
+
+# =========================================================
+# 🎓 STUDENT ONBOARDING APIS
+# =========================================================
+
+@frappe.whitelist(methods=['GET'])
+def get_academic_masters():
+    """
+    Get available grades, streams, and current academic year for student onboarding.
+    Returns: {grades: [...], streams: [...], current_year: "2025"}
+    """
+    try:
+        # Fetch all Game Academic Grade records
+        grades = frappe.get_all("Game Academic Grade",
+            fields=["name", "grade_name"],
+            order_by="creation asc"
+        )
+
+        # Fetch all Game Academic Stream records
+        streams = frappe.get_all("Game Academic Stream",
+            fields=["name", "stream_name"],
+            order_by="creation asc"
+        )
+
+        # Fetch the active Game Subscription Season
+        active_season = frappe.db.get_value("Game Subscription Season",
+            {"is_active": 1},
+            "season_name"
+        )
+
+        # Transform the data to match frontend expectations
+        grades_list = [{"id": grade.name, "name": grade.grade_name} for grade in grades]
+        streams_list = [{"id": stream.name, "name": stream.stream_name} for stream in streams]
+
+        return {
+            "grades": grades_list,
+            "streams": streams_list,
+            "current_year": active_season or "2025"
+        }
+
+    except Exception as e:
+        frappe.log_error(title="get_academic_masters failed", message=frappe.get_traceback())
+        frappe.throw(_("Failed to load academic masters data."))
+
+
+@frappe.whitelist(methods=['POST'])
+def set_academic_profile(grade_id, stream_id=None):
+    """
+    Update the player's academic profile with selected grade and stream.
+    Args:
+        grade_id: The Game Academic Grade ID
+        stream_id: The Game Academic Stream ID (optional)
+    Returns: {status: "success", message: "Profile updated"}
+    """
+    try:
+        user = frappe.session.user
+
+        # Validate that grade_id exists
+        if not frappe.db.exists("Game Academic Grade", grade_id):
+            frappe.throw(_("Invalid grade selected."))
+
+        # Validate stream_id if provided
+        if stream_id and not frappe.db.exists("Game Academic Stream", stream_id):
+            frappe.throw(_("Invalid stream selected."))
+
+        # Get the active Game Subscription Season
+        active_season = frappe.db.get_value("Game Subscription Season",
+            {"is_active": 1},
+            "season_name"
+        )
+
+        if not active_season:
+            frappe.log_error(title="No active season", message="No active Game Subscription Season found")
+            active_season = "2025"  # Fallback to default
+
+        # Get or create Player Profile
+        profile_name = frappe.db.get_value("Player Profile", {"user": user}, "name")
+
+        if profile_name:
+            # Update existing profile
+            profile_doc = frappe.get_doc("Player Profile", profile_name)
+            profile_doc.current_grade = grade_id
+            profile_doc.current_stream = stream_id if stream_id else None
+            profile_doc.academic_year = active_season
+            profile_doc.save(ignore_permissions=True)
+        else:
+            # Create new profile if it doesn't exist
+            profile_doc = frappe.get_doc({
+                "doctype": "Player Profile",
+                "user": user,
+                "total_xp": 0,
+                "gems_balance": 50,
+                "current_grade": grade_id,
+                "current_stream": stream_id if stream_id else None,
+                "academic_year": active_season
+            })
+            profile_doc.insert(ignore_permissions=True)
+
+        # Clear caches (optional but good practice)
+        frappe.cache().delete_value(f"player_profile_{user}")
+
+        # Clear any existing Player Subject Score or Player Memory Tracker caches if necessary
+        # This ensures fresh data for the new academic profile
+        frappe.cache().delete_value(f"subject_scores_{user}")
+        frappe.cache().delete_value(f"memory_tracker_{user}")
+
+        frappe.db.commit()
+
+        return {
+            "status": "success",
+            "message": _("Profile updated successfully")
+        }
+
+    except Exception as e:
+        frappe.log_error(title="set_academic_profile failed", message=frappe.get_traceback())
+        frappe.throw(_("Failed to update academic profile."))
