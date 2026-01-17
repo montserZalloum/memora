@@ -8,6 +8,8 @@
  "engine": "InnoDB",
  "field_order": [
   "item_name",
+  "target_grade",
+  "target_streams",
   "description",
   "image",
   "price",
@@ -51,12 +53,24 @@
    "fieldname": "sku",
    "fieldtype": "Data",
    "label": "SKU"
+  },
+  {
+   "fieldname": "target_grade",
+   "fieldtype": "Link",
+   "label": "Target Grade",
+   "options": "Game Academic Grade"
+  },
+  {
+   "fieldname": "target_streams",
+   "fieldtype": "Table MultiSelect",
+   "label": "Target Streams",
+   "options": "Game Item Target Stream"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-15 22:41:24.787352",
+ "modified": "2026-01-17 11:49:02.821352",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Sales Item",

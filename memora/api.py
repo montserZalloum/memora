@@ -1446,23 +1446,74 @@ def set_academic_profile(grade, stream=None):
 @frappe.whitelist()
 def get_store_items():
     """
-    جلب المنتجات المتاحة للشراء في المتجر.
-    يستثني المواد التي اشتراها الطالب بالفعل (Logic ذكي).
+    جلب منتجات المتجر مع فلترة ذكية حسب الصف والتخصص.
+    المنطق:
+    1. إذا كان المنتج مرتبطاً بصف معين، يجب أن يطابق صف الطالب.
+    2. إذا كان المنتج مرتبطاً بتخصصات معينة (قائمة)، يجب أن يكون تخصص الطالب من ضمنها.
+    3. إذا كانت الحقول فارغة، يعتبر المنتج عاماً ويظهر للجميع.
     """
     try:
         user = frappe.session.user
         
-        # 1. جلب كل المنتجات المنشورة
+        # 1. جلب سياق الطالب (الصف والتخصص)
+        profile = frappe.db.get_value("Player Profile", {"user": user}, 
+            ["current_grade", "current_stream"], as_dict=True)
+        
+        user_grade = profile.get("current_grade") if profile else None
+        user_stream = profile.get("current_stream") if profile else None
+
+        # 2. جلب كل المنتجات (Master Data)
         items = frappe.get_all("Game Sales Item", 
-            fields=["name", "item_name", "description", "price", "discounted_price", "image", "sku"],
+            fields=["name", "item_name", "description", "price", "discounted_price", "image", "sku", "target_grade"],
             order_by="price asc"
         )
         
-        # 2. (مستقبلاً) يمكننا إضافة منطق هنا لإخفاء ما تم شراؤه
-        # حالياً سنعيد الكل والفرونت يقرر
+        if not items:
+            return []
+
+        # 3. جلب قواعد التخصصات (Child Table Data) دفعة واحدة 🚀
+        # هذا أسرع بكثير من الاستعلام داخل الـ loop
+        item_names = [item.name for item in items]
         
-        return items
+        stream_rules = {} # { 'item_id': ['Scientific', 'Literary'] }
+        
+        # نجلب كل التخصصات المستهدفة لكل المنتجات الموجودة
+        all_targets = frappe.get_all("Game Item Target Stream", 
+            filters={"parent": ["in", item_names]}, 
+            fields=["parent", "stream"]
+        )
+        
+        # تجميع البيانات
+        for t in all_targets:
+            if t.parent not in stream_rules:
+                stream_rules[t.parent] = []
+            stream_rules[t.parent].append(t.stream)
+
+        # 4. عملية الفلترة (The Filtering Engine) 🛡️
+        filtered_items = []
+        
+        for item in items:
+            # أ. فحص الصف (Grade Check)
+            # إذا كان المنتج محدداً لصف، ولم يطابق صف الطالب -> استبعاد
+            if item.target_grade and item.target_grade != user_grade:
+                continue
+
+            # ب. فحص التخصص (Stream Check)
+            allowed_streams = stream_rules.get(item.name, [])
+            
+            # إذا كان المنتج محدداً لتخصصات معينة (القائمة ليست فارغة)
+            if allowed_streams:
+                # إذا الطالب ليس لديه تخصص، أو تخصصه غير موجود في القائمة -> استبعاد
+                if not user_stream or user_stream not in allowed_streams:
+                    continue
+            
+            # إذا نجح في الاختبارات، نضيفه للقائمة النهائية
+            filtered_items.append(item)
+
+        return filtered_items
+
     except Exception as e:
+        frappe.log_error("Get Store Items Failed", frappe.get_traceback())
         return []
 
 @frappe.whitelist()

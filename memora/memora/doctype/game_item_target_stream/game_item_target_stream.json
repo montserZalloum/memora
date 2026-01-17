@@ -1,0 +1,36 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-01-17 11:46:26.286698",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "stream"
+ ],
+ "fields": [
+  {
+   "fieldname": "stream",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Stream",
+   "options": "Game Academic Stream",
+   "reqd": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-01-17 11:47:23.449796",
+ "modified_by": "Administrator",
+ "module": "Memora",
+ "name": "Game Item Target Stream",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
