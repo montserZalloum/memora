@@ -388,31 +388,49 @@ def get_map_data(subject=None, track=None):
 # =========================================================
 
 def get_user_active_subscriptions(user):
-    """جلب كل الاشتراكات الفعالة دفعة واحدة"""
-    subs = frappe.get_all("Game Player Subscription", 
-        filters={
-            "player": user,
-            "status": "Active",
-            "expiry_date": [">=", nowdate()]
-        },
-        fields=["type", "name"]
-    )
+    """
+    جلب الاشتراكات الفعالة.
+    التصحيح:
+    1. يعتمد على تاريخ انتهاء 'الموسم' (Linked Season) وليس الاشتراك نفسه.
+    2. يجلب ID البروفايل الصحيح بدلاً من التخمين.
+    """
+    # 1. جلب معرف البروفايل الآمن (Best Practice)
+    # هذا يحميك لو قررت تغير تسمية البروفايل مستقبلاً
+    profile_name = frappe.db.get_value("Player Profile", {"user": user}, "name")
     
-    # نحتاج لمعرفة تفاصيل الـ Specific Access
-    active_access_list = []
+    if not profile_name:
+        return []
+
+    # 2. الاستعلام الذكي (SQL Join)
+    # نربط جدول الاشتراكات بجدول المواسم للتحقق من التاريخ
+    active_subs = frappe.db.sql("""
+        SELECT 
+            sub.name, sub.type
+        FROM 
+            `tabGame Player Subscription` sub
+        JOIN 
+            `tabGame Subscription Season` season ON sub.linked_season = season.name
+        WHERE 
+            sub.player = %s 
+            AND sub.status = 'Active'
+            AND season.end_date >= CURDATE()
+    """, (profile_name,), as_dict=True)
     
-    for sub in subs:
+    # 3. تجميع العناصر (Items Retrieval)
+    final_access_list = []
+    
+    for sub in active_subs:
         if sub.type == 'Global Access':
-            active_access_list.append({"type": "Global"})
+            final_access_list.append({"type": "Global"})
         else:
-            # جلب المواد المسموحة في هذا الاشتراك
+            # جلب المواد المحددة من الجدول الفرعي
             items = frappe.get_all("Game Subscription Access", 
                 filters={"parent": sub.name}, 
                 fields=["type", "subject", "track"]
             )
-            active_access_list.extend(items)
+            final_access_list.extend(items)
             
-    return active_access_list
+    return final_access_list
 
 def check_subscription_access(active_subs, subject_id, track_id=None):
     """
@@ -1585,106 +1603,85 @@ def set_academic_profile(grade, stream=None):
 @frappe.whitelist()
 def get_store_items():
     """
-    جلب المنتجات المتاحة للشراء.
-    التحديث: يخفي المنتجات التي تم شراؤها أو التي لها طلب معلق.
+    جلب المنتجات مع إخفاء ما تم شراؤه (بناءً على الموسم الفعال).
     """
     try:
         user = frappe.session.user
         
-        # 1. جلب سياق الطالب (للفلترة حسب الصف والتخصص)
+        # 1. جلب سياق الطالب
         profile = frappe.db.get_value("Player Profile", {"user": user}, 
             ["current_grade", "current_stream"], as_dict=True)
         
         user_grade = profile.get("current_grade") if profile else None
         user_stream = profile.get("current_stream") if profile else None
 
-        # -------------------------------------------------------
-        # 🕵️‍♂️ الفلترة الذكية (Smart Filtering)
-        # -------------------------------------------------------
+        # 2. ما هي المواد التي يمتلكها الطالب حالياً؟ (Active Season Subs)
+        # نستخدم الدالة المساعدة التي تعتمد على تاريخ الموسم
+        active_access = get_user_active_subscriptions(user)
         
-        # أ. قائمة المنتجات التي لها طلبات معلقة (Pending Requests)
-        pending_item_ids = frappe.get_all("Game Purchase Request", 
-            filters={"user": user, "docstatus": 0}, # 0 = Draft/Pending
-            pluck="sales_item"
-        )
+        # تحويل القائمة إلى Sets للبحث السريع
+        owned_subjects = {x['subject'] for x in active_access if x['type'] == 'Subject'}
+        owned_tracks = {x['track'] for x in active_access if x['type'] == 'Track'}
+        has_global = any(x['type'] == 'Global' for x in active_access)
 
-        # ب. قائمة المواد التي يملك الطالب اشتراكاً فعالاً بها
-        # (نستخدم الدالة المساعدة التي كتبناها سابقاً)
-        active_subs = get_user_active_subscriptions(user) # ترجع قائمة [{'type': 'Subject', 'subject': 'Math'}, ...]
+        if has_global:
+            return [] # لديه اشتراك شامل، لا داعي لشراء شيء
 
-        # تحويل الاشتراكات لمجموعة سهلة البحث (Set of Subjects/Tracks)
-        subscribed_subjects = {s['subject'] for s in active_subs if s['type'] == 'Subject'}
-        subscribed_tracks = {s['track'] for s in active_subs if s['type'] == 'Track'}
-        is_global_subscriber = any(s['type'] == 'Global' for s in active_subs)
+        # 3. الطلبات المعلقة (Pending)
+        pending_items = frappe.get_all("Game Purchase Request", 
+            filters={"user": user, "docstatus": 0}, pluck="sales_item")
 
-        if is_global_subscriber:
-            return [] # المشترك الشامل لا يحتاج لشراء شيء!
-
-        # -------------------------------------------------------
-        # 2. جلب المنتجات ومعالجتها
-        # -------------------------------------------------------
+        # 4. جلب المنتجات
         items = frappe.get_all("Game Sales Item", 
             fields=["name", "item_name", "description", "price", "discounted_price", "image", "sku", "target_grade"],
             order_by="price asc"
         )
-        
-        # جلب قواعد التخصصات (كما فعلنا سابقاً)
-        item_names = [item.name for item in items]
-        stream_rules = {}
-        all_targets = frappe.get_all("Game Item Target Stream", filters={"parent": ["in", item_names]}, fields=["parent", "stream"])
-        for t in all_targets:
-            if t.parent not in stream_rules: stream_rules[t.parent] = []
-            stream_rules[t.parent].append(t.stream)
 
-        # جلب محتويات الباقات (لنعرف ماذا تبيع كل باقة)
-        # هذا ضروري لنعرف هل الطالب يملك محتوى الباقة أم لا
+        # 5. تحليل محتويات الباقات (لنعرف ماذا نخفي)
+        item_names = [i.name for i in items]
         bundle_contents = frappe.get_all("Game Bundle Content", 
             filters={"parent": ["in", item_names]}, 
             fields=["parent", "type", "target_subject", "target_track"]
         )
         
-        # تنظيم المحتويات: { 'item_id': [{'type': 'Subject', 'id': 'Math'}, ...] }
-        item_contents_map = {}
+        # Map: Item -> Contents
+        content_map = {}
         for c in bundle_contents:
-            if c.parent not in item_contents_map: item_contents_map[c.parent] = []
-            item_contents_map[c.parent].append(c)
+            if c.parent not in content_map: content_map[c.parent] = []
+            content_map[c.parent].append(c)
 
-        # -------------------------------------------------------
-        # 3. حلقة الفلترة النهائية
-        # -------------------------------------------------------
+        # 6. جلب قواعد التخصصات (Streams)
+        stream_rules = {}
+        targets = frappe.get_all("Game Item Target Stream", filters={"parent": ["in", item_names]}, fields=["parent", "stream"])
+        for t in targets:
+            if t.parent not in stream_rules: stream_rules[t.parent] = []
+            stream_rules[t.parent].append(t.stream)
+
+        # 7. الفلترة النهائية
         filtered_items = []
-        
         for item in items:
-            # 1. فلترة الطلبات المعلقة
-            if item.name in pending_item_ids:
-                continue # إخفاء ما تم طلبه
+            # أ. هل تم طلبها سابقاً؟
+            if item.name in pending_items: continue
 
-            # 2. فلترة الملكية (Ownership Check)
-            # إذا كانت الباقة تحتوي على مادة، والطالب يملك هذه المادة -> نخفي الباقة
-            # (للتبسيط: نخفي الباقة إذا كان الطالب يملك *أي* جزء منها لتجنب الشراء المزدوج)
+            # ب. هل يمتلك محتواها؟
+            # القاعدة: إذا كانت الباقة تحتوي على مادة يملكها الطالب، نخفي الباقة
+            contents = content_map.get(item.name, [])
             is_owned = False
-            contents = item_contents_map.get(item.name, [])
+            for c in contents:
+                if c.type == 'Subject' and c.target_subject in owned_subjects:
+                    is_owned = True; break
+                if c.type == 'Track' and c.target_track in owned_tracks:
+                    is_owned = True; break
             
-            for content in contents:
-                if content.type == 'Subject' and content.target_subject in subscribed_subjects:
-                    is_owned = True
-                    break
-                if content.type == 'Track' and content.target_track in subscribed_tracks:
-                    is_owned = True
-                    break
+            if is_owned: continue # إخفاء ما تم شراؤه
+
+            # ج. فلترة الصف والتخصص
+            if item.target_grade and item.target_grade != user_grade: continue
             
-            if is_owned:
-                continue # إخفاء ما يملكه الطالب
-
-            # 3. فلترة الصف والتخصص (الكود القديم)
-            if item.target_grade and item.target_grade != user_grade:
-                continue
-
             allowed_streams = stream_rules.get(item.name, [])
             if allowed_streams and (not user_stream or user_stream not in allowed_streams):
                 continue
-            
-            # نجح في كل الاختبارات
+
             filtered_items.append(item)
 
         return filtered_items
