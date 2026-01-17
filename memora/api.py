@@ -509,48 +509,39 @@ def update_memory_tracker(user, atom_id, rating, next_date, subject=None):
 
 @frappe.whitelist()
 def get_player_profile():
+    """
+    جلب البيانات الأساسية للاعب عند فتح التطبيق.
+    التحديث: إضافة الصف والتخصص للتحقق من الـ Onboarding.
+    """
     try:
         user = frappe.session.user
         
-        # تجاهل الزوار (Guest) - لا ننشئ لهم بروفايلات
-        if user == "Guest":
-            return {"xp": 0, "gems": 0, "hearts": 5}
-
-        # 1. البحث عن بروفايل اللاعب
+        # جلب البيانات من البروفايل بما فيها الحقول الأكاديمية الجديدة
         profile = frappe.db.get_value("Player Profile", {"user": user}, 
-            ["name", "total_xp", "gems_balance"], 
+            ["total_xp", "gems_balance", "current_grade", "current_stream"], 
             as_dict=True
         )
-        
+
         if not profile:
-            # 🐣 إنشاء بروفايل جديد
-            new_doc = frappe.get_doc({
-                "doctype": "Player Profile",
-                "user": user,
-                "total_xp": 0,
-                "gems_balance": 50
-            })
-            new_doc.insert(ignore_permissions=True)
-            
-            # 🚨 هذا هو السطر المفقود!
-            # بما أننا نستخدم GET request، يجب أن نجبر الداتابيز على الحفظ
-            frappe.db.commit()
-            
+            # في حال كان مستخدماً جديداً جداً وليس له بروفايل بعد
             return {
-                "xp": 0,
-                "gems": 50,
-                "hearts": 5
+                "xp": 0, 
+                "gems": 0, 
+                "current_grade": None,
+                "current_stream": None
             }
-        
+
         return {
-            "xp": profile.total_xp,
-            "gems": profile.gems_balance,
-            "hearts": 5
+            "xp": int(profile.total_xp or 0),
+            "gems": int(profile.gems_balance or 0),
+            # 👇 هذه هي الحقول التي ينتظرها الفرونت-إند
+            "current_grade": profile.current_grade,
+            "current_stream": profile.current_stream
         }
 
     except Exception as e:
-        frappe.log_error(title="get_player_profile failed", message=frappe.get_traceback())
-        return {"xp": 0, "gems": 0, "hearts": 5}
+        frappe.log_error("Get Player Profile Failed", frappe.get_traceback())
+        return {}
 
 
 @frappe.whitelist()
@@ -1396,39 +1387,52 @@ def get_academic_masters():
 @frappe.whitelist()
 def set_academic_profile(grade, stream=None):
     """
-    حفظ خيارات الطالب (الصف والتخصص).
-    التحديث: يتحقق من أن التخصص المختار مسموح به لهذا الصف.
+    حفظ خيارات الطالب.
+    التحديث: يقوم بإنشاء البروفايل إذا لم يكن موجوداً (للمستخدمين الجدد).
     """
     try:
         user = frappe.session.user
         
-        # 1. التحقق من الصف
+        # 1. التحقق من صحة البيانات (Validation)
         if not frappe.db.exists("Game Academic Grade", grade):
             frappe.throw("Invalid Grade Selected")
 
-        # 2. التحقق من التخصص (Validation Logic) 🛡️
         if stream:
-            # هل هذا التخصص موجود في قائمة المسموحات لهذا الصف؟
+            # التأكد من أن التخصص متاح لهذا الصف
             is_allowed = frappe.db.exists("Game Grade Valid Stream", {
                 "parent": grade,
                 "stream": stream
             })
-            
             if not is_allowed:
-                # محاولة اختراق أو خطأ في البيانات
                 frappe.throw(f"Stream '{stream}' is not valid for Grade '{grade}'")
             
-        # 3. جلب الموسم الفعال
+        # 2. جلب الموسم الفعال
         season = frappe.db.get_value("Game Subscription Season", {"is_active": 1}, "name")
 
-        # 4. تحديث البروفايل
-        frappe.db.set_value("Player Profile", {"user": user}, {
-            "current_grade": grade,
-            "current_stream": stream if stream else None,
-            "academic_year": season
-        })
+        # 3. البحث عن البروفايل (Upsert Logic)
+        profile_name = frappe.db.get_value("Player Profile", {"user": user}, "name")
 
-        return {"status": "success", "message": "Academic profile updated"}
+        if profile_name:
+            # ✅ حالة التحديث: البروفايل موجود
+            frappe.db.set_value("Player Profile", profile_name, {
+                "current_grade": grade,
+                "current_stream": stream if stream else None,
+                "academic_year": season
+            })
+        else:
+            # 🆕 حالة الإنشاء: مستخدم جديد لا يملك بروفايل
+            new_profile = frappe.get_doc({
+                "doctype": "Player Profile",
+                "user": user,
+                "current_grade": grade,
+                "current_stream": stream if stream else None,
+                "academic_year": season,
+                "total_xp": 0,
+                "hearts": 5 # القيمة الافتراضية للقلوب
+            })
+            new_profile.insert(ignore_permissions=True)
+
+        return {"status": "success", "message": "Academic profile saved successfully"}
 
     except Exception as e:
         frappe.log_error("Set Profile Failed", frappe.get_traceback())
