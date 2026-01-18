@@ -1,18 +1,15 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:title",
- "creation": "2026-01-08 14:22:33.279031",
+ "creation": "2026-01-18 09:30:34.140558",
  "doctype": "DocType",
- "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
   "title",
   "unit",
-  "topic",
-  "xp_reward",
-  "is_published",
-  "stages"
+  "is_free_preview",
+  "is_linear",
+  "description"
  ],
  "fields": [
   {
@@ -20,8 +17,7 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Title",
-   "reqd": 1,
-   "unique": 1
+   "reqd": 1
   },
   {
    "fieldname": "unit",
@@ -32,39 +28,30 @@
    "reqd": 1
   },
   {
-   "default": "10",
-   "fieldname": "xp_reward",
-   "fieldtype": "Int",
-   "label": "XP Reward"
-  },
-  {
-   "fieldname": "stages",
-   "fieldtype": "Table",
-   "label": "Stages",
-   "options": "Game Stage"
+   "default": "0",
+   "fieldname": "is_free_preview",
+   "fieldtype": "Check",
+   "label": "is Free Preview"
   },
   {
    "default": "1",
-   "fieldname": "is_published",
+   "fieldname": "is_linear",
    "fieldtype": "Check",
-   "in_list_view": 1,
-   "label": "Is Published"
+   "label": "is Linear"
   },
   {
-   "fieldname": "topic",
-   "fieldtype": "Link",
-   "label": "Topic",
-   "options": "Game Topic"
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-18 09:43:33.465098",
+ "modified": "2026-01-18 09:58:59.362006",
  "modified_by": "Administrator",
  "module": "Memora",
- "name": "Game Lesson",
- "naming_rule": "By fieldname",
+ "name": "Game Topic",
  "owner": "Administrator",
  "permissions": [
   {
@@ -82,7 +69,10 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "search_fields": "title",
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "title"
 }

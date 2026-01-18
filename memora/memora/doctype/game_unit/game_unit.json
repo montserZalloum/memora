@@ -10,6 +10,8 @@
   "title",
   "subject",
   "learning_track",
+  "structure_type",
+  "is_linear_topics",
   "order",
   "is_published",
   "is_free_preview"
@@ -54,12 +56,26 @@
    "fieldname": "is_free_preview",
    "fieldtype": "Check",
    "label": "Is Free Preview"
+  },
+  {
+   "default": "Topic Based",
+   "fieldname": "structure_type",
+   "fieldtype": "Select",
+   "label": "Structure Type",
+   "options": "Topic Based\nLesson Based"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.structure_type=='Topic Based'",
+   "fieldname": "is_linear_topics",
+   "fieldtype": "Check",
+   "label": "is Linear Topics"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-15 22:18:52.531597",
+ "modified": "2026-01-18 09:47:12.538990",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Unit",
