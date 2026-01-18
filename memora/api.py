@@ -178,27 +178,23 @@ from frappe.utils import nowdate, cint
 # =========================================================
 
 @frappe.whitelist()
-def get_map_data(subject=None, track=None):
+def get_map_data(subject=None):
     """
-    محرك الخريطة الدراسي (The Academic Map Engine).
-    يقوم بجلب المحتوى، فلترته حسب الخطة الدراسية، وتطبيق قواعد القفل المالي والتقدم.
+    محرك الخريطة الذكي (Smart Hybrid Map).
+    - إذا كانت الوحدة (Lesson Based): تعيد الدروس فوراً لرسم المسار.
+    - إذا كانت الوحدة (Topic Based): تعيد المواضيع فقط (Lazy Load).
     """
     try:
         user = frappe.session.user
 
-        # ---------------------------------------------------------
-        # 1. تحديد هوية الطالب (Academic Context)
-        # ---------------------------------------------------------
+        # 1. السياق الأكاديمي
         profile = frappe.db.get_value("Player Profile", {"user": user}, 
             ["current_grade", "current_stream", "academic_year"], as_dict=True)
 
         if not profile or not profile.current_grade:
-            # لم يقم بالتسجيل بعد، نرجع قائمة فارغة ليقوم الفرونت بتوجيهه
-            return []
+            return [] 
 
-        # ---------------------------------------------------------
-        # 2. جلب الخطة الدراسية (Fetch Plan)
-        # ---------------------------------------------------------
+        # 2. جلب الخطة
         plan_filters = {
             "grade": profile.current_grade,
             "year": profile.academic_year or "2025"
@@ -207,23 +203,14 @@ def get_map_data(subject=None, track=None):
             plan_filters["stream"] = profile.current_stream
 
         plan_name = frappe.db.get_value("Game Academic Plan", plan_filters, "name")
-        if not plan_name:
-            # لا توجد خطة مطابقة (حالة نادرة)
-            return []
+        if not plan_name: return []
 
         plan_doc = frappe.get_doc("Game Academic Plan", plan_name)
 
-        # ---------------------------------------------------------
-        # 3. معالجة قواعد الخطة (Aggregation Rules)
-        # ---------------------------------------------------------
-        # نقوم بتجميع الأسطر المتفرقة في الخطة لتكوين "قواعد" لكل مادة
-        # Structure: { subject_id: { 'include_all': Bool, 'units': Set(), 'display_name': Str } }
+        # 3. تجميع القواعد
         subject_rules = {}
-
         for row in plan_doc.subjects:
-            # فلترة: إذا طلب الـ API مادة معينة، نتجاهل الباقي
-            if subject and row.subject != subject:
-                continue
+            if subject and row.subject != subject: continue 
 
             if row.subject not in subject_rules:
                 subject_rules[row.subject] = {
@@ -232,151 +219,172 @@ def get_map_data(subject=None, track=None):
                     'display_name': row.display_name or None
                 }
             
-            rule = subject_rules[row.subject]
-            
-            # تحديث الاسم إذا وجد
-            if row.display_name: rule['display_name'] = row.display_name
-
-            # منطق الدمج (All Units تغلب Specific Units)
             if row.selection_type == 'All Units':
-                rule['include_all'] = True
+                subject_rules[row.subject]['include_all'] = True
             elif row.selection_type == 'Specific Unit' and row.specific_unit:
-                rule['units'].add(row.specific_unit)
+                subject_rules[row.subject]['units'].add(row.specific_unit)
 
-        # ---------------------------------------------------------
-        # 4. جلب الاشتراكات الفعالة (Caching Subscriptions)
-        # ---------------------------------------------------------
-        # نجلب الاشتراكات مرة واحدة لتجنب الاستعلام داخل الـ Loop
+        # 4. البيانات المساعدة
         active_subs = get_user_active_subscriptions(user)
-
-        # ---------------------------------------------------------
-        # 5. جلب الدروس المكتملة (Progress)
-        # ---------------------------------------------------------
-        completed_lessons = set(frappe.get_all("Gameplay Session", 
+        completed_lessons_set = set(frappe.get_all("Gameplay Session", 
             filters={"player": user}, pluck="lesson"))
 
-        # ---------------------------------------------------------
-        # 6. بناء الخريطة الهرمية (Building the Tree)
-        # ---------------------------------------------------------
         final_map = []
 
         for sub_id, rule in subject_rules.items():
-            # أ. بيانات المادة
             subject_doc = frappe.db.get_value("Game Subject", sub_id, 
                 ["name", "title", "is_paid"], as_dict=True)
             if not subject_doc: continue
 
-            # ب. جلب الوحدات (مع الترتيب)
             unit_filters = {"subject": sub_id}
             if not rule['include_all']:
-                if not rule['units']: continue # لا يوجد وحدات مختارة
+                if not rule['units']: continue 
                 unit_filters["name"] = ["in", list(rule['units'])]
 
-            # نحتاج لمعرفة التراك لكل وحدة لفحص الـ is_paid الخاص به
             units = frappe.get_all("Game Unit", 
                 filters=unit_filters,
-                fields=["name", "title", "learning_track", "is_free_preview", "`order`"],
+                fields=["name", "title", "learning_track", "is_free_preview", "structure_type", "is_linear_topics", "`order`"],
                 order_by="`order` asc, creation asc"
             )
 
-            # هيكلية المادة في الرد
             subject_data = {
                 "subject_id": sub_id,
                 "title": rule['display_name'] or subject_doc.title,
                 "units": []
             }
 
-            # تتبع آخر درس مفتوح (للتقدم الخطي)
-            # نفترض أن كل وحدة تبدأ مفتوحة خطياً إذا أنهينا الوحدة السابقة
-            # (للتبسيط: التقدم الخطي يتم داخل الوحدة، وبين الوحدات)
-            previous_lesson_completed = True 
+            previous_unit_completed = True 
 
             for unit in units:
-                # جلب حالة التراك (Track)
                 track_is_paid = 0
                 if unit.learning_track:
                     track_is_paid = frappe.db.get_value("Game Learning Track", unit.learning_track, "is_paid") or 0
 
-                # جلب الدروس
-                lessons = frappe.get_all("Game Lesson", 
-                    filters={"unit": unit.name, "is_published": 1},
-                    fields=["name", "title", "xp_reward"],
-                    order_by="creation asc"
-                )
+                # تحديد نوع الهيكلية للعرض
+                # نرسلها للفرونت ليقرر شكل الرسم
+                unit_style = "lessons" if unit.structure_type == "Lesson Based" else "topics"
 
-                if not lessons: continue
-
-                unit_data = {
+                unit_output = {
                     "id": unit.name,
                     "title": unit.title,
-                    "is_free_preview": unit.is_free_preview,
-                    "status": "locked", # الافتراضي
-                    "lessons": []
+                    "style": unit_style, # 👈 الحقل الجديد للتمييز
+                    "topics": []
                 }
 
-                # تحديد الصلاحية المالية للوحدة (Financial Access) 💰
-                # هل يملك الحق في دخول هذه الوحدة؟
-                has_financial_access = False
-                
-                # 1. معاينة مجانية؟
-                if unit.is_free_preview:
-                    has_financial_access = True
-                # 2. اشتراك فعال؟
-                elif check_subscription_access(active_subs, sub_id, unit.learning_track):
-                    has_financial_access = True
-                # 3. المادة والتراك مجانيان؟
-                elif (not subject_doc.is_paid) and (not track_is_paid):
-                    has_financial_access = True
-                
-                # بناء الدروس وحالتها
-                is_unit_completed = True # افتراض، سنفحصه
-                unit_has_available_lesson = False
-
-                for lesson in lessons:
-                    lesson_status = "locked"
+                # -------------------------------------------------
+                # السيناريو 1: Lesson Based (تحميل فوري للدروس)
+                # -------------------------------------------------
+                if unit_style == "lessons":
+                    # نجلب الدروس مباشرة ونضعها في توبيك وهمي
+                    direct_lessons = frappe.get_all("Game Lesson", 
+                        filters={"unit": unit.name, "topic": ["is", "not set"], "is_published": 1},
+                        fields=["name", "title", "xp_reward"],
+                        order_by="creation asc"
+                    )
                     
-                    is_completed = lesson.name in completed_lessons
-                    if not is_completed: is_unit_completed = False
+                    if not direct_lessons: continue
 
-                    if is_completed:
-                        lesson_status = "completed"
-                    else:
-                        # إذا لم يكتمل، نفحص هل يمكن فتحه؟
-                        if not has_financial_access:
-                            lesson_status = "locked_premium" # 🔒 قفل مالي
-                        elif previous_lesson_completed:
-                            lesson_status = "available"      # 🔓 مفتوح للعب
-                            previous_lesson_completed = False # الدرس التالي سيغلق حتى ننهي هذا
+                    # معالجة حالة الدروس (قفل/فتح)
+                    processed_lessons = []
+                    previous_lesson_completed = True
+                    has_financial_access = False
+                    
+                    # فحص مالي (وحدة)
+                    if unit.is_free_preview or (not subject_doc.is_paid and not track_is_paid) or check_subscription_access(active_subs, sub_id, unit.learning_track):
+                        has_financial_access = True
+
+                    for lesson in direct_lessons:
+                        is_completed = lesson.name in completed_lessons_set
+                        status = "locked"
+                        
+                        if is_completed:
+                            status = "completed"
                         else:
-                            lesson_status = "locked"         # ⛓️ قفل تقدم (يجب إنهاء السابق)
+                            if not has_financial_access:
+                                status = "locked_premium"
+                            elif previous_lesson_completed: # (نفترض دائماً خطي في هذا الوضع)
+                                status = "available"
+                                previous_lesson_completed = False
+                            else:
+                                status = "locked"
+                        
+                        processed_lessons.append({
+                            "id": lesson.name,
+                            "title": lesson.title,
+                            "status": status,
+                            "xp": lesson.xp_reward
+                        })
+                        if is_completed: previous_lesson_completed = True
 
-                    if lesson_status == "available":
-                        unit_has_available_lesson = True
-
-                    unit_data["lessons"].append({
-                        "id": lesson.name,
-                        "title": lesson.title,
-                        "status": lesson_status,
-                        "xp": lesson.xp_reward
+                    # إضافة التوبيك الوهمي مع الدروس
+                    unit_output["topics"].append({
+                        "id": f"{unit.name}-default",
+                        "title": unit.title,
+                        "is_virtual": True,
+                        "lessons": processed_lessons # ✅ نرسل الدروس هنا
                     })
-                
-                # حالة الوحدة العامة للعرض
-                if is_unit_completed:
-                    unit_data["status"] = "completed"
-                    previous_lesson_completed = True # نسمح بفتح الدرس الأول في الوحدة التالية
-                elif unit_has_available_lesson:
-                    unit_data["status"] = "available"
-                elif not has_financial_access:
-                    unit_data["status"] = "locked_premium"
+
+                # -------------------------------------------------
+                # السيناريو 2: Topic Based (تحميل كسول)
+                # -------------------------------------------------
                 else:
-                    unit_data["status"] = "locked"
+                    real_topics = frappe.get_all("Game Topic", 
+                        filters={"unit": unit.name},
+                        fields=["name", "title", "is_free_preview", "is_linear", "description"],
+                        order_by="creation asc"
+                    )
+                    
+                    previous_topic_completed = True # للتحكم بتسلسل التوبيكس
 
-                subject_data["units"].append(unit_data)
+                    for topic in real_topics:
+                        # فحص مالي (توبيك)
+                        has_financial_access = False
+                        if unit.is_free_preview or topic.is_free_preview or (not subject_doc.is_paid and not track_is_paid) or check_subscription_access(active_subs, sub_id, unit.learning_track):
+                            has_financial_access = True
 
+                        # نحتاج لحساب حالة التوبيك (هل هو مكتمل؟)
+                        # هنا نضطر لجلب الدروس فقط للحساب (Count Check) وليس للإرسال
+                        topic_lessons = frappe.get_all("Game Lesson", 
+                            filters={"topic": topic.name, "is_published": 1},
+                            fields=["name"], # ID only
+                            order_by="creation asc"
+                        )
+                        
+                        total_lessons = len(topic_lessons)
+                        completed_count = len([l for l in topic_lessons if l.name in completed_lessons_set])
+                        is_fully_completed = (total_lessons > 0 and total_lessons == completed_count)
+
+                        # تحديد حالة التوبيك
+                        topic_status = "locked"
+                        if is_fully_completed:
+                            topic_status = "completed"
+                        elif not has_financial_access:
+                            topic_status = "locked_premium"
+                        elif unit.is_linear_topics and not previous_topic_completed:
+                            topic_status = "locked"
+                        else:
+                            # إذا كان متاحاً مالياً، ووصله الدور في الترتيب
+                            topic_status = "available"
+
+                        if is_fully_completed: previous_topic_completed = True
+                        
+                        # إضافة التوبيك (بدون دروس)
+                        unit_output["topics"].append({
+                            "id": topic.name,
+                            "title": topic.title,
+                            "description": topic.description,
+                            "status": topic_status,
+                            "stats": { # ميتا داتا للعرض
+                                "total": total_lessons,
+                                "completed": completed_count
+                            }
+                            # ❌ lessons removed here
+                        })
+
+                subject_data["units"].append(unit_output)
+            
             final_map.append(subject_data)
 
-        # إذا طلب الفرونت القائمة المسطحة القديمة (Flat List) لسبب ما، يمكن تعديل الرد هنا
-        # لكن الهيكلية الهرمية أفضل: [ {Subject, Units: [ {Unit, Lessons: []} ]} ]
         return final_map
 
     except Exception as e:
@@ -436,7 +444,7 @@ def check_subscription_access(active_subs, subject_id, track_id=None):
     """
     فحص هل تغطي الاشتراكات هذه المادة أو التراك.
     """
-    for access in active_access_list:
+    for access in active_subs:
         # 1. اشتراك شامل
         if access.get("type") == "Global":
             return True
