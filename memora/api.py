@@ -1199,7 +1199,7 @@ def submit_review_session(session_data):
         completion_time_ms = data.get('completion_time_ms', 0)
         
         current_subject = session_meta.get('subject')
-        current_topic = session_meta.get('topic') # ✅ استلام التوبيك
+        current_topic = session_meta.get('topic') # ✅
 
         # حساب الجوائز
         correct_count = sum(1 for item in interactions if item.get('is_correct'))
@@ -1213,7 +1213,7 @@ def submit_review_session(session_data):
             duration = item.get('time_spent_ms') or item.get('duration_ms') or 3000
             
             if question_id:
-                # ✅ نمرر التوبيك هنا
+                # ✅ التعديل هنا: نمرر التوبيك للدالة المصححة
                 update_srs_after_review(user, question_id, is_correct, duration, current_subject, current_topic)
 
         # تسجيل الجلسة
@@ -1241,12 +1241,9 @@ def submit_review_session(session_data):
 
         frappe.db.commit()
 
-        # =========================================================
-        # 🆕 حساب المتبقي (Netflix Effect)
-        # =========================================================
+        # حساب المتبقي (Netflix Effect)
         remaining_count = 0
         if current_topic:
-            # كم سؤال بقي في "المنطقة الحمراء أو البيضاء" لهذا التوبيك؟
             remaining_count = frappe.db.sql("""
                 SELECT COUNT(*) FROM `tabPlayer Memory Tracker`
                 WHERE player = %s 
@@ -1257,7 +1254,7 @@ def submit_review_session(session_data):
         return {
             "status": "success",
             "xp_earned": total_xp,
-            "remaining_items": remaining_count, # ✅ يرسل للفرونت ليظهر زر "أكمل"
+            "remaining_items": remaining_count,
             "new_stability_counts": get_mastery_counts(user)
         }
 
@@ -1266,11 +1263,12 @@ def submit_review_session(session_data):
         return {"status": "error", "message": str(e)}
 
 
-def update_srs_after_review(user, question_id, is_correct, duration_ms, subject=None):
+def update_srs_after_review(user, question_id, is_correct, duration_ms, subject=None, topic=None):
     """
-    تحديث حالة الذاكرة (SRS) مع منطق بونص السرعة وتنظيف السجلات الأب.
+    تحديث حالة الذاكرة (SRS).
+    تم إصلاح عدد المتغيرات (أضيف topic) وإزالة التكرار في المنطق.
     """
-    # 1. جلب السجل الحالي لمعرفة المستوى السابق
+    # 1. جلب السجل الحالي
     tracker_name = frappe.db.get_value("Player Memory Tracker", 
         {"player": user, "question_id": question_id}, "name")
     
@@ -1278,57 +1276,31 @@ def update_srs_after_review(user, question_id, is_correct, duration_ms, subject=
     if tracker_name:
         current_stability = cint(frappe.db.get_value("Player Memory Tracker", tracker_name, "stability"))
 
-    # 2. خوارزمية التقييم (SRS Logic)
+    # 2. خوارزمية التقييم (Speed Bonus)
     new_stability = current_stability
     
     if is_correct:
-        # ✅ إجابة صحيحة
         if duration_ms < 2000: 
-            # 🚀 سريع جداً (Easy) -> قفزة مزدوجة
-            new_stability = min(current_stability + 2, 4)
+            new_stability = min(current_stability + 2, 4) # سريع جداً
         elif duration_ms > 6000:
-            # 🐢 بطيء (Hard) -> لا زيادة في المتانة، يبقى كما هو
-            new_stability = max(current_stability, 1) # نضمن ألا يقل عن 1
+            new_stability = max(current_stability, 1) # بطيء
         else:
-            # 👌 متوسط (Good) -> خطوة واحدة
-            new_stability = min(current_stability + 1, 4)
+            new_stability = min(current_stability + 1, 4) # عادي
         
-        # ضمان الحد الأدنى 1 عند النجاح
         if new_stability < 1: new_stability = 1
-            
     else:
-        # ❌ خطأ (Fail) -> تصفير الذاكرة
-        new_stability = 1 
+        new_stability = 1 # خطأ
     
     # 3. حساب الموعد القادم
-    # الخريطة: 1=غداً، 2=3أيام، 3=أسبوع، 4=أسبوعين
     interval_map = {1: 1, 2: 3, 3: 7, 4: 14}
     days_to_add = interval_map.get(new_stability, 1)
-    
     new_date = add_days(now_datetime(), days_to_add)
-
-    attempts = 1 if is_correct else 2
-    rating = infer_rating(duration_ms, attempts) # أو منطقك المخصص
-    # (استخدم منطقك المفضل للسرعة هنا، المهم التمرير للدالة التالية)
     
-    # حساب الموعد القادم (منطقك)
-    new_stability = min(4, rating) if is_correct else 1 # تبسيط للدمج، استخدم كودك الأصلي هنا
-    interval_map = {1: 1, 2: 3, 3: 7, 4: 14}
-    days_to_add = interval_map.get(new_stability, 1)
-    new_date = add_days(nowdate(), days_to_add)
-
-    # ✅ التخزين النهائي
+    # 4. التخزين (مرة واحدة فقط وبشكل صحيح)
+    # نمرر topic للدالة المساعدة
     update_memory_tracker(user, question_id, new_stability, new_date, subject, topic)
-    
-    # 4. التخزين في قاعدة البيانات
-    # نستخدم الدالة المساعدة لضمان توحيد آلية الحفظ (Insert/Update)
-    update_memory_tracker(user, question_id, new_stability, new_date, subject)
 
-    # =========================================================
-    # 🧹 CLEANUP: ترحيل موعد الأب ليختفي من المهام
-    # =========================================================
-    # عند حل سؤال فرعي (مثل ...:0)، نقوم بتأجيل السجل الأصلي القديم 
-    # (الذي بدون لاحقة) لنفس التاريخ، لكي لا يظهر كتكرار في المراجعات.
+    # 5. تنظيف السجلات الأب (Parent Cleanup)
     if ":" in question_id:
         parent_id = question_id.rsplit(":", 1)[0]
         parent_tracker = frappe.db.get_value("Player Memory Tracker", 
