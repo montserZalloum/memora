@@ -243,8 +243,8 @@ def get_map_data(subject=None):
 
             units = frappe.get_all("Game Unit", 
                 filters=unit_filters,
-                fields=["name", "title", "learning_track", "is_free_preview", "structure_type", "is_linear_topics", "`order`"],
-                order_by="`order` asc, creation asc"
+                fields=["name", "title", "learning_track", "is_free_preview", "structure_type", "is_linear_topics"],
+                order_by="creation asc"
             )
 
             subject_data = {
@@ -1742,3 +1742,141 @@ def request_purchase(item_id, transaction_id=None):
     except Exception as e:
         frappe.log_error("Purchase Request Failed", frappe.get_traceback())
         return {"status": "error", "message": "حدث خطأ أثناء الطلب."}
+
+
+@frappe.whitelist()
+def get_topic_details(topic_id):
+    """
+    جلب تفاصيل الدروس لتوبيك معين (عند الضغط عليه في الخريطة).
+    يدعم التوبيك الحقيقي والتوبيك الوهمي (للوحدات المباشرة).
+    """
+    try:
+        user = frappe.session.user
+        
+        lessons_data = []
+        is_linear_progression = 1 # الافتراضي
+        has_financial_access = False
+        topic_title = ""
+        topic_desc = ""
+
+        # ---------------------------------------------------------
+        # 1. تحديد نوع التوبيك وجلب بياناته وبيانات الأب (Unit/Subject)
+        # ---------------------------------------------------------
+        
+        # الحالة أ: توبيك وهمي (درس مباشر تابع للوحدة)
+        if topic_id.endswith("-default"):
+            unit_id = topic_id.replace("-default", "")
+            unit_doc = frappe.db.get_value("Game Unit", unit_id, 
+                ["name", "title", "subject", "learning_track", "is_free_preview"], as_dict=True)
+            
+            if not unit_doc: frappe.throw("Unit not found")
+            
+            topic_title = unit_doc.title
+            topic_desc = "دروس الوحدة"
+            is_linear_progression = 1 # نفترض الوحدات المباشرة خطية
+            
+            # جلب الدروس
+            raw_lessons = frappe.get_all("Game Lesson",
+                filters={"unit": unit_id, "topic": ["is", "not set"], "is_published": 1},
+                fields=["name", "title", "xp_reward"],
+                order_by="creation asc"
+            )
+            
+            # التحقق المالي (يعتمد على الوحدة)
+            check_doc = unit_doc # سنفحص على مستوى الوحدة
+
+        # الحالة ب: توبيك حقيقي
+        else:
+            topic_doc = frappe.db.get_value("Game Topic", topic_id,
+                ["name", "title", "description", "unit", "is_free_preview", "is_linear"], as_dict=True)
+            
+            if not topic_doc: frappe.throw("Topic not found")
+            
+            topic_title = topic_doc.title
+            topic_desc = topic_doc.description
+            is_linear_progression = topic_doc.is_linear
+            
+            # جلب بيانات الأب (للفحص المالي)
+            unit_doc = frappe.db.get_value("Game Unit", topic_doc.unit, 
+                ["subject", "learning_track", "is_free_preview"], as_dict=True)
+                
+            # جلب الدروس
+            raw_lessons = frappe.get_all("Game Lesson",
+                filters={"topic": topic_id, "is_published": 1},
+                fields=["name", "title", "xp_reward"],
+                order_by="creation asc"
+            )
+            
+            check_doc = topic_doc # سنفحص على مستوى التوبيك + الوحدة
+
+        # ---------------------------------------------------------
+        # 2. التحقق المالي (Financial Check) 💰
+        # ---------------------------------------------------------
+        # نحتاج بيانات المادة والتراك
+        subject_doc = frappe.db.get_value("Game Subject", unit_doc.subject, ["name", "is_paid"], as_dict=True)
+        track_is_paid = 0
+        if unit_doc.learning_track:
+            track_is_paid = frappe.db.get_value("Game Learning Track", unit_doc.learning_track, "is_paid") or 0
+
+        active_subs = get_user_active_subscriptions(user)
+
+        # منطق الفتح (OR Logic)
+        if unit_doc.is_free_preview: # الوحدة مجانية
+            has_financial_access = True
+        elif check_doc.get("is_free_preview"): # التوبيك مجاني
+            has_financial_access = True
+        elif (not subject_doc.is_paid) and (not track_is_paid): # المادة والتراك مجانيان
+            has_financial_access = True
+        elif check_subscription_access(active_subs, unit_doc.subject, unit_doc.learning_track): # اشتراك
+            has_financial_access = True
+
+        # ---------------------------------------------------------
+        # 3. معالجة حالة الدروس (Progress Logic) ⛓️
+        # ---------------------------------------------------------
+        # جلب ما تم إنجازه
+        if raw_lessons:
+            lesson_ids = [l.name for l in raw_lessons]
+            completed_set = set(frappe.get_all("Gameplay Session", 
+                filters={"player": user, "lesson": ["in", lesson_ids]}, 
+                pluck="lesson"))
+        else:
+            completed_set = set()
+
+        previous_lesson_completed = True
+
+        for lesson in raw_lessons:
+            is_completed = lesson.name in completed_set
+            status = "locked"
+
+            if is_completed:
+                status = "completed"
+                # إذا اكتمل، الذي بعده مسموح له أن يفتح
+                previous_lesson_completed = True 
+            else:
+                if not has_financial_access:
+                    status = "locked_premium" # قفل مالي (اذهب للمتجر)
+                elif is_linear_progression and not previous_lesson_completed:
+                    status = "locked" # قفل تسلسلي (أكمل السابق)
+                else:
+                    status = "available" # متاح للعب
+                    # بما أن هذا متاح ولم يكتمل، نغلق الذي بعده
+                    previous_lesson_completed = False 
+
+            lessons_data.append({
+                "id": lesson.name,
+                "title": lesson.title,
+                "status": status,
+                "xp": lesson.xp_reward
+            })
+
+        return {
+            "topic_id": topic_id,
+            "title": topic_title,
+            "description": topic_desc,
+            "is_locked_premium": not has_financial_access, # حالة عامة للتوبيك
+            "lessons": lessons_data
+        }
+
+    except Exception as e:
+        frappe.log_error("Get Topic Details Failed", frappe.get_traceback())
+        return {"error": str(e)}
