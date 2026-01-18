@@ -9,6 +9,7 @@
  "field_order": [
   "player",
   "subject",
+  "topic",
   "question_id",
   "stability",
   "next_review_date",
@@ -64,12 +65,18 @@
    "fieldtype": "Link",
    "label": "Season",
    "options": "Game Subscription Season"
+  },
+  {
+   "fieldname": "topic",
+   "fieldtype": "Link",
+   "label": "Topic",
+   "options": "Game Topic"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-15 22:18:52.969700",
+ "modified": "2026-01-18 13:48:10.863962",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Player Memory Tracker",

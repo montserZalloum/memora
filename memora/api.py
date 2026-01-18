@@ -499,7 +499,6 @@ def submit_session(session_meta, gamification_results, interactions):
     try:
         user = frappe.session.user
         
-        # 1. تحويل JSON إلى Python (في حال وصل كنص)
         if isinstance(session_meta, str): session_meta = json.loads(session_meta)
         if isinstance(interactions, str): interactions = json.loads(interactions)
         if isinstance(gamification_results, str): gamification_results = json.loads(gamification_results)
@@ -507,29 +506,27 @@ def submit_session(session_meta, gamification_results, interactions):
         lesson_id = session_meta.get('lesson_id')
         if not lesson_id: frappe.throw("Missing lesson_id")
 
-        # استخراج النتائج (تم إزالة الجواهر)
         xp_earned = gamification_results.get('xp_earned', 0)
         score = gamification_results.get('score', 0)
 
-        # ---------------------------------------------------------
-        # 🕵️‍♂️ اكتشاف المادة (Subject Lookup)
-        # ---------------------------------------------------------
-        # نبحث عن المادة التابعة لهذا الدرس عبر التسلسل:
-        # Lesson -> Unit -> Learning Track -> Subject
-        subject_data = frappe.db.sql("""
-            SELECT t.subject 
+        # 1. اكتشاف المادة والتوبيك (Subject & Topic Lookup) 🕵️‍♂️
+        # نجلب topic من الدرس، و subject من التراك/الوحدة
+        data = frappe.db.sql("""
+            SELECT l.topic, t.subject 
             FROM `tabGame Lesson` l
             LEFT JOIN `tabGame Unit` u ON l.unit = u.name
             LEFT JOIN `tabGame Learning Track` t ON u.learning_track = t.name
             WHERE l.name = %s
-        """, (lesson_id,))
+        """, (lesson_id,), as_dict=True)
         
-        # إذا وجدنا المادة نأخذها، وإلا نعتبرها None
-        current_subject = subject_data[0][0] if subject_data and subject_data[0][0] else None
+        current_subject = None
+        current_topic = None
+        
+        if data:
+            current_subject = data[0].subject
+            current_topic = data[0].topic
 
-        # ---------------------------------------------------------
-        # 2. أرشفة الجلسة (Logging)
-        # ---------------------------------------------------------
+        # 2. أرشفة الجلسة
         doc = frappe.get_doc({
             "doctype": "Gameplay Session",
             "player": user,
@@ -540,45 +537,31 @@ def submit_session(session_meta, gamification_results, interactions):
         })
         doc.insert(ignore_permissions=True)
         
-        # ---------------------------------------------------------
-        # 3. تحديث البروفايل العام (Global XP)
-        # ---------------------------------------------------------
+        # 3. تحديث الـ XP العام
         if xp_earned > 0:
-            frappe.db.sql("""
-                UPDATE `tabPlayer Profile`
-                SET total_xp = total_xp + %s
-                WHERE user = %s
-            """, (xp_earned, user))
+            frappe.db.sql("UPDATE `tabPlayer Profile` SET total_xp = total_xp + %s WHERE user = %s", (xp_earned, user))
 
-        # ---------------------------------------------------------
-        # 🆕 4. تحديث نقاط المادة (Subject XP - Leaderboard)
-        # ---------------------------------------------------------
+        # 4. تحديث نقاط المادة (Leaderboard)
         if current_subject and xp_earned > 0:
             update_subject_progression(user, current_subject, xp_earned)
 
-        # ---------------------------------------------------------
-        # 5. تحديث الذاكرة (SRS) مع المادة
-        # ---------------------------------------------------------
+        # 5. تحديث الذاكرة (SRS) - نمرر المادة والتوبيك ✅
         if interactions and isinstance(interactions, list):
-            # نمرر current_subject للدالة لكي تخزنه في الـ Tracker
-            process_srs_batch(user, interactions, current_subject)
+            process_srs_batch(user, interactions, current_subject, current_topic)
 
         frappe.db.commit() 
 
-        return {
-            "status": "success", 
-            "message": "Session Saved. XP & SRS Updated. ✅"
-        }
+        return {"status": "success", "message": "Session Saved ✅"}
 
     except Exception as e:
-        frappe.log_error(title="submit_session failed", message=frappe.get_traceback())
-        frappe.throw(f"Error: {str(e)}")
+        frappe.log_error("submit_session failed", frappe.get_traceback())
+        frappe.throw(str(e))
 
 # =========================================================
 # 🧠 THE BRAIN: SRS Algorithms
 # =========================================================
 
-def process_srs_batch(user, interactions, subject=None):
+def process_srs_batch(user, interactions, subject=None, topic=None):
     """
     معالجة مجموعة من التفاعلات لتحديث الذاكرة.
     تستقبل 'subject' لتمريره للدالة النهائية.
@@ -586,16 +569,13 @@ def process_srs_batch(user, interactions, subject=None):
     for item in interactions:
         atom_id = item.get("question_id")
         if not atom_id: continue
-            
         duration = item.get("duration_ms", item.get("time_spent_ms", 3000))
         attempts = item.get("attempts_count", 1)
-        
-        # استنتاج التقييم
         rating = infer_rating(duration, attempts)
         next_review_date = calculate_next_review(rating)
         
-        # ✅ التعديل هنا: تمرير subject للدالة التالية
-        update_memory_tracker(user, atom_id, rating, next_review_date, subject)
+        # ✅ نمرر التوبيك
+        update_memory_tracker(user, atom_id, rating, next_review_date, subject, topic)
 
 
 def infer_rating(duration_ms, attempts):
@@ -646,18 +626,19 @@ def calculate_next_review(rating):
     return add_days(now_datetime(), days_to_add)
 
 
-def update_memory_tracker(user, atom_id, rating, next_date, subject=None):
-    """تحديث سجل الذاكرة مع دعم المادة"""
+def update_memory_tracker(user, atom_id, rating, next_date, subject=None, topic=None): # ✅
     existing_tracker = frappe.db.get_value("Player Memory Tracker", 
         {"player": user, "question_id": atom_id}, "name")
 
+    values = {
+        "stability": rating,
+        "last_review_date": now_datetime(),
+        "next_review_date": next_date
+    }
+    if subject: values["subject"] = subject
+    if topic: values["topic"] = topic # ✅ حفظ التوبيك عند التحديث
+
     if existing_tracker:
-        values = {
-            "stability": rating,
-            "last_review_date": now_datetime(),
-            "next_review_date": next_date
-        }
-        if subject: values["subject"] = subject
         frappe.db.set_value("Player Memory Tracker", existing_tracker, values)
     else:
         doc = frappe.get_doc({
@@ -665,6 +646,7 @@ def update_memory_tracker(user, atom_id, rating, next_date, subject=None):
             "player": user,
             "question_id": atom_id,
             "subject": subject,
+            "topic": topic, # ✅ حفظ التوبيك عند الإنشاء
             "stability": rating,
             "last_review_date": now_datetime(),
             "next_review_date": next_date
@@ -982,114 +964,154 @@ def get_daily_quests(subject=None):
 
 
 @frappe.whitelist()
-def get_review_session():
+def get_review_session(subject=None, topic_id=None):
     """
-    يولد جلسة مراجعة ذكية (Lightning Round).
-    التحديثات المعمارية:
-    1. يعتمد على ID السطر (Child Row Name) بدلاً من الترتيب، لمنع مشاكل الحذف والترتيب.
-    2. يقوم بالتنظيف الذاتي (Self-Healing) للسجلات اليتيمة.
-    3. يتحقق من أن الدرس منشور (is_published).
+    جلب جلسة مراجعة ذكية.
+    المميزات:
+    1. دعم وضع التركيز (Topic Focus) مع حجم ديناميكي.
+    2. استبعاد الأسئلة التي تم حلها اليوم (Smart Filtering).
+    3. تنظيف ذاتي للبيانات الفاسدة أو القديمة (Self-Healing with Error Catching).
     """
     try:
         user = frappe.session.user
+        import random
         
-        # 1. جلب العناصر المستحقة للمراجعة
-        due_items = frappe.db.sql("""
-            SELECT name, question_id, stability 
-            FROM `tabPlayer Memory Tracker`
-            WHERE player = %s AND next_review_date <= NOW()
-            ORDER BY next_review_date ASC
-            LIMIT 15
-        """, (user,), as_dict=True)
+        limit = 15 # الحد الافتراضي للمراجعة العامة
+
+        # =========================================================
+        # 1. جلب العناصر المرشحة (Fetch Candidates)
+        # =========================================================
         
-        if not due_items:
-            return []
+        # A. مراجعة توبيك محدد (Focus Mode) 🎯
+        if topic_id:
+            # حساب الحجم المناسب (10% من الإجمالي، بين 10 و 30)
+            total_items = frappe.db.count("Player Memory Tracker", {"player": user, "topic": topic_id})
+            if total_items == 0: return []
+
+            calculated_limit = int(total_items * 0.10)
+            limit = max(10, min(calculated_limit, 30))
+
+            # الاستعلام الذكي: هات (الخطأ) أو (القديم). استبعد (الجديد الصحيح).
+            due_items = frappe.db.sql("""
+                SELECT name, question_id, stability 
+                FROM `tabPlayer Memory Tracker`
+                WHERE player = %s 
+                AND topic = %s
+                AND (
+                    stability = 1 
+                    OR 
+                    last_review_date < CURDATE()
+                )
+                ORDER BY stability ASC, last_review_date ASC
+                LIMIT %s
+            """, (user, topic_id, limit), as_dict=True)
+
+            # خطة الطوارئ (Fallback): إذا القائمة فارغة (ختم التوبيك اليوم)، هات عشوائي
+            if not due_items and total_items > 0:
+                due_items = frappe.db.sql("""
+                    SELECT name, question_id, stability 
+                    FROM `tabPlayer Memory Tracker`
+                    WHERE player = %s AND topic = %s
+                    ORDER BY RAND()
+                    LIMIT 10
+                """, (user, topic_id), as_dict=True)
+
+        # B. مراجعة عامة (Daily Mix) 📅
+        else:
+            conditions = "player = %s AND next_review_date <= NOW()"
+            params = [user]
+            if subject:
+                conditions += " AND subject = %s"
+                params.append(subject)
+                
+            due_items = frappe.db.sql(f"""
+                SELECT name, question_id, stability 
+                FROM `tabPlayer Memory Tracker`
+                WHERE {conditions}
+                ORDER BY next_review_date ASC
+                LIMIT 15
+            """, tuple(params), as_dict=True)
+        
+        if not due_items: return []
 
         quiz_cards = []
-        # قائمة لتعقب السجلات الفاسدة لحذفها دفعة واحدة
         corrupt_tracker_ids = []
+        lesson_cache = {} # لتجنب تكرار جلب نفس الدرس
 
+        # =========================================================
+        # 2. معالجة البطاقات (Processing Cards)
+        # =========================================================
         for item in due_items:
             raw_id = item.question_id
-            target_atom_index = None
             
-            # 2. تحليل الـ ID (نتوقع: STAGE_ROW_NAME:ATOM_INDEX)
-            # مثال: a1b2c3d4:0
+            # أ. تحليل المعرف (ID Parsing)
+            # المتوقع: STAGE_HASH:INDEX (مثال: a1b2c3d4:0)
             if ":" in raw_id:
-                # نستخدم rsplit للفصل من اليمين لضمان أخذ الرقم الأخير
                 parts = raw_id.rsplit(":", 1)
                 stage_row_name = parts[0]
-                if parts[1].isdigit():
-                    target_atom_index = int(parts[1])
-                else:
-                    target_atom_index = None
+                try: target_atom_index = int(parts[1])
+                except: target_atom_index = None
             else:
                 stage_row_name = raw_id
                 target_atom_index = None
 
-            # 3. البحث عن المرحلة مباشرة (Direct Lookup)
-            # نبحث في جدول المراحل الفرعي باستخدام الـ Hash الخاص بها
-            stage_data = frappe.db.get_value("Game Lesson Stage", stage_row_name, 
-                ["config", "type", "parent"], as_dict=True)
-            
+            # ب. البحث الآمن (Safe Lookup) 🔥
+            # نستخدم try-except لحماية الكود من البيانات القديمة التي تسبب Crash
+            stage_data = None
+            try:
+                stage_data = frappe.db.get_value("Game Stage", stage_row_name, 
+                    ["config", "type", "parent"], as_dict=True)
+            except Exception:
+                stage_data = None # قاعدة البيانات رفضت الاستعلام (بيانات فاسدة)
+
             if not stage_data:
-                # 🚨 المرحلة غير موجودة! (ربما حُذفت أو الـ ID قديم بتنسيق Lesson-Stage)
                 corrupt_tracker_ids.append(item.name)
                 continue
                 
-            # 4. جلب الدرس الأب (Parent Lesson)
-            # الحقل parent في الجدول الفرعي يحتوي على اسم الدرس
+            # ج. التحقق من الدرس
             lesson_id = stage_data.parent
+            if lesson_id not in lesson_cache:
+                lesson_doc = frappe.get_doc("Game Lesson", lesson_id)
+                if not lesson_doc.is_published:
+                    corrupt_tracker_ids.append(item.name)
+                    continue
+                lesson_cache[lesson_id] = lesson_doc
             
-            # التحقق من وجود الدرس ونشره
-            lesson_status = frappe.db.get_value("Game Lesson", lesson_id, "is_published")
-            if lesson_status is None:
-                # الدرس الأب محذوف
-                corrupt_tracker_ids.append(item.name)
-                continue
-            
-            if lesson_status == 0:
-                # الدرس موجود لكنه غير منشور (Draft)، نتجاوزه ولا نحذفه
-                continue
-
-            # 5. تجهيز البيانات
-            # نحتاج وثيقة الدرس كاملة لجلب "المموهات" (Distractors) من مراحل أخرى
-            lesson_doc = frappe.get_doc("Game Lesson", lesson_id)
+            lesson_doc = lesson_cache[lesson_id]
             config = frappe.parse_json(stage_data.config)
             
-            # =========================================================
-            # 🅰️ التحويل: REVEAL -> QUIZ
-            # =========================================================
+            # =====================================================
+            # د. تحويل REVEAL -> QUIZ
+            # =====================================================
             if stage_data.type == 'Reveal':
                 highlights = config.get('highlights', [])
                 
-                # تجميع بنك المموهات من نفس الدرس
-                lesson_distractor_pool = []
+                # تجميع المموهات من نفس الدرس
+                distractor_pool = []
                 for s in lesson_doc.stages:
                     if s.type == 'Reveal':
                         s_conf = frappe.parse_json(s.config) if s.config else {}
                         for h in s_conf.get('highlights', []):
-                            lesson_distractor_pool.append(h['word'])
+                            distractor_pool.append(h['word'])
                 
                 for idx, highlight in enumerate(highlights):
-                    # الفلتر الذري: هل هذا هو السؤال المطلوب؟
+                    # الفلتر الذري
                     if target_atom_index is not None and target_atom_index != idx:
                         continue
                         
                     correct_word = highlight['word']
                     question_text = config.get('sentence', '').replace(correct_word, "____")
                     
-                    distractors = [w for w in lesson_distractor_pool if w != correct_word]
-                    distractors = list(set(distractors)) # إزالة التكرار
+                    distractors = [w for w in distractor_pool if w != correct_word]
+                    distractors = list(set(distractors))
                     random.shuffle(distractors)
                     selected_distractors = distractors[:3]
-                    
                     while len(selected_distractors) < 3: selected_distractors.append("...") 
 
                     options = selected_distractors + [correct_word]
                     random.shuffle(options)
                     
-                    # الـ ID الجديد
+                    # نستخدم ID الذرة الجديد دائماً
                     atom_id = f"{stage_row_name}:{idx}"
 
                     quiz_cards.append({
@@ -1101,9 +1123,9 @@ def get_review_session():
                         "origin_type": "reveal"
                     })
 
-            # =========================================================
-            # 🅱️ التحويل: MATCHING -> QUIZ
-            # =========================================================
+            # =====================================================
+            # هـ. تحويل MATCHING -> QUIZ
+            # =====================================================
             elif stage_data.type == 'Matching':
                 pairs = config.get('pairs', [])
                 
@@ -1117,7 +1139,6 @@ def get_review_session():
                     distractors = [p.get('left') for p in pairs if p.get('left') != correct_answer]
                     random.shuffle(distractors)
                     selected_distractors = distractors[:3]
-                    
                     while len(selected_distractors) < 3: selected_distractors.append("...")
 
                     options = selected_distractors + [correct_answer]
@@ -1134,13 +1155,16 @@ def get_review_session():
                         "origin_type": "matching"
                     })
 
-        # 🧹 تنفيذ التنظيف الذاتي
+        # =========================================================
+        # 3. التنظيف والإرجاع
+        # =========================================================
         if corrupt_tracker_ids:
-            # حذف السجلات الفاسدة دفعة واحدة
+            # حذف البيانات القديمة بصمت
             frappe.db.delete("Player Memory Tracker", {"name": ["in", corrupt_tracker_ids]})
 
         random.shuffle(quiz_cards)
-        return quiz_cards[:10]
+        # نرجع فقط العدد المطلوب (Limit)
+        return quiz_cards[:limit]
 
     except Exception as e:
         frappe.log_error("Get Review Session Failed", frappe.get_traceback())
@@ -1149,55 +1173,40 @@ def get_review_session():
 
 @frappe.whitelist()
 def submit_review_session(session_data):
-    """
-    النسخة النهائية للمراجعة:
-    - تستخدم ID "مراجعة الذاكرة".
-    - تستخرج 'subject' من الـ Meta لتحديث الـ SRS ونقاط المادة.
-    """
     try:
         user = frappe.session.user
         
-        # 1. فك التغليف
-        if isinstance(session_data, str):
-            data = json.loads(session_data)
-        else:
-            data = session_data
+        if isinstance(session_data, str): data = json.loads(session_data)
+        else: data = session_data
             
         interactions = data.get('answers', []) 
         session_meta = data.get('session_meta', {})
         total_combo = data.get('total_combo', 0)
         completion_time_ms = data.get('completion_time_ms', 0)
         
-        # استخراج المادة (يجب أن يرسلها الفرونت)
         current_subject = session_meta.get('subject')
+        current_topic = session_meta.get('topic') # ✅ استلام التوبيك
 
-        # 2. حساب الجوائز
+        # حساب الجوائز
         correct_count = sum(1 for item in interactions if item.get('is_correct'))
         max_combo = int(total_combo)
+        total_xp = (correct_count * 10) + (max_combo * 2)
         
-        base_xp = correct_count * 10
-        combo_bonus = max_combo * 2
-        total_xp = base_xp + combo_bonus
-        
-        # 3. تحديث الذاكرة (SRS) - مع تمرير المادة
+        # تحديث الذاكرة
         for item in interactions:
             question_id = item.get('question_id')
             is_correct = item.get('is_correct')
             duration = item.get('time_spent_ms') or item.get('duration_ms') or 3000
             
             if question_id:
-                # نمرر current_subject لتخزينه في الـ Tracker
-                update_srs_after_review(user, question_id, is_correct, duration, current_subject)
+                # ✅ نمرر التوبيك هنا
+                update_srs_after_review(user, question_id, is_correct, duration, current_subject, current_topic)
 
-        # 4. تسجيل الجلسة (Log)
+        # تسجيل الجلسة
         full_log_data = {
             "meta": session_meta,
             "interactions": interactions,
-            "stats": {
-                "correct": correct_count,
-                "combo": max_combo,
-                "time_ms": completion_time_ms
-            }
+            "stats": {"correct": correct_count, "combo": max_combo, "time_ms": completion_time_ms}
         }
 
         doc = frappe.get_doc({
@@ -1210,24 +1219,31 @@ def submit_review_session(session_data):
         })
         doc.insert(ignore_permissions=True)
 
-        # 5. التحديثات المالية والنقاط
+        # التحديثات
         if total_xp > 0:
-            # أ. تحديث البروفايل العام
-            frappe.db.sql("""
-                UPDATE `tabPlayer Profile`
-                SET total_xp = total_xp + %s
-                WHERE user = %s
-            """, (total_xp, user))
-            
-            # ب. تحديث نقاط المادة (للمتصدرين) ✅
+            frappe.db.sql("UPDATE `tabPlayer Profile` SET total_xp = total_xp + %s WHERE user = %s", (total_xp, user))
             if current_subject:
                 update_subject_progression(user, current_subject, total_xp)
 
         frappe.db.commit()
 
+        # =========================================================
+        # 🆕 حساب المتبقي (Netflix Effect)
+        # =========================================================
+        remaining_count = 0
+        if current_topic:
+            # كم سؤال بقي في "المنطقة الحمراء أو البيضاء" لهذا التوبيك؟
+            remaining_count = frappe.db.sql("""
+                SELECT COUNT(*) FROM `tabPlayer Memory Tracker`
+                WHERE player = %s 
+                AND topic = %s
+                AND (stability = 1 OR last_review_date < CURDATE())
+            """, (user, current_topic))[0][0]
+
         return {
             "status": "success",
             "xp_earned": total_xp,
+            "remaining_items": remaining_count, # ✅ يرسل للفرونت ليظهر زر "أكمل"
             "new_stability_counts": get_mastery_counts(user)
         }
 
@@ -1276,6 +1292,19 @@ def update_srs_after_review(user, question_id, is_correct, duration_ms, subject=
     days_to_add = interval_map.get(new_stability, 1)
     
     new_date = add_days(now_datetime(), days_to_add)
+
+    attempts = 1 if is_correct else 2
+    rating = infer_rating(duration_ms, attempts) # أو منطقك المخصص
+    # (استخدم منطقك المفضل للسرعة هنا، المهم التمرير للدالة التالية)
+    
+    # حساب الموعد القادم (منطقك)
+    new_stability = min(4, rating) if is_correct else 1 # تبسيط للدمج، استخدم كودك الأصلي هنا
+    interval_map = {1: 1, 2: 3, 3: 7, 4: 14}
+    days_to_add = interval_map.get(new_stability, 1)
+    new_date = add_days(nowdate(), days_to_add)
+
+    # ✅ التخزين النهائي
+    update_memory_tracker(user, question_id, new_stability, new_date, subject, topic)
     
     # 4. التخزين في قاعدة البيانات
     # نستخدم الدالة المساعدة لضمان توحيد آلية الحفظ (Insert/Update)
