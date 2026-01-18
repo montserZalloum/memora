@@ -4,6 +4,7 @@ from frappe import _
 import math
 from frappe.utils import now_datetime, add_days, get_datetime, getdate, nowdate, cint
 import random
+from .ai_engine import get_ai_distractors
 
 @frappe.whitelist()
 def get_subjects():
@@ -970,7 +971,8 @@ def get_review_session(subject=None, topic_id=None):
     المميزات:
     1. دعم وضع التركيز (Topic Focus) مع حجم ديناميكي.
     2. استبعاد الأسئلة التي تم حلها اليوم (Smart Filtering).
-    3. تنظيف ذاتي للبيانات الفاسدة أو القديمة (Self-Healing with Error Catching).
+    3. تنظيف ذاتي للبيانات الفاسدة (Self-Healing).
+    4. استخدام AI لتوليد الخيارات الخاطئة (Distractors).
     """
     try:
         user = frappe.session.user
@@ -984,7 +986,7 @@ def get_review_session(subject=None, topic_id=None):
         
         # A. مراجعة توبيك محدد (Focus Mode) 🎯
         if topic_id:
-            # حساب الحجم المناسب (10% من الإجمالي، بين 10 و 30)
+            # حساب الحجم المناسب
             total_items = frappe.db.count("Player Memory Tracker", {"player": user, "topic": topic_id})
             if total_items == 0: return []
 
@@ -1036,7 +1038,7 @@ def get_review_session(subject=None, topic_id=None):
 
         quiz_cards = []
         corrupt_tracker_ids = []
-        lesson_cache = {} # لتجنب تكرار جلب نفس الدرس
+        lesson_cache = {} # Cache لتجنب تكرار جلب نفس الدرس
 
         # =========================================================
         # 2. معالجة البطاقات (Processing Cards)
@@ -1045,7 +1047,6 @@ def get_review_session(subject=None, topic_id=None):
             raw_id = item.question_id
             
             # أ. تحليل المعرف (ID Parsing)
-            # المتوقع: STAGE_HASH:INDEX (مثال: a1b2c3d4:0)
             if ":" in raw_id:
                 parts = raw_id.rsplit(":", 1)
                 stage_row_name = parts[0]
@@ -1056,13 +1057,12 @@ def get_review_session(subject=None, topic_id=None):
                 target_atom_index = None
 
             # ب. البحث الآمن (Safe Lookup) 🔥
-            # نستخدم try-except لحماية الكود من البيانات القديمة التي تسبب Crash
             stage_data = None
             try:
                 stage_data = frappe.db.get_value("Game Stage", stage_row_name, 
                     ["config", "type", "parent"], as_dict=True)
             except Exception:
-                stage_data = None # قاعدة البيانات رفضت الاستعلام (بيانات فاسدة)
+                stage_data = None
 
             if not stage_data:
                 corrupt_tracker_ids.append(item.name)
@@ -1086,32 +1086,39 @@ def get_review_session(subject=None, topic_id=None):
             if stage_data.type == 'Reveal':
                 highlights = config.get('highlights', [])
                 
-                # تجميع المموهات من نفس الدرس
-                distractor_pool = []
+                # 1. تجميع المخزون المحلي (الخيار الاحتياطي)
+                local_distractor_pool = []
                 for s in lesson_doc.stages:
                     if s.type == 'Reveal':
                         s_conf = frappe.parse_json(s.config) if s.config else {}
                         for h in s_conf.get('highlights', []):
-                            distractor_pool.append(h['word'])
+                            local_distractor_pool.append(h['word'])
                 
                 for idx, highlight in enumerate(highlights):
-                    # الفلتر الذري
                     if target_atom_index is not None and target_atom_index != idx:
                         continue
                         
                     correct_word = highlight['word']
                     question_text = config.get('sentence', '').replace(correct_word, "____")
                     
-                    distractors = [w for w in distractor_pool if w != correct_word]
-                    distractors = list(set(distractors))
-                    random.shuffle(distractors)
-                    selected_distractors = distractors[:3]
-                    while len(selected_distractors) < 3: selected_distractors.append("...") 
+                    # 🤖 محاولة الـ AI
+                    selected_distractors = []
+                    # تأكد أن دالة get_ai_distractors موجودة في الملف
+                    ai_options = get_ai_distractors("reveal", correct_word, config.get('sentence', ''))
+                    
+                    if ai_options and len(ai_options) >= 3:
+                        selected_distractors = ai_options[:3]
+                    else:
+                        # Fallback: استخدام المخزون المحلي
+                        distractors = [w for w in local_distractor_pool if w != correct_word]
+                        distractors = list(set(distractors))
+                        random.shuffle(distractors)
+                        selected_distractors = distractors[:3]
+                        while len(selected_distractors) < 3: selected_distractors.append("...") 
 
                     options = selected_distractors + [correct_word]
                     random.shuffle(options)
                     
-                    # نستخدم ID الذرة الجديد دائماً
                     atom_id = f"{stage_row_name}:{idx}"
 
                     quiz_cards.append({
@@ -1136,10 +1143,18 @@ def get_review_session(subject=None, topic_id=None):
                     question_text = pair.get('right')
                     correct_answer = pair.get('left')
                     
-                    distractors = [p.get('left') for p in pairs if p.get('left') != correct_answer]
-                    random.shuffle(distractors)
-                    selected_distractors = distractors[:3]
-                    while len(selected_distractors) < 3: selected_distractors.append("...")
+                    # 🤖 محاولة الـ AI
+                    selected_distractors = []
+                    ai_options = get_ai_distractors("matching", correct_answer, question_text)
+                    
+                    if ai_options and len(ai_options) >= 3:
+                        selected_distractors = ai_options[:3]
+                    else:
+                        # Fallback: استخدام باقي الخيارات في نفس السؤال
+                        distractors = [p.get('left') for p in pairs if p.get('left') != correct_answer]
+                        random.shuffle(distractors)
+                        selected_distractors = distractors[:3]
+                        while len(selected_distractors) < 3: selected_distractors.append("...")
 
                     options = selected_distractors + [correct_answer]
                     random.shuffle(options)
@@ -1163,7 +1178,6 @@ def get_review_session(subject=None, topic_id=None):
             frappe.db.delete("Player Memory Tracker", {"name": ["in", corrupt_tracker_ids]})
 
         random.shuffle(quiz_cards)
-        # نرجع فقط العدد المطلوب (Limit)
         return quiz_cards[:limit]
 
     except Exception as e:
