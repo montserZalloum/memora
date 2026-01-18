@@ -12,7 +12,7 @@ def get_ai_distractors(question_type, correct_answer, context_text=""):
     2. تفحص الكاش.
     3. تطلب من الـ AI إذا لم تجد كاش.
     """
-    
+    return None
     # 1. توليد بصمة فريدة للمحتوى (Content Hash) 🔑
     # ندمج النوع + الجواب + السياق لضمان أن أي تغيير في النص يولد هاش جديد
     raw_string = f"{question_type}:{correct_answer}:{context_text}"
