@@ -8,7 +8,7 @@ description: "Task list template for feature implementation"
 **Input**: Design documents from `/specs/[###-feature-name]/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: Per Memora Constitution, tests are MANDATORY for core logic (Subscription/Access Control, SRS Algorithm, Academic Plan Filtering, Purchase Workflows). Tests are OPTIONAL for UI/component work unless explicitly requested. **Golden Rule:** If it touches Money or Grades, it must be tested.
+**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -79,17 +79,8 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 1 ⚠️
+### Tests for User Story 1 (OPTIONAL - only if tests requested) ⚠️
 
-> **IMPORTANT**: Tests are MANDATORY if this story involves:
-> - Subscription/Access Control Logic
-> - SRS Algorithm or Scheduling
-> - Academic Plan Filtering
-> - Purchase Workflows
-> - **Golden Rule**: If it touches Money or Grades, it must be tested
->
-> Tests are OPTIONAL for UI/component work only.
->
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
 - [ ] T010 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
@@ -114,9 +105,7 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 2 ⚠️
-
-> **IMPORTANT**: Tests are MANDATORY for core logic (Money/Grades/Subscriptions/SRS/Academic Plan). OPTIONAL for UI work.
+### Tests for User Story 2 (OPTIONAL - only if tests requested) ⚠️
 
 - [ ] T018 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
 - [ ] T019 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
@@ -138,9 +127,7 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 3 ⚠️
-
-> **IMPORTANT**: Tests are MANDATORY for core logic (Money/Grades/Subscriptions/SRS/Academic Plan). OPTIONAL for UI work.
+### Tests for User Story 3 (OPTIONAL - only if tests requested) ⚠️
 
 - [ ] T024 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
 - [ ] T025 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py

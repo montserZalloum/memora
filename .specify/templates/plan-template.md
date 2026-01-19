@@ -31,16 +31,7 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-Verify compliance with Memora Constitution (v1.0.0):
-
-- [ ] **Academic-First Architecture**: Does this respect the `Game Academic Plan` as the single source of truth for content visibility? Does it support Partial Content (Specific Units)?
-- [ ] **Backend Sovereignty**: Is all critical business logic (SRS, Access Control, Store Logic) implemented in Frappe Backend (`api.py`)? Frontend is "dumb renderer" only?
-- [ ] **Lock-First Security**: Does content follow the Hierarchy of Keys (is_free_preview → Active Subscription → is_paid=0)? Are access checks server-side?
-- [ ] **Data Integrity**: Does this involve Lesson/Question changes? If yes, UUID injection confirmed? Orphaned data cleanup strategy defined?
-- [ ] **Performance**: Will this handle concurrent load? Are payloads efficient (no full lesson bodies in map data)? Atomic transactions used?
-- [ ] **Mandatory Tests**: Does this touch Money or Grades (Subscription, SRS, Academic Plan, Purchase)? If yes, test suite required.
-
-**Violations/Justifications**: [Document any deviations from constitution principles and why they are necessary]
+[Gates determined based on constitution file]
 
 ## Project Structure
 

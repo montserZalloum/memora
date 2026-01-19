@@ -1,0 +1,995 @@
+openapi: 3.0.0
+info:
+  title: Memora API
+  description: API endpoints for the Memora learning platform
+  version: 1.0.0
+  contact:
+    name: Memora Team
+
+servers:
+  - url: /api/method
+    description: Frappe API methods endpoint
+
+tags:
+  - name: Subjects
+    description: Subject and track management
+  - name: Map
+    description: Map engine and content navigation
+  - name: Sessions
+    description: Gameplay session management
+  - name: Reviews
+    description: Review session and SRS
+  - name: Profile
+    description: Player profile and statistics
+  - name: Quests
+    description: Daily quests
+  - name: Leaderboard
+    description: Leaderboard and rankings
+  - name: Onboarding
+    description: Student onboarding
+  - name: Store
+    description: Store and purchases
+
+paths:
+  /memora.api.get_subjects:
+    get:
+      tags:
+        - Subjects
+      summary: Get subjects based on user's academic plan
+      description: |
+        Retrieves subjects specific to the current user's academic plan (grade and stream).
+        Returns subjects with display names and metadata.
+      operationId: get_subjects
+      responses:
+        '200':
+          description: List of subjects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Subject'
+
+  /memora.api.get_my_subjects:
+    get:
+      tags:
+        - Subjects
+      summary: Get subjects for current user
+      description: |
+        Get subjects specific to the current user's Academic Plan.
+        Returns subjects with their display names and additional metadata.
+      operationId: get_my_subjects
+      responses:
+        '200':
+          description: List of subjects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MySubject'
+
+  /memora.api.get_game_tracks:
+    get:
+      tags:
+        - Subjects
+      summary: Get tracks for a subject
+      description: Retrieves learning tracks associated with a given subject
+      operationId: get_game_tracks
+      parameters:
+        - name: subject
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Subject name
+      responses:
+        '200':
+          description: List of tracks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Track'
+
+  /memora.api.get_map_data:
+    get:
+      tags:
+        - Map
+      summary: Get map data with smart hybrid loading
+      description: |
+        Smart hybrid map engine.
+        - If unit is Lesson Based: returns lessons immediately for path drawing.
+        - If unit is Topic Based: returns topics only (lazy load).
+      operationId: get_map_data
+      parameters:
+        - name: subject
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional subject filter
+      responses:
+        '200':
+          description: Map data with units and topics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MapSubject'
+
+  /memora.api.get_topic_details:
+    get:
+      tags:
+        - Map
+      summary: Get topic/lesson details
+      description: |
+        Get lesson details for a specific topic (lazy load).
+        Supports both real topics and virtual topics (for direct lesson units).
+      operationId: get_topic_details
+      parameters:
+        - name: topic_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Topic ID or virtual topic ID
+      responses:
+        '200':
+          description: Topic details with lessons
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopicDetails'
+
+  /memora.api.get_lesson_details:
+    get:
+      tags:
+        - Sessions
+      summary: Get lesson content with stages
+      description: Retrieves lesson details including all stages and their configurations
+      operationId: get_lesson_details
+      parameters:
+        - name: lesson_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Lesson ID
+      responses:
+        '200':
+          description: Lesson details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonDetails'
+        '404':
+          description: Lesson not found or access denied
+
+  /memora.api.submit_session:
+    post:
+      tags:
+        - Sessions
+      summary: Submit gameplay session
+      description: |
+        Archives gameplay session, updates XP, subject progression, and SRS memory tracking.
+        All updates happen within a single database transaction.
+      operationId: submit_session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                session_meta:
+                  $ref: '#/components/schemas/SessionMeta'
+                gamification_results:
+                  $ref: '#/components/schemas/GamificationResults'
+                interactions:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Interaction'
+      responses:
+        '200':
+          description: Session submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Session Saved ✅
+
+  /memora.api.get_review_session:
+    get:
+      tags:
+        - Reviews
+      summary: Get review session
+      description: |
+        Get review session with quiz cards.
+        Supports focus mode (topic-specific) and daily mix (general).
+        Includes smart filtering and AI distractor generation.
+      operationId: get_review_session
+      parameters:
+        - name: subject
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional subject filter
+        - name: topic_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional topic filter for focus mode
+      responses:
+        '200':
+          description: Review session with quiz cards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/QuizCard'
+
+  /memora.api.submit_review_session:
+    post:
+      tags:
+        - Reviews
+      summary: Submit review session
+      description: |
+        Submit review session results, updates SRS memory tracking, and awards XP.
+        Calculates remaining items for Netflix effect.
+      operationId: submit_review_session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewSessionData'
+      responses:
+        '200':
+          description: Review session submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewSessionResponse'
+
+  /memora.api.get_player_profile:
+    get:
+      tags:
+        - Profile
+      summary: Get basic player profile
+      description: Retrieves basic player profile data including XP, gems, grade, and stream
+      operationId: get_player_profile
+      responses:
+        '200':
+          description: Player profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerProfile'
+
+  /memora.api.get_full_profile_stats:
+    get:
+      tags:
+        - Profile
+      summary: Get full profile statistics
+      description: |
+        Get comprehensive profile statistics including level, streak, weekly activity, and mastery data.
+        Can be filtered by subject for subject-specific stats.
+      operationId: get_full_profile_stats
+      parameters:
+        - name: subject
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional subject filter
+      responses:
+        '200':
+          description: Full profile statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FullProfileStats'
+
+  /memora.api.get_daily_quests:
+    get:
+      tags:
+        - Quests
+      summary: Get daily quests
+      description: |
+        Returns daily quests including review quests (grouped by subject), streak quest, and XP goal quest.
+      operationId: get_daily_quests
+      parameters:
+        - name: subject
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional subject filter
+      responses:
+        '200':
+          description: List of daily quests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Quest'
+
+  /memora.api.get_leaderboard:
+    get:
+      tags:
+        - Leaderboard
+      summary: Get leaderboard
+      description: |
+        Get leaderboard with all-time or weekly rankings.
+        Supports subject-specific or global leaderboards.
+        Includes user's rank even if not in top 50.
+      operationId: get_leaderboard
+      parameters:
+        - name: subject
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional subject filter
+        - name: period
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all_time, weekly]
+            default: all_time
+          description: Time period for ranking
+      responses:
+        '200':
+          description: Leaderboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaderboardResponse'
+
+  /memora.api.get_academic_masters:
+    get:
+      tags:
+        - Onboarding
+      summary: Get academic master data
+      description: |
+        Get master data for onboarding including grades with allowed streams,
+        all streams, and current active season.
+      operationId: get_academic_masters
+      responses:
+        '200':
+          description: Academic master data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcademicMasters'
+
+  /memora.api.set_academic_profile:
+    post:
+      tags:
+        - Onboarding
+      summary: Set academic profile
+      description: |
+        Save user's academic profile (grade and stream).
+        Creates profile if it doesn't exist.
+      operationId: set_academic_profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                grade:
+                  type: string
+                  description: Grade ID
+                stream:
+                  type: string
+                  description: Optional stream ID
+      responses:
+        '200':
+          description: Academic profile saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+
+  /memora.api.get_store_items:
+    get:
+      tags:
+        - Store
+      summary: Get store items
+      description: |
+        Get store items with smart filtering.
+        Hides items user already owns or has pending requests for.
+        Filters by user's grade and stream.
+      operationId: get_store_items
+      responses:
+        '200':
+          description: List of available store items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StoreItem'
+
+  /memora.api.request_purchase:
+    post:
+      tags:
+        - Store
+      summary: Request purchase
+      description: |
+        Submit purchase request for a store item.
+        Prevents duplicate pending requests.
+      operationId: request_purchase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                item_id:
+                  type: string
+                  description: Sales item ID
+                transaction_id:
+                  type: string
+                  description: Optional transaction ID
+      responses:
+        '200':
+          description: Purchase request submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+
+components:
+  schemas:
+    Subject:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Subject ID
+        title:
+          type: string
+          description: Subject display name
+        icon:
+          type: string
+          description: Subject icon URL
+        is_paid:
+          type: integer
+          description: 1 if paid, 0 if free
+
+    MySubject:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Subject ID
+        name:
+          type: string
+          description: Subject title
+        icon:
+          type: string
+          description: Subject icon URL
+        display_name:
+          type: string
+          description: Custom display name from academic plan
+        is_mandatory:
+          type: integer
+          description: 1 if mandatory, 0 if optional
+
+    Track:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Track ID
+        track_name:
+          type: string
+          description: Track name
+        is_default:
+          type: integer
+          description: 1 if default track
+        unlock_level:
+          type: integer
+          description: Level required to unlock
+        icon:
+          type: string
+          description: Track icon URL
+        description:
+          type: string
+          description: Track description
+
+    MapSubject:
+      type: object
+      properties:
+        subject_id:
+          type: string
+          description: Subject ID
+        title:
+          type: string
+          description: Subject display name
+        units:
+          type: array
+          items:
+            $ref: '#/components/schemas/MapUnit'
+
+    MapUnit:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unit ID
+        title:
+          type: string
+          description: Unit title
+        style:
+          type: string
+          enum: [lessons, topics]
+          description: Unit structure type
+        topics:
+          type: array
+          items:
+            $ref: '#/components/schemas/MapTopic'
+
+    MapTopic:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Topic ID
+        title:
+          type: string
+          description: Topic title
+        description:
+          type: string
+          description: Topic description
+        status:
+          type: string
+          enum: [locked, locked_premium, available, completed]
+          description: Topic status
+        stats:
+          type: object
+          properties:
+            total:
+              type: integer
+              description: Total lessons in topic
+            completed:
+              type: integer
+              description: Completed lessons in topic
+        lessons:
+          type: array
+          items:
+            $ref: '#/components/schemas/MapLesson'
+          description: Lessons (only included for lesson-based units)
+
+    MapLesson:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Lesson ID
+        title:
+          type: string
+          description: Lesson title
+        status:
+          type: string
+          enum: [locked, locked_premium, available, completed]
+          description: Lesson status
+        xp:
+          type: integer
+          description: XP reward
+
+    TopicDetails:
+      type: object
+      properties:
+        topic_id:
+          type: string
+          description: Topic ID
+        title:
+          type: string
+          description: Topic title
+        description:
+          type: string
+          description: Topic description
+        is_locked_premium:
+          type: boolean
+          description: True if topic is locked due to premium content
+        lessons:
+          type: array
+          items:
+            $ref: '#/components/schemas/MapLesson'
+
+    LessonDetails:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Lesson ID
+        title:
+          type: string
+          description: Lesson title
+        xp_reward:
+          type: integer
+          description: XP reward for completing lesson
+        stages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Stage'
+
+    Stage:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Stage ID
+        title:
+          type: string
+          description: Stage title
+        type:
+          type: string
+          description: Stage type (e.g., Reveal, Matching, Quiz)
+        config:
+          type: object
+          description: Stage configuration (parsed JSON)
+
+    SessionMeta:
+      type: object
+      properties:
+        lesson_id:
+          type: string
+          description: Lesson ID
+
+    GamificationResults:
+      type: object
+      properties:
+        xp_earned:
+          type: integer
+          description: XP earned from session
+        score:
+          type: integer
+          description: Session score
+
+    Interaction:
+      type: object
+      properties:
+        question_id:
+          type: string
+          description: Question ID (atom ID)
+        duration_ms:
+          type: integer
+          description: Time spent on question in milliseconds
+        attempts_count:
+          type: integer
+          description: Number of attempts
+
+    ReviewSessionData:
+      type: object
+      properties:
+        session_meta:
+          type: object
+          properties:
+            subject:
+              type: string
+            topic:
+              type: string
+        answers:
+          type: array
+          items:
+            type: object
+            properties:
+              question_id:
+                type: string
+              is_correct:
+                type: boolean
+              time_spent_ms:
+                type: integer
+        total_combo:
+          type: integer
+          description: Maximum combo achieved
+        completion_time_ms:
+          type: integer
+          description: Total completion time
+
+    ReviewSessionResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        xp_earned:
+          type: integer
+        remaining_items:
+          type: integer
+          description: Number of items still due for review
+        new_stability_counts:
+          type: object
+          properties:
+            new:
+              type: integer
+            learning:
+              type: integer
+            mature:
+              type: integer
+
+    QuizCard:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Question ID
+        type:
+          type: string
+          enum: [quiz]
+        question:
+          type: string
+          description: Question text
+        correct_answer:
+          type: string
+          description: Correct answer
+        options:
+          type: array
+          items:
+            type: string
+          description: Answer options (shuffled)
+        origin_type:
+          type: string
+          enum: [reveal, matching]
+          description: Original stage type
+
+    PlayerProfile:
+      type: object
+      properties:
+        xp:
+          type: integer
+          description: Total XP
+        gems:
+          type: integer
+          description: Gems balance
+        current_grade:
+          type: string
+          description: Current grade ID
+        current_stream:
+          type: string
+          description: Current stream ID
+
+    FullProfileStats:
+      type: object
+      properties:
+        fullName:
+          type: string
+          description: User's full name
+        avatarUrl:
+          type: string
+          description: User avatar URL
+        level:
+          type: integer
+          description: Current level
+        levelTitle:
+          type: string
+          description: Level title (e.g., "مستكشف مبتدئ")
+        nextLevelProgress:
+          type: integer
+          description: Progress to next level (0-100)
+        xpInLevel:
+          type: integer
+          description: XP earned in current level
+        xpToNextLevel:
+          type: integer
+          description: XP needed for next level
+        streak:
+          type: integer
+          description: Current streak (consecutive days)
+        gems:
+          type: integer
+          description: Gems balance (deprecated, always 0)
+        totalXP:
+          type: integer
+          description: Total XP
+        totalLearned:
+          type: integer
+          description: Total items learned
+        weeklyActivity:
+          type: array
+          items:
+            $ref: '#/components/schemas/DailyActivity'
+        mastery:
+          $ref: '#/components/schemas/MasteryStats'
+
+    DailyActivity:
+      type: object
+      properties:
+        day:
+          type: string
+          description: Day name in Arabic
+        full_date:
+          type: string
+          description: Date in YYYY-MM-DD format
+        xp:
+          type: integer
+          description: XP earned on this day
+        isToday:
+          type: boolean
+          description: True if this is today
+
+    MasteryStats:
+      type: object
+      properties:
+        new:
+          type: integer
+          description: Items with stability 1 (AGAIN)
+        learning:
+          type: integer
+          description: Items with stability 2 (HARD)
+        mature:
+          type: integer
+          description: Items with stability 3 or 4 (GOOD/EASY)
+
+    Quest:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Quest ID
+        type:
+          type: string
+          enum: [review, streak, xp_goal]
+          description: Quest type
+        title:
+          type: string
+          description: Quest title
+        description:
+          type: string
+          description: Quest description
+        icon:
+          type: string
+          description: Quest icon name
+        progress:
+          type: integer
+          description: Current progress
+        target:
+          type: integer
+          description: Target value
+        reward:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [xp]
+            amount:
+              type: integer
+        status:
+          type: string
+          enum: [active, completed]
+          description: Quest status
+        isUrgent:
+          type: boolean
+          description: True if quest is urgent
+        meta:
+          type: object
+          description: Additional metadata (e.g., subject for review quests)
+
+    LeaderboardResponse:
+      type: object
+      properties:
+        leaderboard:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaderboardEntry'
+        userRank:
+          $ref: '#/components/schemas/LeaderboardEntry'
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        rank:
+          type: string
+          description: Rank (number or "50+")
+        name:
+          type: string
+          description: Player name
+        avatar:
+          type: string
+          description: Player avatar URL
+        xp:
+          type: integer
+          description: Total XP
+        level:
+          type: integer
+          description: Player level
+        isCurrentUser:
+          type: boolean
+          description: True if this is the current user
+
+    AcademicMasters:
+      type: object
+      properties:
+        grades:
+          type: array
+          items:
+            $ref: '#/components/schemas/Grade'
+        streams:
+          type: array
+          items:
+            $ref: '#/components/schemas/Stream'
+        current_season:
+          type: string
+          description: Current active season
+
+    Grade:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Grade ID
+        name:
+          type: string
+          description: Grade name
+        allowed_streams:
+          type: array
+          items:
+            type: string
+          description: List of stream IDs allowed for this grade
+
+    Stream:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Stream ID
+        stream_name:
+          type: string
+          description: Stream display name
+
+    StoreItem:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Item ID
+        item_name:
+          type: string
+          description: Item name
+        description:
+          type: string
+          description: Item description
+        price:
+          type: number
+          description: Original price
+        discounted_price:
+          type: number
+          description: Discounted price
+        image:
+          type: string
+          description: Item image URL
+        sku:
+          type: string
+          description: Item SKU
+        target_grade:
+          type: string
+          description: Target grade ID

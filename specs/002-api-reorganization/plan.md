@@ -1,53 +1,98 @@
-# Implementation Plan: [FEATURE]
+# Implementation Plan: API Module Reorganization
 
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
+**Branch**: `002-api-reorganization` | **Date**: 2026-01-19 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/002-api-reorganization/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+Reorganize the monolithic `api.py` file (1897 lines) into a modular package structure with domain-specific modules. The approach uses a Python package with `__init__.py` that re-exports all public `@frappe.whitelist()` functions to maintain backward compatibility. Each domain module will contain logically related functions, with shared utilities in a dedicated `utils.py` module. The reorganization aims to improve code navigation and maintainability while preserving all existing functionality with zero breaking changes.
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
-
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [single/web/mobile - determines source structure]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Language/Version**: Python 3.11+ (Frappe framework)
+**Primary Dependencies**: Frappe Framework, frappe.whitelist() decorator
+**Storage**: Frappe Database (MariaDB/MySQL) - No schema changes required
+**Testing**: pytest (existing test suite), Frappe test framework
+**Target Platform**: Linux server (Frappe backend)
+**Project Type**: Single project (Frappe app)
+**Performance Goals**: No performance degradation - API responses must remain identical
+**Constraints**: Zero breaking changes, maintain backward compatibility, each module < 400 lines
+**Scale/Scope**: 11 domain modules, 1 shared utilities module, ~1897 lines of code to reorganize
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-Verify compliance with Memora Constitution (v1.0.0):
+### I. Academic-First Architecture (The Brain)
+- **Status**: ✅ PASS - No changes to Academic Plan logic
+- **Impact**: The reorganization is purely code organization. All academic filtering logic remains in the same functions, just moved to different files. The `get_subjects()`, `get_my_subjects()`, and related academic filtering functions will preserve their exact logic.
 
-- [ ] **Academic-First Architecture**: Does this respect the `Game Academic Plan` as the single source of truth for content visibility? Does it support Partial Content (Specific Units)?
-- [ ] **Backend Sovereignty**: Is all critical business logic (SRS, Access Control, Store Logic) implemented in Frappe Backend (`api.py`)? Frontend is "dumb renderer" only?
-- [ ] **Lock-First Security**: Does content follow the Hierarchy of Keys (is_free_preview → Active Subscription → is_paid=0)? Are access checks server-side?
-- [ ] **Data Integrity**: Does this involve Lesson/Question changes? If yes, UUID injection confirmed? Orphaned data cleanup strategy defined?
-- [ ] **Performance**: Will this handle concurrent load? Are payloads efficient (no full lesson bodies in map data)? Atomic transactions used?
-- [ ] **Mandatory Tests**: Does this touch Money or Grades (Subscription, SRS, Academic Plan, Purchase)? If yes, test suite required.
+### II. Backend Sovereignty (Headless Logic)
+- **Status**: ✅ PASS - No changes to backend logic
+- **Impact**: All critical business logic (SRS calculation, access control, store filtering) remains in Python backend. The reorganization only changes file locations, not the logic itself. The React app remains a "dumb renderer."
 
-**Violations/Justifications**: [Document any deviations from constitution principles and why they are necessary]
+### III. Lock-First Security (The Freemium Model)
+- **Status**: ✅ PASS - No changes to access control logic
+- **Impact**: The `get_user_active_subscriptions()` and `check_subscription_access()` utility functions maintain their exact implementation. All subscription/access control checks remain on the server side.
+
+### IV. Data Integrity & Stable Identity
+- **Status**: ✅ PASS - No changes to data handling
+- **Impact**: All SRS tracking, memory updates, and session submissions use the same database operations. No changes to ID injection or self-healing logic.
+
+### V. Performance & Scalability
+- **Status**: ✅ PASS - No performance degradation
+- **Impact**: The reorganization does not change database queries, lazy loading behavior, or transaction handling. The `get_map_data()` function continues to use the same payload-efficient approach.
+
+### Quality Standards
+- **Testing**: ✅ PASS - All existing tests must pass without modification (or with only import path updates)
+- **Documentation**: ✅ PASS - All API endpoints maintain their existing documentation
+
+**Overall Gate Status**: ✅ PASS - All constitution principles are upheld. The reorganization is a code organization change only, with no modifications to business logic, data handling, or security controls.
+
+---
+
+## Post-Design Constitution Check
+
+*GATE: Re-evaluated after Phase 1 design.*
+
+### I. Academic-First Architecture (The Brain)
+- **Status**: ✅ PASS - No changes to Academic Plan logic
+- **Post-Design Verification**: All academic filtering logic remains in the same functions, just moved to `api/subjects.py` and `api/map_engine.py`. The `get_subjects()`, `get_my_subjects()`, and related functions preserve their exact implementation.
+
+### II. Backend Sovereignty (Headless Logic)
+- **Status**: ✅ PASS - No changes to backend logic
+- **Post-Design Verification**: All critical business logic (SRS calculation, access control, store filtering) remains in Python backend. Functions are now in domain-specific modules (`api/srs.py`, `api/store.py`, etc.) but logic is unchanged. The React app remains a "dumb renderer."
+
+### III. Lock-First Security (The Freemium Model)
+- **Status**: ✅ PASS - No changes to access control logic
+- **Post-Design Verification**: The `get_user_active_subscriptions()` and `check_subscription_access()` utility functions maintain their exact implementation in `api/utils.py`. All subscription/access control checks remain on the server side in the same functions.
+
+### IV. Data Integrity & Stable Identity
+- **Status**: ✅ PASS - No changes to data handling
+- **Post-Design Verification**: All SRS tracking, memory updates, and session submissions use the same database operations. No changes to ID injection or self-healing logic. Functions are now in `api/srs.py` and `api/sessions.py` but data handling is identical.
+
+### V. Performance & Scalability
+- **Status**: ✅ PASS - No performance degradation
+- **Post-Design Verification**: The reorganization does not change database queries, lazy loading behavior, or transaction handling. The `get_map_data()` function in `api/map_engine.py` continues to use the same payload-efficient approach. No performance impact expected from modularization.
+
+### Quality Standards
+- **Testing**: ✅ PASS - All existing tests must pass without modification (or with only import path updates)
+- **Post-Design Verification**: The reorganization maintains all function signatures and decorators. Tests should pass without changes to test logic, only import paths may need updating if they import internal functions.
+
+- **Documentation**: ✅ PASS - All API endpoints maintain their existing documentation
+- **Post-Design Verification**: Function docstrings are preserved in their new modules. API contracts in `contracts/api-openapi.yaml` document all endpoints accurately.
+
+**Overall Post-Design Gate Status**: ✅ PASS - All constitution principles continue to be upheld. The modular design preserves all business logic, data handling, security controls, and performance characteristics while improving code organization.
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```text
-specs/[###-feature]/
+specs/002-api-reorganization/
+├── spec.md               # Feature specification
 ├── plan.md              # This file (/speckit.plan command output)
 ├── research.md          # Phase 0 output (/speckit.plan command)
 ├── data-model.md        # Phase 1 output (/speckit.plan command)
@@ -57,57 +102,35 @@ specs/[###-feature]/
 ```
 
 ### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
 
 ```text
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
-
-tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+memora/
+├── api/                 # NEW: Modular API package
+│   ├── __init__.py      # Re-exports all public @frappe.whitelist() functions
+│   ├── utils.py         # Shared utilities (get_user_active_subscriptions, check_subscription_access)
+│   ├── subjects.py      # Subjects & Tracks domain
+│   ├── map_engine.py    # Map Engine domain
+│   ├── sessions.py      # Session & Gameplay domain
+│   ├── srs.py           # SRS/Memory algorithms
+│   ├── reviews.py       # Review Session domain
+│   ├── profile.py       # Profile domain
+│   ├── quests.py        # Daily Quests domain
+│   ├── leaderboard.py   # Leaderboard domain
+│   ├── onboarding.py    # Onboarding domain
+│   └── store.py        # Store domain
+├── api.py              # DEPRECATED: Original monolithic file (to be removed after migration)
+├── ai_engine.py        # AI distractor generation (imported by reviews.py)
+├── config/             # Configuration files
+├── memora/             # DocType definitions
+├── migrations/         # Database migrations
+├── public/            # Frontend assets
+├── templates/         # HTML templates
+├── tests/            # Test suite
+└── www/              # Web assets
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+**Structure Decision**: The selected structure is a Python package (`memora/api/`) with domain-specific modules. This aligns with Python best practices for organizing related functionality and allows for backward compatibility through re-exports from `__init__.py`. The original `api.py` file will be deprecated and eventually removed after successful migration.
 
 ## Complexity Tracking
 
-> **Fill ONLY if Constitution Check has violations that must be justified**
-
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+> **No constitution violations detected. This section is not required.**
