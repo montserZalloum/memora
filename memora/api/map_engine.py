@@ -362,3 +362,125 @@ def get_topic_details(topic_id):
     except Exception as e:
         frappe.log_error("Get Topic Details Failed", frappe.get_traceback())
         return {"error": str(e)}
+
+
+@frappe.whitelist()
+def get_track_details(subject, track=None, is_track_linear=0):
+    """
+    Get specific track info and its units (No topics/lessons recursion).
+    
+    Params:
+        subject (str): Subject Name (ID)
+        track (str): Track Name (ID) - Optional
+        is_track_linear (bool/int): If 1, enforces Unit 1 -> Unit 2 progression.
+    """
+    try:
+        user = frappe.session.user
+        is_track_linear = frappe.parse_json(is_track_linear) # Ensure boolean
+
+        # 1. Fetch Track Metadata (if track provided)
+        track_info = {}
+        track_is_paid = 0
+        
+        if track:
+            track_doc = frappe.db.get_value("Game Learning Track", track, 
+                ["name", "track_name", "is_paid", "is_sold_separately", "unlock_level"], as_dict=True)
+            if track_doc:
+                track_info = track_doc
+                track_is_paid = track_doc.is_paid
+
+        # 2. Fetch Subject Metadata (Master Lock)
+        subject_doc = frappe.db.get_value("Game Subject", subject, ["name", "title", "is_paid"], as_dict=True)
+        if not subject_doc:
+            return {"error": "Subject not found"}
+
+        # 3. Get User Subscriptions & Progress
+        active_subs = get_user_active_subscriptions(user) # Helper function defined in your system
+        
+        # Get all completed lessons for this user to calculate unit progress
+        user_completed_lessons = frappe.get_all("Gameplay Session", 
+            filters={"player": user}, pluck="lesson")
+        
+        user_completed_set = set(user_completed_lessons)
+
+        # 4. Fetch Units for this Track
+        # Filter: Match Subject AND (Match Track OR Track is Empty)
+        filters = {"subject": subject}
+        if track:
+            filters["learning_track"] = track
+        else:
+            filters["learning_track"] = ["is", "not set"]
+
+        units = frappe.get_all("Game Unit",
+            filters=filters,
+            fields=["name", "title","is_linear_topics", "is_free_preview", "structure_type"],
+            order_by="creation asc" # Important for linear check
+        )
+
+        units_list = []
+        previous_unit_completed = True # Start true for the first unit
+
+        for unit in units:
+            # --- A. Check Financial Access ---
+            # Access logic: Unit Free OR (Subject Free & Track Free) OR Has Subscription
+            is_financially_unlocked = False
+            
+            if unit.is_free_preview:
+                is_financially_unlocked = True
+            elif (not subject_doc.is_paid and not track_is_paid):
+                is_financially_unlocked = True
+            elif check_subscription_access(active_subs, subject, track): # Helper function
+                is_financially_unlocked = True
+
+            # --- B. Calculate Progress (Heavy Lifting Optimized) ---
+            # We need to know if this unit is completed to unlock the next one (if linear)
+            unit_lessons = frappe.get_all("Game Lesson", 
+                filters={"unit": unit.name, "is_published": 1}, pluck="name")
+            
+            total_lessons = len(unit_lessons)
+            completed_count = 0
+            if total_lessons > 0:
+                # Intersection of unit lessons and user completed lessons
+                completed_count = len(set(unit_lessons).intersection(user_completed_set))
+            
+            progress_percent = int((completed_count / total_lessons) * 100) if total_lessons > 0 else 0
+            is_unit_completed = (progress_percent == 100)
+
+            # --- C. Determine Final Status ---
+            status = "locked"
+            
+            if is_unit_completed:
+                status = "completed"
+            elif not is_financially_unlocked:
+                status = "locked_premium" # Needs payment
+            elif is_track_linear and not previous_unit_completed:
+                status = "locked_progression" # Needs previous unit
+            else:
+                status = "available"
+
+            # Append to result
+            units_list.append({
+                "id": unit.name,
+                "title": unit.title,
+                "structure_type": unit.structure_type, # 'Topic Based' or 'Lesson Based'
+                "status": status,
+                "progress": progress_percent,
+                "is_free": unit.is_free_preview
+            })
+
+            # Update flag for next iteration
+            if is_track_linear:
+                previous_unit_completed = is_unit_completed
+
+        return {
+            "subject": {
+                "id": subject_doc.name,
+                "title": subject_doc.title
+            },
+            "track": track_info,
+            "units": units_list
+        }
+
+    except Exception as e:
+        frappe.log_error(f"Get Track Details Error: {str(e)}")
+        return {"error": "Failed to fetch track details"}

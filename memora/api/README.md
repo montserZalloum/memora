@@ -20,7 +20,7 @@ Each domain module contains logically related API functions:
 | Module | Purpose | Public Functions |
 |---------|-----------|-----------------|
 | `subjects.py` | Subjects & Tracks domain | `get_subjects()`, `get_my_subjects()`, `get_game_tracks()` |
-| `map_engine.py` | Map Engine domain | `get_map_data()`, `get_topic_details()` |
+| `map_engine.py` | Map Engine domain | `get_map_data()`, `get_topic_details()` | `get_track_details`|
 | `sessions.py` | Session & Gameplay domain | `submit_session()`, `get_lesson_details()` |
 | `srs.py` | SRS/Memory algorithms | Internal helper functions only |
 | `reviews.py` | Review Session domain | `get_review_session()`, `submit_review_session()` |
