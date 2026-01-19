@@ -484,3 +484,126 @@ def get_track_details(subject, track=None, is_track_linear=0):
     except Exception as e:
         frappe.log_error(f"Get Track Details Error: {str(e)}")
         return {"error": "Failed to fetch track details"}
+
+
+@frappe.whitelist()
+def get_unit_topics(subject, unit, track=None):
+    """
+    Get topics list for a specific unit with precise status (Locked/Available/Completed).
+    """
+    try:
+        user = frappe.session.user
+
+        # 1. Fetch Context Metadata
+        # -------------------------
+        subject_doc = frappe.db.get_value("Game Subject", subject, ["is_paid"], as_dict=True)
+        unit_doc = frappe.db.get_value("Game Unit", unit, 
+            ["name", "title", "is_free_preview", "is_linear_topics", "learning_track"], as_dict=True)
+        
+        if not unit_doc:
+            return {"error": "Unit not found"}
+
+        # Resolve Track (If passed explicitly or derived from unit)
+        track_id = track or unit_doc.learning_track
+        track_is_paid = 0
+        if track_id:
+            track_is_paid = frappe.db.get_value("Game Learning Track", track_id, "is_paid") or 0
+
+        # 2. Get User Progress & Subscriptions
+        # ------------------------------------
+        active_subs = get_user_active_subscriptions(user)
+        user_completed_lessons_set = set(frappe.get_all("Gameplay Session", 
+            filters={"player": user}, pluck="lesson"))
+
+        # 3. Optimization: Fetch ALL lessons for this unit at once
+        # ------------------------------------------------------
+        # Instead of querying DB inside the loop, we query once and map in Python
+        all_unit_lessons = frappe.get_all("Game Lesson",
+            filters={"unit": unit, "is_published": 1},
+            fields=["name", "topic"]
+        )
+        
+        # Create a map: { topic_id: [list_of_lesson_ids] }
+        topic_lessons_map = {}
+        for l in all_unit_lessons:
+            if l.topic:
+                if l.topic not in topic_lessons_map: topic_lessons_map[l.topic] = []
+                topic_lessons_map[l.topic].append(l.name)
+
+        # 4. Fetch Topics
+        # ---------------
+        topics = frappe.get_all("Game Topic",
+            filters={"unit": unit},
+            fields=["name", "title", "description", "is_free_preview"],
+            order_by="creation asc" # Assuming creation order dictates linearity
+        )
+
+        final_topics = []
+        previous_topic_completed = True # Flag for linearity check
+
+        for topic in topics:
+            # A. Calculate Stats
+            # ------------------
+            # Get lessons from our memory map (Default to empty list if none)
+            topic_lesson_ids = topic_lessons_map.get(topic.name, [])
+            total_lessons = len(topic_lesson_ids)
+            
+            # Count intersection with user completed set
+            completed_count = len([l_id for l_id in topic_lesson_ids if l_id in user_completed_lessons_set])
+            
+            is_fully_completed = (total_lessons > 0 and total_lessons == completed_count)
+            progress_percent = int((completed_count / total_lessons) * 100) if total_lessons > 0 else 0
+
+            # B. Check Financial Access
+            # -------------------------
+            # Hierarchy: Unit Free > Topic Free > (Subject & Track Free) > Subscription
+            has_financial_access = False
+            
+            if unit_doc.is_free_preview:
+                has_financial_access = True
+            elif topic.is_free_preview:
+                has_financial_access = True
+            elif (not subject_doc.is_paid and not track_is_paid):
+                has_financial_access = True
+            elif check_subscription_access(active_subs, subject, track_id):
+                has_financial_access = True
+
+            # C. Determine Status
+            # -------------------
+            status = "locked"
+
+            if is_fully_completed:
+                status = "completed"
+            elif not has_financial_access:
+                status = "locked_premium" # 🔒 Needs Payment
+            elif unit_doc.is_linear_topics and not previous_topic_completed:
+                status = "locked_progression" # ⛓️ Needs Previous Topic
+            else:
+                status = "available" # 🟢 Ready to play
+
+            # Add to list
+            final_topics.append({
+                "id": topic.name,
+                "title": topic.title,
+                "description": topic.description,
+                "status": status,
+                "progress": progress_percent,
+                "stats": {
+                    "total_lessons": total_lessons,
+                    "completed_lessons": completed_count
+                },
+                "is_free": topic.is_free_preview
+            })
+
+            # Update flag for next iteration
+            if unit_doc.is_linear_topics:
+                previous_topic_completed = is_fully_completed
+
+        return {
+            "unit_title": unit_doc.title,
+            "topics": final_topics
+        }
+
+    except Exception as e:
+        frappe.log_error(f"Get Unit Topics Error: {str(e)}")
+        return {"error": "Failed to fetch topics"}

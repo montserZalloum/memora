@@ -23,7 +23,7 @@ Modules:
 
 # Re-export all public functions from domain modules
 from .subjects import get_subjects, get_my_subjects, get_game_tracks
-from .map_engine import get_map_data, get_track_details,get_topic_details
+from .map_engine import get_map_data, get_track_details,get_topic_details,get_unit_topics
 from .sessions import submit_session, get_lesson_details
 from .reviews import get_review_session, submit_review_session
 from .profile import get_player_profile, get_full_profile_stats
@@ -41,6 +41,7 @@ __all__ = [
     'get_map_data',
     'get_topic_details',
     'get_track_details',
+    'get_unit_topics',
     # Sessions
     'submit_session',
     'get_lesson_details',
