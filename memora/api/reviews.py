@@ -48,8 +48,13 @@ def get_reviews_safe_mode(user: str, season: str, subject: str = None, limit: in
 	"""
 	try:
 		# Build query conditions
-		conditions = ["player = %s", "season = %s", "next_review_date <= NOW()"]
-		params = [user, season]
+		conditions = ["player = %s", "next_review_date <= NOW()"]
+		params = [user]
+		
+		# CRITICAL FIX: Add season filter (T029)
+		if season:
+			conditions.append("season = %s")
+			params.append(season)
 
 		if subject:
 			conditions.append("subject = %s")
@@ -74,9 +79,6 @@ def get_reviews_safe_mode(user: str, season: str, subject: str = None, limit: in
 			"get_reviews_safe_mode"
 		)
 		return []
-
-
-
 
 
 def get_mastery_counts(user):
@@ -250,16 +252,22 @@ def get_review_session(subject=None, topic_id=None):
 
         # B. General review (Daily Mix) 📅 - only if not already fetched from Redis
         elif due_items is None:
-            conditions = "player = %s AND next_review_date <= NOW()"
+            conditions = ["player = %s", "next_review_date <= NOW()"]
             params = [user]
+            
             if subject:
-                conditions += " AND subject = %s"
+                conditions.append("subject = %s")
                 params.append(subject)
+            
+            # Apply Season Filter for DB query too
+            if season:
+                conditions.append("season = %s")
+                params.append(season)
 
             due_items = frappe.db.sql(f"""
                 SELECT name, question_id, stability
                 FROM `tabPlayer Memory Tracker`
-                WHERE {conditions}
+                WHERE {' AND '.join(conditions)}
                 ORDER BY next_review_date ASC
                 LIMIT 15
             """, tuple(params), as_dict=True)
@@ -277,7 +285,7 @@ def get_review_session(subject=None, topic_id=None):
         for item in due_items:
             raw_id = item.question_id
 
-            # أ. Parse ID (ID Parsing)
+            # A. Parse ID (ID Parsing)
             if ":" in raw_id:
                 parts = raw_id.rsplit(":", 1)
                 stage_row_name = parts[0]
@@ -287,7 +295,7 @@ def get_review_session(subject=None, topic_id=None):
                 stage_row_name = raw_id
                 target_atom_index = None
 
-            # ب. Safe Lookup (Safe Lookup) 🔥
+            # B. Safe Lookup (Safe Lookup) 🔥
             stage_data = None
             try:
                 stage_data = frappe.db.get_value("Game Stage", stage_row_name,
@@ -299,7 +307,7 @@ def get_review_session(subject=None, topic_id=None):
                 corrupt_tracker_ids.append(item.name)
                 continue
 
-            # ج. Verify lesson
+            # C. Verify lesson
             lesson_id = stage_data.parent
             if lesson_id not in lesson_cache:
                 lesson_doc = frappe.get_doc("Game Lesson", lesson_id)
@@ -312,7 +320,7 @@ def get_review_session(subject=None, topic_id=None):
             config = frappe.parse_json(stage_data.config)
 
             # =====================================================
-            # د. Convert REVEAL -> QUIZ
+            # D. Convert REVEAL -> QUIZ
             # =====================================================
             if stage_data.type == 'Reveal':
                 highlights = config.get('highlights', [])
@@ -362,7 +370,7 @@ def get_review_session(subject=None, topic_id=None):
                     })
 
             # =====================================================
-            # هـ. Convert MATCHING -> QUIZ
+            # E. Convert MATCHING -> QUIZ
             # =====================================================
             elif stage_data.type == 'Matching':
                 pairs = config.get('pairs', [])
@@ -428,20 +436,6 @@ def get_review_session(subject=None, topic_id=None):
 def submit_review_session(session_data):
     """
     Submit review session results.
-
-    Updates SRS memory tracking and awards XP.
-    Calculates remaining items for Netflix effect.
-
-    Integration with SRS Scalability (Phase 4 - User Story 2):
-    - Updates Redis cache synchronously for instant confirmation (<500ms)
-    - Queues background job for async database persistence
-    - Returns persistence_job_id for tracking
-
-    Args:
-        session_data: Session data with answers and metadata
-
-    Returns:
-        Response with XP earned, remaining items, and persistence_job_id
     """
     try:
         user = frappe.session.user
@@ -527,13 +521,13 @@ def submit_review_session(session_data):
             try:
                 job = frappe.enqueue(
                     "memora.services.srs_persistence.persist_review_batch",
-                    queue="long",  # Use standard Frappe queue for reliable background processing
+                    queue="srs_write",  # CRITICAL: Use the dedicated queue
                     job_name=f"srs_persist_{user}_{now_datetime().strftime('%Y%m%d_%H%M%S')}",
                     responses=persistence_responses,
                     user=user,
                     season=season,
                     is_async=True,
-                    timeout=300  # 5 minute timeout for batch persistence
+                    timeout=300
                 )
                 persistence_job_id = job.id if job else None
             except Exception as e:
@@ -598,51 +592,28 @@ def submit_review_session(session_data):
 
 def _calculate_new_srs_schedule(user, question_id, is_correct, duration_ms, season=None):
     """
-    Calculate new SRS schedule for a question
-
-    This helper function calculates the new stability score and next review date
-    without updating the database (for async persistence).
-
-    Args:
-        user: User ID
-        question_id: Question ID
-        is_correct: Whether answer was correct
-        duration_ms: Time taken to answer
-        season: Season ID (optional, for filtering tracker records)
-
-    Returns:
-        Tuple of (new_stability, new_next_review_date)
+    Calculate new SRS schedule for a question without updating DB
     """
-    # Fetch current stability with season filter
     filters = {"player": user, "question_id": question_id}
     if season:
         filters["season"] = season
 
-    stability_value = frappe.db.get_value(
-        "Player Memory Tracker",
-        filters,
-        "stability"
-    )
-
+    stability_value = frappe.db.get_value("Player Memory Tracker", filters, "stability")
     current_stability = cint(stability_value) if stability_value else 0
 
-    # Calculate new stability
     new_stability = current_stability
-
     if is_correct:
         if duration_ms < 2000:
-            new_stability = min(current_stability + 2, 4)  # Very fast
+            new_stability = min(current_stability + 2, 4)
         elif duration_ms > 6000:
-            new_stability = max(current_stability, 1)  # Slow
+            new_stability = max(current_stability, 1)
         else:
-            new_stability = min(current_stability + 1, 4)  # Normal
-
+            new_stability = min(current_stability + 1, 4)
         if new_stability < 1:
             new_stability = 1
     else:
-        new_stability = 1  # Error
+        new_stability = 1
 
-    # Calculate next review date
     interval_map = {1: 1, 2: 3, 3: 7, 4: 14}
     days_to_add = interval_map.get(new_stability, 1)
     new_next_review_date = add_days(now_datetime(), days_to_add)

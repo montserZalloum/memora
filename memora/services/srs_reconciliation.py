@@ -35,115 +35,120 @@ def reconcile_cache_with_database(sample_size: int = 10000) -> Dict[str, Any]:
 		- discrepancy_rate: Percentage of discrepancies (0-1)
 		- auto_corrected: Number of records auto-corrected
 		- alert_triggered: Whether alert threshold was exceeded
-
-	Alert Threshold: Sends email alert if discrepancy rate > 0.1% (0.001)
 	"""
-	redis_manager = SRSRedisManager()
+	try:
+		redis_manager = SRSRedisManager()
 
-	# Get active seasons for sampling
-	active_seasons = frappe.get_all(
-		"Game Subscription Season",
-		filters={"is_active": 1},
-		fields=["name"]
-	)
+		# Get active seasons for sampling
+		active_seasons = frappe.get_all(
+			"Game Subscription Season",
+			filters={"is_active": 1},
+			fields=["name"]
+		)
 
-	if not active_seasons:
+		if not active_seasons:
+			return {
+				"sample_size": 0,
+				"discrepancies_found": 0,
+				"discrepancy_rate": 0.0,
+				"auto_corrected": 0,
+				"alert_triggered": False,
+				"message": "No active seasons found to reconcile."
+			}
+
+		season_names = [s.name for s in active_seasons]
+
+		# Sample records from database
+		# Using dynamic query building safely
+		placeholders = ', '.join(['%s'] * len(season_names))
+		query = f"""
+			SELECT player, season, question_id, next_review_date
+			FROM `tabPlayer Memory Tracker`
+			WHERE season IN ({placeholders})
+			ORDER BY RAND()
+			LIMIT %s
+		"""
+		
+		# Execute query with params
+		params = season_names + [sample_size]
+		records = frappe.db.sql(query, params, as_dict=True)
+
+		if not records:
+			return {
+				"sample_size": 0,
+				"discrepancies_found": 0,
+				"discrepancy_rate": 0.0,
+				"auto_corrected": 0,
+				"alert_triggered": False,
+				"message": "No memory records found in active seasons."
+			}
+
+		discrepancies = 0
+		auto_corrected = 0
+		tolerance_seconds = 1  # Allow 1 second difference for rounding
+
+		for record in records:
+			key = f"srs:{record.player}:{record.season}"
+			question_id = record.question_id
+
+			# Get cached score from Redis
+			try:
+				cached_score = redis_manager.redis.zscore(key, question_id)
+			except Exception:
+				continue # Skip if Redis fails
+
+			# Calculate expected score from database
+			# next_review_date can be None in DB, treat as 0 or skip
+			if not record.next_review_date:
+				continue
+				
+			db_score = record.next_review_date.timestamp()
+
+			# Check for discrepancy
+			if cached_score is None:
+				# Case 1: Missing from cache
+				discrepancies += 1
+				try:
+					redis_manager.add_item(record.player, record.season, question_id, db_score)
+					auto_corrected += 1
+				except:
+					pass
+			
+			elif abs(cached_score - db_score) > tolerance_seconds:
+				# Case 2: Score mismatch
+				discrepancies += 1
+				try:
+					redis_manager.add_item(record.player, record.season, question_id, db_score)
+					auto_corrected += 1
+				except:
+					pass
+
+		# Calculate discrepancy rate
+		discrepancy_rate = discrepancies / len(records)
+
+		# Alert Threshold (0.1%)
+		alert_threshold = 0.001
+		alert_triggered = discrepancy_rate > alert_threshold
+
+		if alert_triggered:
+			_trigger_reconciliation_alert(discrepancies, len(records), discrepancy_rate, season_names)
+
+		frappe.log_error(
+			f"Reconciliation Report: {discrepancies}/{len(records)} errors ({discrepancy_rate:.4%}). Corrected: {auto_corrected}",
+			"SRS Reconciliation"
+		)
+
 		return {
-			"sample_size": 0,
-			"discrepancies_found": 0,
-			"discrepancy_rate": 0.0,
-			"auto_corrected": 0,
-			"alert_triggered": False,
-			"message": "No active seasons found"
+			"sample_size": len(records),
+			"discrepancies_found": discrepancies,
+			"discrepancy_rate": discrepancy_rate,
+			"auto_corrected": auto_corrected,
+			"alert_triggered": alert_triggered
 		}
 
-	season_names = [s.name for s in active_seasons]
-
-	# Sample records from database
-	records = frappe.db.sql("""
-		SELECT player, season, question_id, next_review_date
-		FROM `tabPlayer Memory Tracker`
-		WHERE season IN ({})
-		ORDER BY RAND()
-		LIMIT %s
-	""".format(','.join(['%s'] * len(season_names))),
-		season_names + [sample_size],
-		as_dict=True
-	)
-
-	discrepancies = 0
-	auto_corrected = 0
-	tolerance_seconds = 1  # Allow 1 second difference for rounding
-
-	for record in records:
-		key = f"srs:{record.player}:{record.season}"
-		question_id = record.question_id
-
-		# Get cached score from Redis
-		try:
-			cached_score = redis_manager.redis.zscore(key, question_id)
-		except Exception:
-			# Redis error - skip this record
-			continue
-
-		# Calculate expected score from database
-		db_score = record.next_review_date.timestamp()
-
-		# Check for discrepancy
-		if cached_score is None:
-			# Missing from cache
-			discrepancies += 1
-			# Auto-correct: Add to cache
-			try:
-				redis_manager.add_item(
-					record.player,
-					record.season,
-					question_id,
-					db_score
-				)
-				auto_corrected += 1
-			except Exception:
-				pass
-		elif abs(cached_score - db_score) > tolerance_seconds:
-			# Score mismatch
-			discrepancies += 1
-			# Auto-correct: Update cache
-			try:
-				redis_manager.add_item(
-					record.player,
-					record.season,
-					question_id,
-					db_score
-				)
-				auto_corrected += 1
-			except Exception:
-				pass
-
-	# Calculate discrepancy rate
-	discrepancy_rate = discrepancies / len(records) if records else 0
-
-	# Check alert threshold (0.1%)
-	alert_threshold = 0.001
-	alert_triggered = discrepancy_rate > alert_threshold
-
-	# Trigger alert if threshold exceeded
-	if alert_triggered:
-		_trigger_reconciliation_alert(discrepancies, len(records), discrepancy_rate, season_names)
-
-	# Log reconciliation result
-	frappe.log_error(
-		f"Reconciliation complete: {discrepancies}/{len(records)} discrepancies "
-		f"({discrepancy_rate:.4%}), {auto_corrected} auto-corrected",
-		"SRS Reconciliation"
-	)
-
-	return {
-		"sample_size": len(records),
-		"discrepancies_found": discrepancies,
-		"discrepancy_rate": discrepancy_rate,
-		"auto_corrected": auto_corrected,
-		"alert_triggered": alert_triggered
-	}
+	except Exception as e:
+		frappe.log_error(f"Reconciliation Job Failed: {str(e)}", "SRS Reconciliation")
+		return {"success": False, "error": str(e)}
 
 
 def _trigger_reconciliation_alert(
@@ -154,81 +159,54 @@ def _trigger_reconciliation_alert(
 ) -> None:
 	"""
 	Send email alert when discrepancy rate exceeds threshold.
-
-	Args:
-		discrepancies: Number of discrepancies found
-		sample_size: Total sample size
-		discrepancy_rate: Discrepancy rate (0-1)
-		season_names: List of season names checked
 	"""
-	# Get system administrators
-	admins = frappe.get_all("User", filters={"system_user": 1}, fields=["email"])
-	admin_emails = [admin.email for admin in admins if admin.email]
-
-	if not admin_emails:
-		return
-
-	# Prepare email content
-	subject = f"ALERT: SRS Cache Discrepancy Rate Exceeded ({discrepancy_rate:.2%})"
-
-	message = f"""
-	<h2>SRS Cache Discrepancy Alert</h2>
-
-	<p>The daily cache reconciliation job detected a discrepancy rate exceeding the alert threshold.</p>
-
-	<h3>Details</h3>
-	<ul>
-		<li><strong>Sample Size:</strong> {sample_size:,} records</li>
-		<li><strong>Discrepancies Found:</strong> {discrepancies:,}</li>
-		<li><strong>Discrepancy Rate:</strong> {discrepancy_rate:.4%} (threshold: 0.1%)</li>
-		<li><strong>Seasons Checked:</strong> {', '.join(season_names)}</li>
-		<li><strong>Auto-Correction:</strong> Applied ({discrepancies} records corrected)</li>
-	</ul>
-
-	<h3>Recommendations</h3>
-	<ul>
-		<li>Check Redis connectivity and performance</li>
-		<li>Review background job queue for persistence failures</li>
-		<li>Consider triggering a full cache rebuild if issue persists</li>
-		<li>Monitor Safe Mode activation frequency</li>
-	</ul>
-
-	<p><em>This is an automated alert from the SRS Reconciliation Service.</em></p>
-	"""
-
-	# Send email
 	try:
+		# Get System Managers specifically
+		admin_emails = frappe.get_all(
+			"User", 
+			filters={"role_profile_name": "System Manager", "enabled": 1}, 
+			pluck="email"
+		)
+
+		if not admin_emails:
+			return
+
+		subject = f"⚠️ ALERT: High SRS Cache Discrepancy ({discrepancy_rate:.2%})"
+
+		message = f"""
+		<h2>SRS Cache Integrity Alert</h2>
+		<p>The daily reconciliation job detected a discrepancy rate exceeding the 0.1% threshold.</p>
+		
+		<table border="1" cellpadding="5" style="border-collapse: collapse;">
+			<tr><td><strong>Sample Size</strong></td><td>{sample_size:,} records</td></tr>
+			<tr><td><strong>Discrepancies</strong></td><td>{discrepancies:,}</td></tr>
+			<tr><td><strong>Error Rate</strong></td><td>{discrepancy_rate:.4%} (Threshold: 0.1%)</td></tr>
+			<tr><td><strong>Auto-Corrected</strong></td><td>Yes</td></tr>
+		</table>
+		
+		<p><strong>Affected Seasons:</strong> {', '.join(season_names)}</p>
+		
+		<h3>Recommended Actions:</h3>
+		<ol>
+			<li>Check Redis logs for connectivity issues or restarts.</li>
+			<li>Check 'Worker' logs for failed persistence jobs.</li>
+			<li>Consider running a manual 'Rebuild Cache' for active seasons.</li>
+		</ol>
+		"""
+
 		frappe.sendmail(
 			recipients=admin_emails,
 			subject=subject,
-			message=message,
-			reference_doctype="System Notification",
-			reference_name="SRS Reconciliation Alert"
+			message=message
 		)
 	except Exception as e:
-		frappe.log_error(
-			f"Failed to send reconciliation alert: {str(e)}",
-			"SRS Reconciliation Alert"
-		)
+		frappe.log_error(f"Failed to send alert: {str(e)}", "SRS Reconciliation Alert")
 
 
 def get_reconciliation_stats() -> Dict[str, Any]:
 	"""
-	Get statistics about recent reconciliation runs.
-
-	Returns:
-		Dictionary containing:
-		- last_run: Timestamp of last reconciliation
-		- last_discrepancy_rate: Discrepancy rate from last run
-		- last_alert_triggered: Whether last run triggered an alert
-		- total_runs: Total number of reconciliation runs
+	Get statistics about recent reconciliation runs (Placeholder).
 	"""
-	# This would typically query a log table or error log
-	# For now, return placeholder data
 	return {
-		"last_run": None,
-		"last_discrepancy_rate": 0.0,
-		"last_alert_triggered": False,
-		"total_runs": 0,
-		"message": "Reconciliation statistics not yet available"
+		"message": "Stats implementation pending logging aggregation"
 	}
