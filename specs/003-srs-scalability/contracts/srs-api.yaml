@@ -1,0 +1,449 @@
+openapi: 3.0.3
+info:
+  title: Memora SRS High-Performance API
+  description: |
+    API contracts for the SRS (Spaced Repetition System) scalability feature.
+    All endpoints are Frappe whitelisted methods accessed via `/api/method/memora.api.*`
+  version: 1.0.0
+  contact:
+    name: Memora Development Team
+
+servers:
+  - url: /api/method/memora.api
+    description: Frappe API endpoint base
+
+tags:
+  - name: Reviews
+    description: Review session endpoints (high-frequency, performance-critical)
+  - name: Admin
+    description: Administrative operations (low-frequency)
+  - name: System
+    description: System health and monitoring
+
+paths:
+  /reviews.get_review_session:
+    post:
+      tags:
+        - Reviews
+      summary: Get due review questions for current user
+      description: |
+        Retrieves questions due for review. Uses Redis cache for <100ms response.
+        Falls back to Safe Mode if cache unavailable.
+      operationId: getReviewSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subject:
+                  type: string
+                  description: Optional filter by subject name
+                  example: "Mathematics"
+                limit:
+                  type: integer
+                  default: 20
+                  minimum: 1
+                  maximum: 50
+                  description: Maximum questions to return
+      responses:
+        '200':
+          description: Review session retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: object
+                    properties:
+                      questions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReviewQuestion'
+                      total_due:
+                        type: integer
+                        description: Total questions due (may exceed limit)
+                      is_degraded:
+                        type: boolean
+                        description: True if Safe Mode is active
+                      season:
+                        type: string
+                        description: Current active season name
+              example:
+                message:
+                  questions:
+                    - question_id: "Q-UUID-001"
+                      stage_id: "STAGE-001"
+                      stability: 2.5
+                      next_review_date: "2026-01-19T10:00:00"
+                  total_due: 15
+                  is_degraded: false
+                  season: "SEASON-2026"
+        '429':
+          description: Rate limited (Safe Mode only)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /reviews.submit_review_session:
+    post:
+      tags:
+        - Reviews
+      summary: Submit review responses and update SRS state
+      description: |
+        Submits review responses. Updates Redis immediately (sync) and
+        persists to database asynchronously via background job.
+        Response time target: <500ms for up to 50 items.
+      operationId: submitReviewSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - responses
+              properties:
+                responses:
+                  type: array
+                  maxItems: 50
+                  items:
+                    $ref: '#/components/schemas/ReviewResponse'
+            example:
+              responses:
+                - question_id: "Q-UUID-001"
+                  quality: 4
+                  response_time_ms: 5000
+                - question_id: "Q-UUID-002"
+                  quality: 2
+                  response_time_ms: 8000
+      responses:
+        '200':
+          description: Review session submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [success]
+                      processed:
+                        type: integer
+                        description: Number of responses processed
+                      xp_earned:
+                        type: integer
+                        description: XP awarded for this session
+                      persistence_job_id:
+                        type: string
+                        description: Background job ID for tracking
+              example:
+                message:
+                  status: "success"
+                  processed: 2
+                  xp_earned: 25
+                  persistence_job_id: "rq:job:srs_persist_user@example.com_2026-01-19"
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /srs.rebuild_season_cache:
+    post:
+      tags:
+        - Admin
+      summary: Trigger full cache rebuild for a season
+      description: |
+        Administrative utility to rebuild Redis cache for an entire season.
+        Runs as background job with progress tracking.
+        Requires System Manager role.
+      operationId: rebuildSeasonCache
+      security:
+        - frappeSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - season
+              properties:
+                season:
+                  type: string
+                  description: Season name to rebuild
+                  example: "SEASON-2026"
+      responses:
+        '200':
+          description: Cache rebuild job started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [started]
+                      job_id:
+                        type: string
+                      estimated_records:
+                        type: integer
+              example:
+                message:
+                  status: "started"
+                  job_id: "rq:job:cache_rebuild_SEASON-2026"
+                  estimated_records: 1500000
+        '403':
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /srs.get_cache_status:
+    get:
+      tags:
+        - Admin
+      summary: Get cache health and statistics
+      description: |
+        Returns cache connectivity status, memory usage, and key statistics.
+        Useful for monitoring dashboard.
+      operationId: getCacheStatus
+      security:
+        - frappeSession: []
+      responses:
+        '200':
+          description: Cache status retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: object
+                    properties:
+                      redis_connected:
+                        type: boolean
+                      is_safe_mode:
+                        type: boolean
+                      memory_used_mb:
+                        type: number
+                      total_keys:
+                        type: integer
+                      keys_by_season:
+                        type: object
+                        additionalProperties:
+                          type: integer
+              example:
+                message:
+                  redis_connected: true
+                  is_safe_mode: false
+                  memory_used_mb: 256.5
+                  total_keys: 45000
+                  keys_by_season:
+                    "SEASON-2025": 20000
+                    "SEASON-2026": 25000
+
+  /srs.trigger_reconciliation:
+    post:
+      tags:
+        - Admin
+      summary: Trigger manual cache-DB reconciliation
+      description: |
+        Runs reconciliation check immediately instead of waiting for scheduled job.
+        Returns discrepancy report.
+      operationId: triggerReconciliation
+      security:
+        - frappeSession: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sample_size:
+                  type: integer
+                  default: 10000
+                  minimum: 100
+                  maximum: 100000
+                season:
+                  type: string
+                  description: Optional - limit to specific season
+      responses:
+        '200':
+          description: Reconciliation completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: object
+                    properties:
+                      sample_size:
+                        type: integer
+                      discrepancies_found:
+                        type: integer
+                      discrepancy_rate:
+                        type: number
+                      auto_corrected:
+                        type: integer
+                      alert_triggered:
+                        type: boolean
+              example:
+                message:
+                  sample_size: 10000
+                  discrepancies_found: 5
+                  discrepancy_rate: 0.0005
+                  auto_corrected: 5
+                  alert_triggered: false
+
+  /srs.archive_season:
+    post:
+      tags:
+        - Admin
+      summary: Archive a season's data
+      description: |
+        Moves all Player Memory Tracker records for a season to archive storage
+        and clears Redis cache. Requires explicit confirmation.
+      operationId: archiveSeason
+      security:
+        - frappeSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - season
+                - confirm
+              properties:
+                season:
+                  type: string
+                  description: Season name to archive
+                confirm:
+                  type: boolean
+                  description: Must be true to proceed
+      responses:
+        '200':
+          description: Archive job started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [started, completed]
+                      records_archived:
+                        type: integer
+                      cache_keys_deleted:
+                        type: integer
+        '400':
+          description: Confirmation required or season still active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    ReviewQuestion:
+      type: object
+      properties:
+        question_id:
+          type: string
+          description: UUID of the question
+        stage_id:
+          type: string
+          description: ID of the stage/lesson containing the question
+        stability:
+          type: number
+          format: float
+          description: Current SRS stability score (0-4)
+        next_review_date:
+          type: string
+          format: date-time
+          description: Scheduled review time
+        subject:
+          type: string
+          description: Subject name (if filtered)
+        topic:
+          type: string
+          description: Topic name (if available)
+
+    ReviewResponse:
+      type: object
+      required:
+        - question_id
+        - quality
+      properties:
+        question_id:
+          type: string
+          description: UUID of the reviewed question
+        quality:
+          type: integer
+          minimum: 0
+          maximum: 5
+          description: |
+            Quality of recall:
+            0 = Complete blackout
+            1 = Incorrect, but recognized
+            2 = Incorrect, easy to recall
+            3 = Correct with difficulty
+            4 = Correct with hesitation
+            5 = Perfect recall
+        response_time_ms:
+          type: integer
+          description: Time taken to respond in milliseconds
+
+    RateLimitError:
+      type: object
+      properties:
+        exc_type:
+          type: string
+          example: "RateLimitExceeded"
+        message:
+          type: string
+          example: "System is in Safe Mode. Please wait 30 seconds."
+        retry_after:
+          type: integer
+          description: Seconds until next request allowed
+
+    Error:
+      type: object
+      properties:
+        exc_type:
+          type: string
+        message:
+          type: string
+        _server_messages:
+          type: string
+
+  securitySchemes:
+    frappeSession:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: Frappe session cookie (requires System Manager for admin endpoints)

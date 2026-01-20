@@ -13,8 +13,39 @@ app_license = "mit"
 doctype_js = {"Game Lesson": "public/js/game_lesson.js"}
 
 after_migrate = [
-	"memora.setup.setup_review_system"
+	"memora.setup_folder.infrastructure.run_auto_configuration",
+	"memora.setup.setup_review_system",
+	"memora.patches.v1_0.setup_partitioning.execute"
 ]
+after_install = [
+	"memora.setup_folder.infrastructure.run_auto_configuration",
+	"memora.patches.v1_0.setup_partitioning.execute"
+]
+
+
+# Scheduled Tasks
+# ---------------
+
+scheduler_events = {
+	"all": [
+		"memora.tasks.all"
+	],
+	"daily": [
+		"memora.services.srs_archiver.process_auto_archive",
+		"memora.services.srs_reconciliation.reconcile_cache_with_database"
+	],
+	"hourly": [
+		"memora.tasks.hourly"
+	],
+	"weekly": [
+		"memora.tasks.weekly",
+		"memora.services.srs_archiver.flag_eligible_for_deletion"
+	],
+	"monthly": [
+		"memora.tasks.monthly"
+	],
+}
+
 
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
@@ -149,27 +180,6 @@ after_migrate = [
 # 		"on_cancel": "method",
 # 		"on_trash": "method"
 # 	}
-# }
-
-# Scheduled Tasks
-# ---------------
-
-# scheduler_events = {
-# 	"all": [
-# 		"memora.tasks.all"
-# 	],
-# 	"daily": [
-# 		"memora.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"memora.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"memora.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"memora.tasks.monthly"
-# 	],
 # }
 
 # Testing

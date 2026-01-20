@@ -64,7 +64,8 @@
    "fieldname": "season",
    "fieldtype": "Link",
    "label": "Season",
-   "options": "Game Subscription Season"
+   "options": "Game Subscription Season",
+   "reqd": 1
   },
   {
    "fieldname": "topic",

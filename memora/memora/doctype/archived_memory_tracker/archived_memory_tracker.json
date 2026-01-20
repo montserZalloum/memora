@@ -1,0 +1,129 @@
+{
+  "actions": [],
+  "allow_rename": 0,
+  "autoname": "hash",
+  "creation": "2026-01-19 00:00:00.000000",
+  "doctype": "DocType",
+  "document_type": "Setup",
+  "editable_grid": 1,
+  "engine": "InnoDB",
+  "field_order": [
+   "player",
+   "season",
+   "question_id",
+   "stability",
+   "next_review_date",
+   "last_review_date",
+   "subject",
+   "topic",
+   "archived_at",
+   "eligible_for_deletion"
+  ],
+  "fields": [
+   {
+    "fieldname": "player",
+    "fieldtype": "Link",
+    "in_list_view": 1,
+    "label": "Player",
+    "options": "User",
+    "read_only": 1,
+    "reqd": 1
+   },
+   {
+    "fieldname": "season",
+    "fieldtype": "Link",
+    "in_list_view": 1,
+    "label": "Season",
+    "options": "Game Subscription Season",
+    "read_only": 1,
+    "reqd": 1
+   },
+   {
+    "fieldname": "question_id",
+    "fieldtype": "Data",
+    "in_list_view": 1,
+    "label": "Question ID",
+    "read_only": 1,
+    "reqd": 1
+   },
+   {
+    "default": "0.0",
+    "fieldname": "stability",
+    "fieldtype": "Float",
+    "label": "Stability",
+    "read_only": 1
+   },
+   {
+    "fieldname": "next_review_date",
+    "fieldtype": "Datetime",
+    "label": "Next Review Date",
+    "read_only": 1
+   },
+   {
+    "fieldname": "last_review_date",
+    "fieldtype": "Datetime",
+    "label": "Last Review Date",
+    "read_only": 1
+   },
+   {
+    "fieldname": "subject",
+    "fieldtype": "Link",
+    "in_filter": 1,
+    "label": "Subject",
+    "options": "Game Subject",
+    "read_only": 1
+   },
+   {
+    "fieldname": "topic",
+    "fieldtype": "Link",
+    "label": "Topic",
+    "options": "Game Topic",
+    "read_only": 1
+   },
+   {
+    "default": "2026-01-19 00:00:00",
+    "fieldname": "archived_at",
+    "fieldtype": "Datetime",
+    "in_list_view": 1,
+    "label": "Archived At",
+    "read_only": 1,
+    "reqd": 1
+   },
+   {
+    "default": "0",
+    "fieldname": "eligible_for_deletion",
+    "fieldtype": "Check",
+    "label": "Eligible for Deletion",
+    "read_only": 0
+   }
+  ],
+  "grid_page_length": 50,
+  "index_web_pages_for_search": 1,
+  "links": [],
+  "modified": "2026-01-19 00:00:00.000000",
+  "modified_by": "Administrator",
+  "module": "Memora",
+  "name": "Archived Memory Tracker",
+  "naming_rule": "Random",
+  "owner": "Administrator",
+  "permissions": [
+   {
+    "create": 1,
+    "delete": 1,
+    "email": 1,
+    "export": 1,
+    "print": 1,
+    "read": 1,
+    "report": 1,
+    "role": "System Manager",
+    "share": 1,
+    "write": 1
+   }
+  ],
+  "row_format": "Dynamic",
+  "rows_threshold_for_grid_search": 20,
+  "sort_field": "archived_at",
+  "sort_order": "DESC",
+  "states": [],
+  "track_changes": 1
+ }

@@ -5,3 +5,13 @@
 tags
 node_modules
 __pycache__
+.venv/
+venv/
+dist/
+*.log
+.env*
+.env.local
+*.tmp
+.vscode/
+.idea/
+Thumbs.db

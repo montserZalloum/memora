@@ -9,16 +9,21 @@
  "engine": "InnoDB",
  "field_order": [
   "season_name",
+  "title",
   "start_date",
   "end_date",
-  "is_active"
+  "is_active",
+  "partition_created",
+  "enable_redis",
+  "auto_archive"
  ],
  "fields": [
   {
+   "description": "Season name must follow pattern 'SEASON-YYYY' or 'SEASON-YYYY-NAME'",
    "fieldname": "season_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Season Name",
+   "label": "Season ID",
    "reqd": 1,
    "unique": 1
   },
@@ -37,12 +42,38 @@
    "fieldname": "is_active",
    "fieldtype": "Check",
    "label": "Is Active"
+  },
+  {
+   "default": "0",
+   "fieldname": "partition_created",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Partition Created",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_redis",
+   "fieldtype": "Check",
+   "label": "Enable Redis Cache"
+  },
+  {
+   "default": "0",
+   "fieldname": "auto_archive",
+   "fieldtype": "Check",
+   "label": "Auto Archive"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Season Name",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-17 13:36:55.082842",
+ "modified": "2026-01-20 17:01:41.625938",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Subscription Season",
@@ -64,8 +95,11 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 1
+ "title_field": "title",
+ "track_changes": 1,
+ "translated_doctype": 1
 }

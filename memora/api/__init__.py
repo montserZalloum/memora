@@ -31,6 +31,14 @@ from .quests import get_daily_quests
 from .leaderboard import get_leaderboard
 from .onboarding import get_academic_masters, set_academic_profile
 from .store import get_store_items, request_purchase
+from .srs import (
+    archive_season,
+    get_archive_status,
+    delete_eligible_archived_records,
+    get_cache_status,
+    rebuild_season_cache,
+    trigger_reconciliation,
+)
 
 __all__ = [
     # Subjects
@@ -61,4 +69,11 @@ __all__ = [
     # Store
     'get_store_items',
     'request_purchase',
+    # SRS Scalability
+    'archive_season',
+    'get_archive_status',
+    'delete_eligible_archived_records',
+    'get_cache_status',
+    'rebuild_season_cache',
+    'trigger_reconciliation',
 ]
