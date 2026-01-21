@@ -75,13 +75,28 @@ def build_user_access_bundle(user):
     }
 
 def get_student_plan_version(user):
-    """جلب نسخة الخطة الحالية لضمان تحديث الكاش في المتصفح"""
+    """جلب نسخة الخطة الحالية من Redis أو DB"""
     profile = frappe.db.get_value("Player Profile", {"user": user}, 
-        ["current_grade", "season"], as_dict=True)
+        ["current_grade", "season", "current_stream"], as_dict=True)
+    
     if not profile: return 1
     
-    file_slug = f"plan_{profile.current_grade}_{profile.season}".lower().replace(" ", "_")
-    return frappe.cache().get_value(f"version:{file_slug}") or 1
+    # بناء اسم المفتاح بناءً على تخصص الطالب
+    file_slug = f"plan_{profile.current_grade}_{profile.current_stream or 'general'}_{profile.season}".lower().replace(" ", "_")
+    version_key = f"version:plans:{file_slug}"
+    
+    # جلب من Redis أولاً لضمان الـ 29ms التي رأيناها سابقاً
+    version = frappe.cache().get_value(version_key)
+    
+    if not version:
+        # Fallback للداتابيز في حال ضياع كاش الريديس
+        modified = frappe.db.get_value("Game Academic Plan", 
+            {"grade": profile.current_grade, "season": profile.season, "stream": profile.current_stream}, 
+            "modified")
+        version = int(modified.timestamp()) if modified else 1
+        frappe.cache().set_value(version_key, version)
+        
+    return version
 
 # --- دالة مسح الكاش (للاستخدام في الـ Hooks) ---
 def handle_purchase_approval(doc, method=None):
@@ -129,3 +144,16 @@ def clear_season_users_cache(season_name):
         frappe.cache().delete_value(cache_key)
         
     frappe.logger().info(f"Cleared access cache for {len(users)} users due to Season {season_name} date change.")
+
+
+def get_subject_version(subject_id):
+    """دالة مساعدة لجلب نسخة هيكل المادة"""
+    version_key = f"version:subjects:structure_{subject_id}.json"
+    version = frappe.cache().get_value(version_key)
+    
+    if not version:
+        modified = frappe.db.get_value("Game Subject", subject_id, "modified")
+        version = int(modified.timestamp()) if modified else 1
+        frappe.cache().set_value(version_key, version)
+    
+    return version

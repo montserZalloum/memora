@@ -52,7 +52,7 @@ def rebuild_subject_structure_json(subject_id):
     
     # استخدام Game Learning Track (الاسم الصحيح)
     tracks = frappe.get_all("Game Learning Track", 
-        filters={"subject": subject_id," is_published": 1}, 
+        filters={"subject": subject_id,"is_published": 1}, 
         fields=["name", "track_name", "is_paid"], order_by="idx asc")
     
     final_tracks = []
@@ -87,7 +87,7 @@ def rebuild_topic_content_json(topic_id):
 
     lessons = frappe.get_all("Game Lesson", 
         filters={"topic": topic_id}, 
-        fields=["name", "title", "lesson_type", "modified"], order_by="idx asc")
+        fields=["name", "modified"], order_by="idx asc")
 
     for lesson in lessons:
         lesson["version"] = int(lesson.modified.timestamp())
@@ -103,15 +103,15 @@ def rebuild_lesson_detail_json(lesson_id):
     """يحتوي على الجداول والأجزاء لدرس واحد فقط"""
     if not frappe.db.exists("Game Lesson", lesson_id): return
     
-    lesson_doc = frappe.db.get_value("Game Lesson", lesson_id, ["name", "title", "lesson_type"], as_dict=True)
+    lesson_doc = frappe.db.get_value("Game Lesson", lesson_id, ["name"], as_dict=True)
     
-    parts = frappe.get_all("Game Lesson Part", 
+    parts = frappe.get_all("Game Stage", 
         filters={"parent": lesson_id}, 
-        fields=["title", "content_type", "table_data"], order_by="idx asc")
+        fields=["title", "type", "config"], order_by="idx asc")
     
     for part in parts:
-        if part.table_data and isinstance(part.table_data, str):
-            try: part.table_data = json.loads(part.table_data)
+        if part.config and isinstance(part.config, str):
+            try: part.config = json.loads(part.config)
             except: pass
 
     save_static_file("lessons", f"detail_{lesson_id}.json", {
@@ -172,3 +172,34 @@ def trigger_subject_update(doc, method=None):
     plans = frappe.get_all("Game Plan Subject", filters={"subject": doc.name}, pluck="parent")
     for p in plans:
         frappe.enqueue(rebuild_academic_plan_json, plan_name=p, enqueue_after_commit=True)
+
+@frappe.whitelist(allow_guest=True) # السماح للضيوف أيضاً بالوصول للنسخة
+def get_plan_version(grade, season, stream=None):
+    """
+    API يرجع رقم نسخة الخطة (Timestamp).
+    يستخدمه الفرونت إند لفك الكاش (Cache Busting).
+    """
+    # 1. بناء اسم الملف المعياري الذي اتفقنا عليه
+    # نستخدم slugify لضمان أن الاسم متوافق مع نظام الملفات
+    file_name = f"plan_{grade}_{stream or 'general'}_{season}.json".lower().replace(" ", "_")
+    
+    # مفتاح النسخة في Redis (يجب أن يكون موحداً مع دالة save_static_file)
+    version_key = f"version:plans:{file_name}"
+
+    # 2. محاولة جلب النسخة من Redis (الأسرع لـ 50 ألف مستخدم)
+    version = frappe.cache().get_value(version_key)
+
+    # 3. إذا لم تكن في الريديس (حالة نادرة أو أول مرة)، نجلبها من الداتابيز
+    if not version:
+        # نبحث عن وقت آخر تعديل للخطة الدراسية
+        modified = frappe.db.get_value("Game Academic Plan", 
+            {"grade": grade, "season": season, "stream": stream}, 
+            "modified")
+        
+        # تحويل الوقت لـ Timestamp (رقم فريد)
+        version = int(modified.timestamp()) if modified else 1
+        
+        # تخزين القيمة في Redis لكي لا نلمس الداتابيز في الطلبات القادمة
+        frappe.cache().set_value(version_key, version)
+
+    return {"version": version}
