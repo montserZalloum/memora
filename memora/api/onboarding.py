@@ -12,20 +12,22 @@ from frappe import _
 def get_academic_masters():
     """
     Fetch master data for onboarding.
-
-    Update: Links streams to grades (Nested Streams).
-    Returns JSON containing grades, and each grade contains list of allowed stream IDs.
+    Returns: Grades (with allowed streams & seasons), All Streams, and All Seasons.
     """
     try:
-        # 1. Fetch streams (as complete reference - Master Data)
-        # We need this so frontend knows stream name and number
+        # 1. جلب قائمة كل المسارات (Master Data)
         all_streams = frappe.get_all("Game Academic Stream",
             fields=["name", "stream_name"],
             order_by="creation asc"
         )
 
-        # 2. Fetch grades with their allowed streams
-        # We use get_all for fast fetch, then simple loop
+        # 2. جلب قائمة كل المواسم (Master Data)
+        all_seasons = frappe.get_all("Game Subscription Season",
+            fields=["name", "title"],
+            order_by="creation desc"
+        )
+
+        # 3. جلب الصفوف وتطعيمها بالمسارات والمواسم المسموحة
         grades_list = frappe.get_all("Game Academic Grade",
             fields=["name", "grade_name"],
             order_by="creation asc"
@@ -33,36 +35,44 @@ def get_academic_masters():
 
         enriched_grades = []
         for g in grades_list:
-            # We need to access child table, so we use get_doc or custom query
-            # Here we use direct query for better performance (instead of loading full document)
+            # جلب المسارات المسموحة لهذا الصف
             allowed_streams = frappe.get_all("Game Grade Valid Stream",
                 filters={"parent": g.name},
-                pluck="stream"  # Returns list of IDs directly ['Scientific', 'Literary']
+                pluck="stream"
+            )
+
+            # جلب المواسم التي تحتوي على خطة دراسية لهذا الصف
+            allowed_seasons = frappe.get_all("Game Academic Plan",
+                filters={"grade": g.name},
+                pluck="season",
+                distinct=True
             )
 
             enriched_grades.append({
                 "id": g.name,
                 "name": g.grade_name,
-                "allowed_streams": allowed_streams  # 👈 Filtered list
+                "allowed_streams": allowed_streams,
+                "allowed_seasons": allowed_seasons
             })
-
-        # 3. Current season
-        active_season = frappe.db.get_value("Game Subscription Season",
-            {"is_active": 1}, "name") or "2025"
 
         return {
             "grades": enriched_grades,
             "streams": all_streams,
-            "current_season": active_season
+            "seasons": all_seasons
         }
 
     except Exception as e:
         frappe.log_error("Get Masters Failed", frappe.get_traceback())
-        return {"grades": [], "streams": [], "current_season": "2025"}
+        return {
+            "grades": [], 
+            "streams": [], 
+            "seasons": [],
+            "error": str(e)
+        }
 
 
 @frappe.whitelist()
-def set_academic_profile(grade, stream=None):
+def set_academic_profile(grade, stream=None, season=None):
     """
     Save student's choices.
 
@@ -84,8 +94,6 @@ def set_academic_profile(grade, stream=None):
             if not is_allowed:
                 frappe.throw(f"Stream '{stream}' is not valid for Grade '{grade}'")
 
-        # 2. Fetch active season
-        season = frappe.db.get_value("Game Subscription Season", {"is_active": 1}, "name")
 
         # 3. Search for profile (Upsert Logic)
         profile_name = frappe.db.get_value("Player Profile", {"user": user}, "name")
@@ -95,7 +103,7 @@ def set_academic_profile(grade, stream=None):
             frappe.db.set_value("Player Profile", profile_name, {
                 "current_grade": grade,
                 "current_stream": stream if stream else None,
-                "academic_year": season
+                "season": season
             })
         else:
             # 🆕 Create case: New user without profile
@@ -104,7 +112,7 @@ def set_academic_profile(grade, stream=None):
                 "user": user,
                 "current_grade": grade,
                 "current_stream": stream if stream else None,
-                "academic_year": season,
+                "season": season,
                 "total_xp": 0,
                 "hearts": 5  # Default value for hearts
             })

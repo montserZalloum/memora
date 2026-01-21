@@ -11,7 +11,7 @@
   "naming_series",
   "grade",
   "stream",
-  "year",
+  "season",
   "subjects"
  ],
  "fields": [
@@ -40,21 +40,22 @@
    "reqd": 1
   },
   {
-   "fieldname": "year",
-   "fieldtype": "Data",
-   "label": "Year"
-  },
-  {
    "fieldname": "subjects",
    "fieldtype": "Table",
    "label": "Subjects",
    "options": "Game Plan Subject"
+  },
+  {
+   "fieldname": "season",
+   "fieldtype": "Link",
+   "label": "Season",
+   "options": "Game Subscription Season"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-16 15:53:59.383038",
+ "modified": "2026-01-21 13:33:07.908489",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Academic Plan",
