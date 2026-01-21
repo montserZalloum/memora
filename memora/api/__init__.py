@@ -26,11 +26,14 @@ from .subjects import get_subjects, get_my_subjects, get_game_tracks
 from .map_engine import get_map_data, get_track_details,get_topic_details,get_unit_topics
 from .sessions import submit_session, get_lesson_details
 from .reviews import get_review_session, submit_review_session
-from .profile import get_player_profile, get_full_profile_stats
+from .profile import get_player_profile, get_full_profile_stats,get_player_login_info
 from .quests import get_daily_quests
 from .leaderboard import get_leaderboard
 from .onboarding import get_academic_masters, set_academic_profile
 from .store import get_store_items, request_purchase
+from .user_access import get_user_access_keys
+from .json_builders.academic_cache import get_plan_version
+
 from .srs import (
     archive_season,
     get_archive_status,
@@ -42,6 +45,7 @@ from .srs import (
 
 __all__ = [
     # Subjects
+    'get_plan_version',
     'get_subjects',
     'get_my_subjects',
     'get_game_tracks',
@@ -57,6 +61,8 @@ __all__ = [
     'get_review_session',
     'submit_review_session',
     # Profile
+    'get_user_access_keys',
+    'get_player_login_info',
     'get_player_profile',
     'get_full_profile_stats',
     # Quests

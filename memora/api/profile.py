@@ -196,3 +196,38 @@ def get_full_profile_stats(subject=None):
     except Exception as e:
         frappe.log_error("Get Profile Stats Error", frappe.get_traceback())
         return {}
+
+
+@frappe.whitelist()
+def get_player_login_info():
+    # 1. جيب اليوزر الحالي
+    current_user = frappe.session.user
+    
+    if current_user == 'Guest':
+        return {"is_logged_in": False}
+
+    # 2. جيب البيانات من Player Profile
+    # بنبحث عن البروفايل اللي مربوط باليوزر الحالي
+    # frappe.db.get_value (Doctype, Filters, Fields, as_dict)
+    
+    player_data = frappe.db.get_value(
+        "Player Profile", 
+        {"user": current_user},  # <-- تأكد أن اسم الحقل في الدوكتايب هو user
+        ["total_xp", "current_grade", "current_stream", "season"],
+        as_dict=True
+    )
+
+    # حالة لو اليوزر مسجل بس لسه ما عنده Player Profile
+    if not player_data:
+        player_data = {
+            "total_xp": 0,
+            "current_grade": None,
+            "current_stream": None,
+            "season": None
+        }
+
+    # 3. ضيف الإيميل للداتا ورجع النتيجة
+    player_data['email'] = current_user
+    player_data['is_logged_in'] = True
+    
+    return player_data

@@ -35,7 +35,8 @@
   {
    "fieldname": "end_date",
    "fieldtype": "Date",
-   "label": "End Date"
+   "label": "End Date",
+   "search_index": 1
   },
   {
    "default": "0",
@@ -73,7 +74,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-20 17:01:41.625938",
+ "modified": "2026-01-21 18:16:11.460744",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Subscription Season",

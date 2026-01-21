@@ -22,6 +22,43 @@ after_install = [
 	"memora.patches.v1_0.setup_partitioning.execute"
 ]
 
+doc_events = {
+    "Game Academic Plan": {
+        "on_update": "memora.json_builders.academic_cache.trigger_plan_update",
+        "on_trash": "memora.json_builders.academic_cache.trigger_plan_update"
+    },
+    "Game Subject": {
+        "on_update": "memora.json_builders.academic_cache.trigger_subject_update",
+        "on_trash": "memora.json_builders.academic_cache.trigger_subject_update"
+    },
+    "Game Track": {
+        "on_update": "memora.json_builders.academic_cache.trigger_track_update",
+        "on_trash": "memora.json_builders.academic_cache.trigger_track_update"
+    },
+    "Game Unit": {
+        "on_update": "memora.json_builders.academic_cache.trigger_unit_update",
+        "on_trash": "memora.json_builders.academic_cache.trigger_unit_update"
+    },
+    "Game Topic": {
+        "on_update": "memora.json_builders.academic_cache.trigger_topic_update",
+        "on_trash": "memora.json_builders.academic_cache.trigger_topic_update"
+    },
+    "Game Lesson": {
+        "on_update": "memora.json_builders.academic_cache.trigger_lesson_update",
+        "on_trash": "memora.json_builders.academic_cache.trigger_lesson_update"
+    },
+	"Game Purchase Request": {
+        "on_update": "memora.api.user_access.handle_purchase_approval"
+    },
+    "Game Player Subscription": {
+        "on_update": "memora.api.user_access.handle_subscription_change",
+        "on_trash": "memora.api.user_access.handle_subscription_change"
+    },
+	"Game Subscription Season": {
+        "on_update": "memora.api.user_access.handle_season_date_change"
+    }
+}
+
 
 # Scheduled Tasks
 # ---------------
