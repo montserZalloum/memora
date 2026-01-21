@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:title",
+ "autoname": "format:UN-{#####}",
  "creation": "2026-01-08 14:22:33.121624",
  "doctype": "DocType",
  "editable_grid": 1,
@@ -22,8 +22,7 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Title",
-   "reqd": 1,
-   "unique": 1
+   "reqd": 1
   },
   {
    "fieldname": "subject",
@@ -75,10 +74,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-18 09:47:12.538990",
+ "modified": "2026-01-21 23:54:51.185777",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Unit",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
