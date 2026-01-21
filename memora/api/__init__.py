@@ -32,7 +32,7 @@ from .leaderboard import get_leaderboard
 from .onboarding import get_academic_masters, set_academic_profile
 from .store import get_store_items, request_purchase
 from .user_access import get_user_access_keys
-from .json_builders.academic_cache import get_plan_version
+from ..json_builders.academic_cache import get_plan_version
 
 from .srs import (
     archive_season,

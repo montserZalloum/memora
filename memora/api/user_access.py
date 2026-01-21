@@ -77,10 +77,10 @@ def build_user_access_bundle(user):
 def get_student_plan_version(user):
     """جلب نسخة الخطة الحالية لضمان تحديث الكاش في المتصفح"""
     profile = frappe.db.get_value("Player Profile", {"user": user}, 
-        ["current_grade", "current_season"], as_dict=True)
+        ["current_grade", "season"], as_dict=True)
     if not profile: return 1
     
-    file_slug = f"plan_{profile.current_grade}_{profile.current_season}".lower().replace(" ", "_")
+    file_slug = f"plan_{profile.current_grade}_{profile.season}".lower().replace(" ", "_")
     return frappe.cache().get_value(f"version:{file_slug}") or 1
 
 # --- دالة مسح الكاش (للاستخدام في الـ Hooks) ---
