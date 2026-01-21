@@ -11,72 +11,66 @@ from frappe import _
 @frappe.whitelist()
 def get_subjects():
     """
-    Get subjects based on user's academic plan (Arabic version).
+    Get subjects based on user's academic plan (Seasonal version).
 
     Logic:
-    1. Determine student's grade and stream.
-    2. Fetch the Academic Plan matching their profile.
-    3. Display only subjects listed in the plan.
-    4. Use "Display Name" from plan if available (e.g., show "رياضيات" instead of "رياضيات أدبي").
+    1. Determine student's grade, stream, and CURRENT SEASON.
+    2. Fetch the Academic Plan matching (Grade + Stream + Season).
+    3. Display only subjects listed in that seasonal plan.
     """
     try:
         user = frappe.session.user
         
-        # 1. Fetch student data (Context)
+        # 1. جلب بيانات بروفايل الطالب (تعديل: جلب season بدلاً من academic_year)
         profile = frappe.db.get_value("Player Profile", {"user": user},
-            ["current_grade", "current_stream", "academic_year"], as_dict=True)
+            ["current_grade", "current_stream", "season"], as_dict=True)
 
-        if not profile or not profile.current_grade:
-            # Special case: Student hasn't completed onboarding yet
-            # We can return "all subjects" as demo, or empty list to redirect to settings
-            # We'll return empty to let frontend redirect to Onboarding page
+        # إذا لم يكمل الطالب إعدادات البروفايل أو لم يحدد الموسم
+        if not profile or not profile.current_grade or not profile.season:
             return []
 
-        # 2. Search for Academic Plan (The Plan)
-        # We search for a plan matching grade + stream + year
+        # 2. البحث عن الخطة الأكاديمية للموسم الحالي
+        # الفلتر الآن يعتمد على الموسم (Season)
         filters = {
             "grade": profile.current_grade,
-            "year": profile.academic_year or "2025"  # Fallback year
+            "season": profile.season  # 👈 التغيير هنا
         }
 
-        # Stream might be empty (for primary grades), so we check it
+        # التخصص (Stream) قد يكون فارغاً في الصفوف الأساسية
         if profile.current_stream:
             filters["stream"] = profile.current_stream
 
         plan_name = frappe.db.get_value("Game Academic Plan", filters, "name")
 
         if not plan_name:
-            # No plan found for this stream! (Data entry error by admin)
+            # لم يتم العثور على خطة لهذا الموسم (خطأ في إدخال البيانات من الإدارة)
             return []
 
-        # 3. Fetch subjects from within the plan
-        # We extract subjects from child table (Game Plan Subject)
+        # 3. جلب المواد من داخل هذه الخطة الموسمية
         plan_subjects = frappe.get_all("Game Plan Subject",
             filters={"parent": plan_name},
             fields=["subject", "display_name"],
-            order_by="idx asc"  # Order as set by admin in plan
+            order_by="idx asc"
         )
 
         final_list = []
 
         for item in plan_subjects:
-            # Fetch original subject details (icon, color, etc.)
+            # جلب تفاصيل المادة الأصلية (أيقونة، لون، هل هي مدفوعة)
             original_subject = frappe.db.get_value("Game Subject", item.subject,
                 ["name", "title", "icon", "is_paid"], as_dict=True)
 
-            if not original_subject: continue
+            if not original_subject: 
+                continue
 
-            # Smart naming logic 🧠
-            # If there's a "display_name" in the plan, we use it (e.g., "إنجليزي")
-            # Otherwise we use the original name (e.g., "إنجليزي مستوى ثالث")
+            # استخدام الاسم المخصص في الخطة (Display Name) إذا وجد، وإلا الاسم الأصلي
             title_to_show = item.display_name if item.display_name else original_subject.title
 
             final_list.append({
-                "name": original_subject.name,   # The real ID
-                "title": title_to_show,          # The customized name for student
+                "name": original_subject.name,   # المعرف البرمجي (مثلاً: math-10)
+                "title": title_to_show,          # الاسم للعرض (مثلاً: رياضيات)
                 "icon": original_subject.icon,
                 "is_paid": original_subject.is_paid
-                # We don't send "locked" here, because we want to allow them to enter to see Free Preview
             })
 
         return final_list
