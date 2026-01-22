@@ -1,6 +1,6 @@
 {
  "actions": [],
- "allow_rename": 1,
+ "autoname": "hash",
  "creation": "2026-01-18 09:30:34.140558",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -55,10 +55,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-22 17:03:36.688581",
+ "modified": "2026-01-22 17:36:46.325304",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Topic",
+ "naming_rule": "Random",
  "owner": "Administrator",
  "permissions": [
   {

@@ -1,28 +1,19 @@
 {
  "actions": [],
- "allow_rename": 1,
- "autoname": "naming_series:",
+ "autoname": "hash",
  "creation": "2026-01-15 22:18:51.453393",
  "doctype": "DocType",
  "document_type": "Setup",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "naming_series",
+  "title",
   "grade",
   "stream",
   "season",
   "subjects"
  ],
  "fields": [
-  {
-   "default": "PLAN-",
-   "fieldname": "naming_series",
-   "fieldtype": "Select",
-   "hidden": 1,
-   "label": "Naming Series",
-   "options": "PLAN-"
-  },
   {
    "fieldname": "grade",
    "fieldtype": "Link",
@@ -50,15 +41,21 @@
    "fieldtype": "Link",
    "label": "Season",
    "options": "Game Subscription Season"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-21 13:33:07.908489",
+ "modified": "2026-01-22 17:34:11.765633",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Academic Plan",
+ "naming_rule": "Random",
  "owner": "Administrator",
  "permissions": [
   {
@@ -76,8 +73,10 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
+ "title_field": "title",
  "track_changes": 1
 }

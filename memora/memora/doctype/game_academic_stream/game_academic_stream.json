@@ -1,7 +1,6 @@
 {
  "actions": [],
- "allow_rename": 1,
- "autoname": "field:stream_name",
+ "autoname": "format:GAS-{#####}",
  "creation": "2026-01-15 22:18:09.917170",
  "doctype": "DocType",
  "document_type": "Setup",
@@ -23,11 +22,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-15 22:35:39.061278",
+ "modified": "2026-01-22 17:32:10.604796",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Academic Stream",
- "naming_rule": "By fieldname",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
@@ -45,8 +44,11 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 1
+ "title_field": "stream_name",
+ "track_changes": 1,
+ "translated_doctype": 1
 }

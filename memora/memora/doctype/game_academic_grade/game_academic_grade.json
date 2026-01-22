@@ -1,7 +1,6 @@
 {
  "actions": [],
- "allow_rename": 1,
- "autoname": "field:grade_name",
+ "autoname": "format:ACG-{#####}",
  "creation": "2026-01-15 22:18:09.450106",
  "doctype": "DocType",
  "document_type": "Setup",
@@ -30,11 +29,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-17 10:19:28.656206",
+ "modified": "2026-01-22 17:31:53.519058",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Academic Grade",
- "naming_rule": "By fieldname",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
@@ -52,8 +51,10 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
+ "title_field": "grade_name",
  "track_changes": 1
 }

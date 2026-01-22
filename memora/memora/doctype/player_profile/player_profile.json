@@ -1,6 +1,5 @@
 {
  "actions": [],
- "allow_rename": 1,
  "autoname": "format:PROFILE-{user}",
  "creation": "2026-01-08 14:22:33.462864",
  "doctype": "DocType",
@@ -65,7 +64,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-21 13:23:38.968496",
+ "modified": "2026-01-22 17:45:24.029102",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Player Profile",

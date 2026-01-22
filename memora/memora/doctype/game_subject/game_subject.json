@@ -1,7 +1,6 @@
 {
  "actions": [],
- "allow_rename": 1,
- "autoname": "field:title",
+ "autoname": "hash",
  "creation": "2026-01-08 14:22:32.974039",
  "doctype": "DocType",
  "editable_grid": 1,
@@ -29,7 +28,7 @@
    "label": "Icon"
   },
   {
-   "default": "0",
+   "default": "1",
    "fieldname": "is_published",
    "fieldtype": "Check",
    "label": "Is Published"
@@ -54,10 +53,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-15 22:18:52.125133",
+ "modified": "2026-01-22 17:35:04.257574",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Subject",
+ "naming_rule": "Random",
  "owner": "Administrator",
  "permissions": [
   {
@@ -75,7 +75,9 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "title"
 }

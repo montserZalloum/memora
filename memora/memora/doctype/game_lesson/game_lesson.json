@@ -1,6 +1,5 @@
 {
  "actions": [],
- "allow_rename": 1,
  "autoname": "format:GL-{#####}",
  "creation": "2026-01-08 14:22:33.279031",
  "doctype": "DocType",
@@ -60,7 +59,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-21 23:47:20.889709",
+ "modified": "2026-01-22 17:37:47.522121",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Lesson",
@@ -82,7 +81,9 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "title"
 }

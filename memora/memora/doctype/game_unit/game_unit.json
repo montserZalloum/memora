@@ -1,6 +1,5 @@
 {
  "actions": [],
- "allow_rename": 1,
  "autoname": "format:UN-{#####}",
  "creation": "2026-01-08 14:22:33.121624",
  "doctype": "DocType",
@@ -74,7 +73,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-21 23:54:51.185777",
+ "modified": "2026-01-22 17:36:10.741988",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Unit",
@@ -96,7 +95,9 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "title"
 }

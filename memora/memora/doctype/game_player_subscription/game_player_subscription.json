@@ -1,14 +1,12 @@
 {
  "actions": [],
- "allow_rename": 1,
- "autoname": "naming_series:",
+ "autoname": "hash",
  "creation": "2026-01-15 22:18:51.765914",
  "doctype": "DocType",
  "document_type": "Setup",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "naming_series",
   "player",
   "linked_season",
   "type",
@@ -16,14 +14,6 @@
   "access_items"
  ],
  "fields": [
-  {
-   "default": "SUB-",
-   "fieldname": "naming_series",
-   "fieldtype": "Select",
-   "hidden": 1,
-   "label": "Naming Series",
-   "options": "SUB-"
-  },
   {
    "fieldname": "player",
    "fieldtype": "Link",
@@ -66,11 +56,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-21 18:10:57.708897",
+ "modified": "2026-01-22 17:42:42.257925",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Player Subscription",
- "naming_rule": "By \"Naming Series\" field",
+ "naming_rule": "Random",
  "owner": "Administrator",
  "permissions": [
   {
@@ -88,8 +78,10 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
+ "title_field": "player",
  "track_changes": 1
 }

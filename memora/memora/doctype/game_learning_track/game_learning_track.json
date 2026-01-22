@@ -1,7 +1,6 @@
 {
  "actions": [],
- "allow_rename": 1,
- "autoname": "format:{subject}-{track_name}",
+ "autoname": "hash",
  "creation": "2026-01-13 08:59:56.783076",
  "doctype": "DocType",
  "editable_grid": 1,
@@ -109,11 +108,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-15 22:18:52.332145",
+ "modified": "2026-01-22 17:35:44.540301",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Learning Track",
- "naming_rule": "Expression",
+ "naming_rule": "Random",
  "owner": "Administrator",
  "permissions": [
   {
@@ -140,7 +139,9 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "track_name"
 }

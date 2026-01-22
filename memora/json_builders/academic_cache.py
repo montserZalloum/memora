@@ -1,7 +1,7 @@
 import frappe
 import json
 import os
-from frappe.utils import slugify # لضمان أسماء ملفات آمنة
+from slugify import slugify
 
 # --- الإعدادات الثوابت ---
 BASE_STATIC_PATH = 'static_api'
@@ -89,7 +89,7 @@ def rebuild_academic_plan_json(plan_name):
     subjects_map = {}
     if subject_names:
         all_subjects = frappe.get_all("Game Subject", 
-            filters={"name": ["in", subject_names]},
+            filters={"name": ["in", subject_names],"is_published": 1},
             fields=["name", "title", "icon", "is_paid", "has_free_content"]
         )
         subjects_map = {s.name: s for s in all_subjects}
@@ -302,3 +302,50 @@ def trigger_subject_deletion(doc, method=None):
                        plan_name=p, 
                        enqueue_after_commit=True, 
                        job_id=f"rebuild_plan_{p}")
+
+
+def trigger_subject_update(doc, method=None):
+    """
+    يتم استدعاؤها عند تعديل بيانات المادة.
+    المسؤولية: تحديث المستوى 2 (Structure) وتحديث المستوى 1 (Plans).
+    """
+    subject_id = doc.name
+    
+    # 1. معالجة الحذف
+    if method == "on_trash":
+        trigger_subject_deletion(doc)
+        return
+
+    # 2. تحديث المستوى 2 (هيكل المادة)
+    # ملاحظة: rebuild_subject_structure_json بداخلها منطق يحذف الملف إذا كان is_published=0
+    frappe.enqueue(
+        rebuild_subject_structure_json, 
+        subject_id=subject_id, 
+        enqueue_after_commit=True, 
+        job_id=f"struct_{subject_id}"
+    )
+
+    # 3. تحديث حالة "المحتوى المجاني" (Denormalization)
+    # نضمن أن يافطة 'جرب مجاناً' ستتحدث إذا قام الأدمن بتغيير شيء في المادة
+    frappe.enqueue(
+        update_subject_free_status, 
+        subject_id=subject_id, 
+        enqueue_after_commit=True, 
+        job_id=f"free_status_{subject_id}"
+    )
+
+    # 4. تحديث المستوى 1 (الخطط الدراسية المرتبطة)
+    # نجلب الخطط قبل الدوران لضمان الأداء
+    plans = frappe.get_all(
+        "Game Plan Subject", 
+        filters={"subject": subject_id}, 
+        pluck="parent"
+    )
+    
+    for plan_name in list(set(plans)):
+        frappe.enqueue(
+            rebuild_academic_plan_json, 
+            plan_name=plan_name, 
+            enqueue_after_commit=True, 
+            job_id=f"rebuild_plan_{plan_name}"
+        )
