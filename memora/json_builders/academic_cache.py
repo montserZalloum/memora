@@ -1,109 +1,185 @@
 import frappe
 import json
 import os
+from frappe.utils import slugify # لضمان أسماء ملفات آمنة
 
-# --- الإعدادات الأساسية ---
+# --- الإعدادات الثوابت ---
 BASE_STATIC_PATH = 'static_api'
 
 def save_static_file(folder, file_name, data):
-    """حفظ الملف وتحديث نسخته في Redis"""
-    path = frappe.get_site_path('public', BASE_STATIC_PATH, folder)
-    if not os.path.exists(path):
-        os.makedirs(path)
-    
-    full_path = os.path.join(path, file_name)
-    with open(full_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+    try:
+        path = frappe.get_site_path('public', BASE_STATIC_PATH, folder)
+        if not os.path.exists(path):
+            os.makedirs(path)
+        
+        full_path = os.path.join(path, file_name)
+        with open(full_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
 
-    # تحديث النسخة في Redis للملف المباشر
-    version_key = f"version:{folder}:{file_name}"
-    timestamp = int(frappe.utils.now_datetime().timestamp())
-    frappe.cache().set_value(version_key, timestamp)
+        version_key = f"version:{folder}:{file_name}"
+        timestamp = int(frappe.utils.now_datetime().timestamp())
+        frappe.cache().set_value(version_key, timestamp)
+    except Exception as e:
+        frappe.log_error(f"Static Gen Error: Save {file_name}", frappe.get_traceback())
 
-# --- 1. بناء ملف الخطة (قائمة المواد) ---
+def delete_static_file(folder, file_name):
+    try:
+        path = frappe.get_site_path('public', BASE_STATIC_PATH, folder, file_name)
+        if os.path.exists(path):
+            os.remove(path)
+        version_key = f"version:{folder}:{file_name}"
+        frappe.cache().delete_value(version_key)
+    except Exception as e:
+        frappe.log_error(f"Static Gen Error: Delete {file_name}", frappe.get_traceback())
+
+# ==============================================================================
+# 2. منطق المحتوى المجاني (Single SQL Query Optimization)
+# ==============================================================================
+
+def update_subject_free_status(subject_id):
+    """
+    فحص المجاني مع التأكد من 'سلسلة النشر' كاملة:
+    المادة -> التراك (Published) -> الوحدة (Published) -> [التوبيك (Published)]
+    """
+    if not subject_id: return
+
+    exists_free = frappe.db.sql("""
+        SELECT EXISTS (
+            -- 1. البحث عن وحدة مجانية ومنشورة داخل تراك منشور
+            SELECT 1 FROM `tabGame Unit` u
+            JOIN `tabGame Learning Track` lt ON u.learning_track = lt.name
+            WHERE lt.subject = %s 
+            AND u.is_free_preview = 1 
+            AND u.is_published = 1
+            AND lt.is_published = 1  -- ✅ تأكدنا أن التراك منشور
+        ) OR EXISTS (
+            -- 2. البحث عن توبيك مجاني ومنشور داخل وحدة منشورة وتراك منشور
+            SELECT 1 FROM `tabGame Topic` t
+            JOIN `tabGame Unit` u ON t.unit = u.name
+            JOIN `tabGame Learning Track` lt ON u.learning_track = lt.name
+            WHERE lt.subject = %s 
+            AND t.is_free_preview = 1 
+            AND t.is_published = 1
+            AND u.is_published = 1   -- ✅ تأكدنا أن الوحدة منشورة
+            AND lt.is_published = 1  -- ✅ تأكدنا أن التراك منشور
+        )
+    """, (subject_id, subject_id))[0][0]
+
+    set_subject_free_status(subject_id, 1 if exists_free else 0)
+
+def set_subject_free_status(subject_id, new_status):
+    current_status = frappe.db.get_value("Game Subject", subject_id, "has_free_content")
+    if int(current_status or 0) != int(new_status):
+        frappe.db.set_value("Game Subject", subject_id, "has_free_content", new_status)
+        plans = frappe.get_all("Game Plan Subject", filters={"subject": subject_id}, pluck="parent")
+        for p in plans:
+            # استخدام job_id لمنع تكرار المهمة في الطابور لنفس الملف
+            frappe.enqueue(rebuild_academic_plan_json, plan_name=p, 
+                           enqueue_after_commit=True, job_id=f"rebuild_plan_{p}")
+
+# ==============================================================================
+# 3. المولدات (Builders)
+# ==============================================================================
+
 def rebuild_academic_plan_json(plan_name):
     if not frappe.db.exists("Game Academic Plan", plan_name): return
     plan = frappe.get_doc("Game Academic Plan", plan_name)
     
+    subject_names = [s.subject for s in plan.subjects]
+    subjects_map = {}
+    if subject_names:
+        all_subjects = frappe.get_all("Game Subject", 
+            filters={"name": ["in", subject_names]},
+            fields=["name", "title", "icon", "is_paid", "has_free_content"]
+        )
+        subjects_map = {s.name: s for s in all_subjects}
+    
     subjects_list = []
     for item in plan.subjects:
-        subject_doc = frappe.db.get_value("Game Subject", item.subject, ["name", "title", "icon", "is_paid"], as_dict=True)
-        if not subject_doc: continue
-        
+        s_data = subjects_map.get(item.subject)
+        if not s_data: continue
         subjects_list.append({
-            "id": subject_doc.name,
-            "title": item.display_name or subject_doc.title,
-            "icon": subject_doc.icon,
-            "is_paid": subject_doc.is_paid,
-            "has_free_sample": check_if_subject_has_free_content(subject_doc.name)
+            "id": s_data.name,
+            "title": item.display_name or s_data.title,
+            "icon": s_data.icon,
+            "is_paid": s_data.is_paid,
+            "has_free_sample": s_data.has_free_content
         })
 
     data = {
-        "metadata": {"grade": plan.grade, "stream": plan.stream, "season": plan.season, "updated_at": str(frappe.utils.now())},
+        "metadata": {
+            "grade": plan.grade, "stream": plan.stream, "season": plan.season, 
+            "updated_at": str(frappe.utils.now())
+        },
         "subjects": subjects_list
     }
-    file_name = f"plan_{plan.grade}_{plan.stream or 'general'}_{plan.season}.json".lower().replace(" ", "_")
+    # استخدام slugify لضمان اسم ملف متوافق
+    file_name = f"plan_{slugify(plan.grade)}_{slugify(plan.stream or 'general')}_{slugify(plan.season)}.json"
     save_static_file("plans", file_name, data)
 
-# --- 2. بناء هيكل المادة (المستوى الأول - بدون دروس) ---
 def rebuild_subject_structure_json(subject_id):
-    """يحتوي على التراكات والوحدات والتوبيكات مع 'نسخة' كل توبيك"""
     if not frappe.db.exists("Game Subject", subject_id): return
     
-    # استخدام Game Learning Track (الاسم الصحيح)
     tracks = frappe.get_all("Game Learning Track", 
-        filters={"subject": subject_id,"is_published": 1}, 
+        filters={"subject": subject_id, "is_published": 1}, 
         fields=["name", "track_name", "is_paid"], order_by="idx asc")
     
-    final_tracks = []
-    for t in tracks:
-        units = frappe.get_all("Game Unit", 
-            filters={"learning_track": t.name}, 
-            fields=["name", "title", "is_free_preview"], order_by="idx asc")
-        
-        for u in units:
-            # نجلب التوبيكات مع modified timestamp ليكون هو الـ version
-            u["topics"] = frappe.get_all("Game Topic", 
-                filters={"unit": u.name}, 
-                fields=["name", "title", "modified"], order_by="idx asc")
-            
-            # تحويل الوقت لـ timestamp
-            for tp in u["topics"]:
-                tp["version"] = int(tp.modified.timestamp())
-                del tp["modified"] # لا نحتاجه في الـ JSON
+    if not tracks:
+        save_static_file("subjects", f"structure_{subject_id}.json", {"tracks": []})
+        return
 
-        t["units"] = units
-        final_tracks.append(t)
+    track_names = [t.name for t in tracks]
+    all_units = frappe.get_all("Game Unit", 
+        filters={"learning_track": ["in", track_names], "is_published": 1}, 
+        fields=["name", "title", "is_free_preview", "structure_type", "modified", "learning_track"], 
+        order_by="idx asc")
+
+    units_by_track = {}
+    for u in all_units:
+        u["version"] = int(u.modified.timestamp())
+        del u["modified"]
+        if u.learning_track not in units_by_track:
+            units_by_track[u.learning_track] = []
+        units_by_track[u.learning_track].append(u)
+
+    for t in tracks:
+        t["units"] = units_by_track.get(t.name, [])
 
     save_static_file("subjects", f"structure_{subject_id}.json", {
         "subject_id": subject_id,
-        "tracks": final_tracks
+        "tracks": tracks
     })
 
-# --- 3. بناء قائمة دروس التوبيك (المستوى الثاني) ---
-def rebuild_topic_content_json(topic_id):
-    """يحتوي على قائمة الدروس مع 'نسخة' كل درس"""
-    if not frappe.db.exists("Game Topic", topic_id): return
+def rebuild_container_content_json(container_type, container_id):
+    folder = "topics" if container_type == "Topic" else "units"
+    doctype = f"Game {container_type}"
+    # تأكد أن الحاوية نفسها (توبيك أو وحدة) منشورة قبل بناء ملفها
+    if not frappe.db.exists(doctype, {"name": container_id, "is_published": 1}):
+        # إذا لم تكن منشورة، نحذف الملف القديم إذا وجد لضمان الأمان
+        delete_static_file(folder, f"content_{container_id}.json")
+        return
 
-    lessons = frappe.get_all("Game Lesson", 
-        filters={"topic": topic_id}, 
-        fields=["name", "modified"], order_by="idx asc")
+    filter_key = "topic" if container_type == "Topic" else "unit"
+    lessons = frappe.get_all("Game Lesson", filters={filter_key: container_id,"is_published": 1}, 
+        fields=["name", "title", "lesson_type", "modified"], order_by="idx asc")
 
     for lesson in lessons:
         lesson["version"] = int(lesson.modified.timestamp())
         del lesson["modified"]
 
-    save_static_file("topics", f"content_{topic_id}.json", {
-        "topic_id": topic_id, 
+    save_static_file(folder, f"content_{container_id}.json", {
+        "id": container_id,
         "lessons": lessons
     })
 
-# --- 4. بناء تفاصيل الدرس (المستوى الثالث - الملف الثقيل) ---
 def rebuild_lesson_detail_json(lesson_id):
-    """يحتوي على الجداول والأجزاء لدرس واحد فقط"""
-    if not frappe.db.exists("Game Lesson", lesson_id): return
+    # لا تبنِ ملف التفاصيل إلا إذا كان الدرس منشوراً
+    if not frappe.db.exists("Game Lesson", {"name": lesson_id, "is_published": 1}):
+        delete_static_file("lessons", f"detail_{lesson_id}.json")
+        return
     
-    lesson_doc = frappe.db.get_value("Game Lesson", lesson_id, ["name"], as_dict=True)
+    # تصحيح الخطأ: جلب البيانات كـ dict
+    lesson_data = frappe.db.get_value("Game Lesson", lesson_id, ["name", "title"], as_dict=True)
     
     parts = frappe.get_all("Game Stage", 
         filters={"parent": lesson_id}, 
@@ -116,90 +192,113 @@ def rebuild_lesson_detail_json(lesson_id):
 
     save_static_file("lessons", f"detail_{lesson_id}.json", {
         "lesson_id": lesson_id,
-        "title": lesson_doc.title,
+        "title": lesson_data["title"], # ✅ تصحيح الوصول للحقل
         "parts": parts
     })
 
-# --- أدوات مساعدة ---
-def check_if_subject_has_free_content(subject_id):
-    # SQL JOIN صحيح باستخدام Game Learning Track
-    has_free = frappe.db.sql("""
-        SELECT u.name FROM `tabGame Unit` u
-        JOIN `tabGame Learning Track` lt ON u.learning_track = lt.name
-        WHERE lt.subject = %s AND u.is_free_preview = 1
-        LIMIT 1
-    """, (subject_id,))
-    if has_free: return 1
-    
-    has_free_topic = frappe.db.sql("""
-        SELECT tp.name FROM `tabGame Topic` tp
-        JOIN `tabGame Unit` u ON tp.unit = u.name
-        JOIN `tabGame Learning Track` lt ON u.learning_track = lt.name
-        WHERE lt.subject = %s AND tp.is_free_preview = 1
-        LIMIT 1
-    """, (subject_id,))
-    return 1 if has_free_topic else 0
-
-# --- التريجرز (Triggers) مع مراعاة الأبناء والآباء ---
+# ==============================================================================
+# 4. التريجرز (Events Logic)
+# ==============================================================================
 
 def trigger_lesson_update(doc, method=None):
-    # 1. بناء ملف الدرس الثقيل
-    frappe.enqueue(rebuild_lesson_detail_json, lesson_id=doc.name, enqueue_after_commit=True)
-    # 2. تحديث قائمة الدروس في التوبيك (لتحديث الـ version)
+    lesson_id = doc.name
+    if method == "on_trash":
+        delete_static_file("lessons", f"detail_{lesson_id}.json")
+    else:
+        frappe.enqueue(rebuild_lesson_detail_json, lesson_id=lesson_id, 
+                       enqueue_after_commit=True, job_id=f"lesson_detail_{lesson_id}")
+
     if doc.topic:
-        frappe.enqueue(rebuild_topic_content_json, topic_id=doc.topic, enqueue_after_commit=True)
+        frappe.enqueue(rebuild_container_content_json, container_type="Topic", container_id=doc.topic, 
+                       enqueue_after_commit=True, job_id=f"topic_content_{doc.topic}")
+    elif doc.unit:
+        frappe.enqueue(rebuild_container_content_json, container_type="Unit", container_id=doc.unit, 
+                       enqueue_after_commit=True, job_id=f"unit_content_{doc.unit}")
 
 def trigger_topic_update(doc, method=None):
-    # 1. تحديث قائمة دروس التوبيك
-    frappe.enqueue(rebuild_topic_content_json, topic_id=doc.name, enqueue_after_commit=True)
-    # 2. تحديث هيكل المادة (لتحديث نسخة التوبيك)
-    unit_lt = frappe.db.get_value("Game Unit", doc.unit, "learning_track")
-    subject_id = frappe.db.get_value("Game Learning Track", unit_lt, "subject")
-    if subject_id:
-        frappe.enqueue(rebuild_subject_structure_json, subject_id=subject_id, enqueue_after_commit=True)
+    topic_id = doc.name
+    if method == "on_trash":
+        delete_static_file("topics", f"content_{topic_id}.json")
+    else:
+        frappe.enqueue(rebuild_container_content_json, container_type="Topic", container_id=topic_id, 
+                       enqueue_after_commit=True, job_id=f"topic_content_{topic_id}")
+    
+    # الحصول على subject_id بضربة SQL نظيفة
+    res = frappe.db.sql("""
+        SELECT lt.subject FROM `tabGame Unit` u
+        JOIN `tabGame Learning Track` lt ON u.learning_track = lt.name
+        WHERE u.name = %s
+    """, (doc.unit,), as_dict=True)
+    
+    if res:
+        s_id = res[0].subject
+        frappe.enqueue(rebuild_subject_structure_json, subject_id=s_id, 
+                       enqueue_after_commit=True, job_id=f"struct_{s_id}")
+        frappe.enqueue(update_subject_free_status, subject_id=s_id, 
+                       enqueue_after_commit=True, job_id=f"free_status_{s_id}")
 
 def trigger_unit_update(doc, method=None):
+    if method == "on_trash":
+        delete_static_file("units", f"content_{doc.name}.json")
+    else:
+        frappe.enqueue(rebuild_container_content_json, container_type="Unit", container_id=doc.name, 
+                       enqueue_after_commit=True, job_id=f"unit_content_{doc.name}")
+
     subject_id = frappe.db.get_value("Game Learning Track", doc.learning_track, "subject")
     if subject_id:
-        frappe.enqueue(rebuild_subject_structure_json, subject_id=subject_id, enqueue_after_commit=True)
+        frappe.enqueue(rebuild_subject_structure_json, subject_id=subject_id, 
+                       enqueue_after_commit=True, job_id=f"struct_{subject_id}")
+        frappe.enqueue(update_subject_free_status, subject_id=subject_id, 
+                       enqueue_after_commit=True, job_id=f"free_status_{subject_id}")
+
+def trigger_plan_update(doc, method=None):
+    if method == "on_trash":
+        file_name = f"plan_{slugify(doc.grade)}_{slugify(doc.stream or 'general')}_{slugify(doc.season)}.json"
+        delete_static_file("plans", file_name)
+    else:
+        frappe.enqueue(rebuild_academic_plan_json, plan_name=doc.name, 
+                       enqueue_after_commit=True, job_id=f"rebuild_plan_{doc.name}")
+
+@frappe.whitelist(allow_guest=True)
+def get_plan_version(grade, season, stream=None):
+    file_name = f"plan_{slugify(grade)}_{slugify(stream or 'general')}_{slugify(season)}.json"
+    version_key = f"version:plans:{file_name}"
+    version = frappe.cache().get_value(version_key)
+    if not version:
+        modified = frappe.db.get_value("Game Academic Plan", {"grade": grade, "season": season, "stream": stream}, "modified")
+        version = int(modified.timestamp()) if modified else 1
+        frappe.cache().set_value(version_key, version)
+    return {"version": version}
+
 
 def trigger_track_update(doc, method=None):
+    """عند تعديل أو حذف تراك، نهز هيكل المادة ونتأكد من حالة المجاني"""
     if doc.subject:
-        frappe.enqueue(rebuild_subject_structure_json, subject_id=doc.subject, enqueue_after_commit=True)
+        # 1. تحديث ملف هيكل المادة (Level 2)
+        frappe.enqueue(rebuild_subject_structure_json, 
+                       subject_id=doc.subject, 
+                       enqueue_after_commit=True, 
+                       job_id=f"struct_{doc.subject}")
+        
+        # 2. ضروري: إعادة فحص حالة المجاني للمادة
+        # (لأن حذف التراك قد يعني اختفاء المحتوى المجاني الوحيد)
+        frappe.enqueue(update_subject_free_status, 
+                       subject_id=doc.subject, 
+                       enqueue_after_commit=True, 
+                       job_id=f"free_status_{doc.subject}")
 
-def trigger_subject_update(doc, method=None):
-    frappe.enqueue(rebuild_subject_structure_json, subject_id=doc.name, enqueue_after_commit=True)
-    plans = frappe.get_all("Game Plan Subject", filters={"subject": doc.name}, pluck="parent")
-    for p in plans:
-        frappe.enqueue(rebuild_academic_plan_json, plan_name=p, enqueue_after_commit=True)
-
-@frappe.whitelist(allow_guest=True) # السماح للضيوف أيضاً بالوصول للنسخة
-def get_plan_version(grade, season, stream=None):
-    """
-    API يرجع رقم نسخة الخطة (Timestamp).
-    يستخدمه الفرونت إند لفك الكاش (Cache Busting).
-    """
-    # 1. بناء اسم الملف المعياري الذي اتفقنا عليه
-    # نستخدم slugify لضمان أن الاسم متوافق مع نظام الملفات
-    file_name = f"plan_{grade}_{stream or 'general'}_{season}.json".lower().replace(" ", "_")
+def trigger_subject_deletion(doc, method=None):
+    """تُستدعى عند حذف مادة لتنظيف الملفات وتحديث الخطط"""
+    subject_id = doc.name
     
-    # مفتاح النسخة في Redis (يجب أن يكون موحداً مع دالة save_static_file)
-    version_key = f"version:plans:{file_name}"
-
-    # 2. محاولة جلب النسخة من Redis (الأسرع لـ 50 ألف مستخدم)
-    version = frappe.cache().get_value(version_key)
-
-    # 3. إذا لم تكن في الريديس (حالة نادرة أو أول مرة)، نجلبها من الداتابيز
-    if not version:
-        # نبحث عن وقت آخر تعديل للخطة الدراسية
-        modified = frappe.db.get_value("Game Academic Plan", 
-            {"grade": grade, "season": season, "stream": stream}, 
-            "modified")
-        
-        # تحويل الوقت لـ Timestamp (رقم فريد)
-        version = int(modified.timestamp()) if modified else 1
-        
-        # تخزين القيمة في Redis لكي لا نلمس الداتابيز في الطلبات القادمة
-        frappe.cache().set_value(version_key, version)
-
-    return {"version": version}
+    # 1. حذف ملف الهيكل الخاص بالمادة
+    delete_static_file("subjects", f"structure_{subject_id}.json")
+    
+    # 2. تحديث الخطط الدراسية (لإزالة المادة من القائمة)
+    # ملاحظة: هذا يعتمد على أن الرابط في Child Table لم يحذف بعد
+    plans = frappe.get_all("Game Plan Subject", filters={"subject": subject_id}, pluck="parent")
+    for p in plans:
+        frappe.enqueue(rebuild_academic_plan_json, 
+                       plan_name=p, 
+                       enqueue_after_commit=True, 
+                       job_id=f"rebuild_plan_{p}")

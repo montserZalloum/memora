@@ -29,7 +29,7 @@ doc_events = {
     },
     "Game Subject": {
         "on_update": "memora.json_builders.academic_cache.trigger_subject_update",
-        "on_trash": "memora.json_builders.academic_cache.trigger_subject_update"
+        "on_trash": "memora.json_builders.academic_cache.trigger_subject_deletion"
     },
     "Game Learning Track": {
         "on_update": "memora.json_builders.academic_cache.trigger_track_update",

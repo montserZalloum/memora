@@ -9,6 +9,7 @@
   "unit",
   "is_free_preview",
   "is_linear",
+  "is_published",
   "description"
  ],
  "fields": [
@@ -43,12 +44,18 @@
    "fieldname": "description",
    "fieldtype": "Small Text",
    "label": "Description"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_published",
+   "fieldtype": "Check",
+   "label": "is Published"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-18 09:58:59.362006",
+ "modified": "2026-01-22 17:03:36.688581",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Topic",
