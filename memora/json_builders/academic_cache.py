@@ -202,22 +202,25 @@ def rebuild_lesson_detail_json(lesson_id):
 
 def trigger_lesson_update(doc, method=None):
     lesson_id = doc.name
-    if method == "on_trash":
+    if method == "on_trash" or not doc.is_published:
         delete_static_file("lessons", f"detail_{lesson_id}.json")
     else:
         frappe.enqueue(rebuild_lesson_detail_json, lesson_id=lesson_id, 
                        enqueue_after_commit=True, job_id=f"lesson_detail_{lesson_id}")
 
+    # 2. التحديث الشلالي للأب المباشر (الحاوية)
+    # إذا كان الدرس يتبع لتوبيك
     if doc.topic:
         frappe.enqueue(rebuild_container_content_json, container_type="Topic", container_id=doc.topic, 
                        enqueue_after_commit=True, job_id=f"topic_content_{doc.topic}")
+    # إذا كان الدرس يتبع لوحدة مباشرة (Lesson Based)
     elif doc.unit:
         frappe.enqueue(rebuild_container_content_json, container_type="Unit", container_id=doc.unit, 
                        enqueue_after_commit=True, job_id=f"unit_content_{doc.unit}")
 
 def trigger_topic_update(doc, method=None):
     topic_id = doc.name
-    if method == "on_trash":
+    if method == "on_trash" or not doc.is_published:
         delete_static_file("topics", f"content_{topic_id}.json")
     else:
         frappe.enqueue(rebuild_container_content_json, container_type="Topic", container_id=topic_id, 
