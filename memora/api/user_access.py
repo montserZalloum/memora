@@ -1,5 +1,11 @@
 import frappe
 import json
+import re
+
+def slugify(text: str) -> str:
+    if not text:
+        return ""
+    return re.sub(r'\s+', '_', text.lower())
 
 # مفتاح الريديس لكل طالب
 def get_cache_key(user):
@@ -74,27 +80,55 @@ def build_user_access_bundle(user):
         "plan_version": get_student_plan_version(user)
     }
 
+@frappe.whitelist(allow_guest=True)
 def get_student_plan_version(user):
-    """جلب نسخة الخطة الحالية من Redis أو DB"""
-    profile = frappe.db.get_value("Player Profile", {"user": user}, 
-        ["current_grade", "season", "current_stream"], as_dict=True)
+    """جلب نسخة الخطة - يجب أن تطابق منطق البناء 100%"""
     
+    # 1. جلب بيانات الطالب
+    if frappe.session.user != "Guest":
+        # للطالب المسجل
+        profile = frappe.db.get_value("Player Profile", {"user": user}, 
+            ["current_grade", "season", "current_stream"], as_dict=True)
+    else:
+        # للزائر (Guest) - يمكننا تمرير المعطيات كـ arguments للدالة بدلاً من Profile
+        # سأفترض هنا أنك تمررها في الـ args، لكن لنركز على منطق الاسم الآن
+        return 1
+
     if not profile: return 1
     
-    # بناء اسم المفتاح بناءً على تخصص الطالب
-    file_slug = f"plan_{profile.current_grade}_{profile.current_stream or 'general'}_{profile.season}".lower().replace(" ", "_")
-    version_key = f"version:plans:{file_slug}"
+    # 2. بناء اسم الملف بنفس طريقة دالة البناء بالضبط (Slugify)
+    grade_slug = slugify(profile.current_grade)
+    stream_slug = slugify(profile.current_stream or 'general')
+    season_slug = slugify(profile.season)
     
-    # جلب من Redis أولاً لضمان الـ 29ms التي رأيناها سابقاً
+    # ✅ الاسم يجب أن يكون مطابقاً لما تم حفظه: شرطات (-) وامتداد (.json)
+    file_name = f"plan_{grade_slug}_{stream_slug}_{season_slug}.json"
+    frappe.log_error(
+        title="Academic Cache Debug",
+        message=f"DEBUG WRITER: {file_name}"
+    )
+    
+    # 3. مفتاح Redis
+    version_key = f"version:plans:{file_name}"
+    
+    # 4. جلب النسخة
     version = frappe.cache().get_value(version_key)
     
+    # 5. في حال عدم وجود كاش (Fallback)
     if not version:
-        # Fallback للداتابيز في حال ضياع كاش الريديس
         modified = frappe.db.get_value("Game Academic Plan", 
             {"grade": profile.current_grade, "season": profile.season, "stream": profile.current_stream}, 
             "modified")
+            
         version = int(modified.timestamp()) if modified else 1
+        
+        # تخزين القيمة في Redis للمستقبل
         frappe.cache().set_value(version_key, version)
+
+    frappe.log_error(
+        title="Academic Cache Debug",
+        message=f"DEBUG WRITER: {file_name}"
+    )
         
     return version
 

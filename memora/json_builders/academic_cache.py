@@ -1,10 +1,15 @@
 import frappe
 import json
 import os
-from slugify import slugify
+import re
 
 # --- الإعدادات الثوابت ---
 BASE_STATIC_PATH = 'static_api'
+
+def slugify(text: str) -> str:
+    if not text:
+        return ""
+    return re.sub(r'\s+', '_', text.lower())
 
 def save_static_file(folder, file_name, data):
     try:
@@ -84,6 +89,8 @@ def set_subject_free_status(subject_id, new_status):
 def rebuild_academic_plan_json(plan_name):
     if not frappe.db.exists("Game Academic Plan", plan_name): return
     plan = frappe.get_doc("Game Academic Plan", plan_name)
+
+    now = frappe.utils.now()
     
     subject_names = [s.subject for s in plan.subjects]
     subjects_map = {}
@@ -109,13 +116,15 @@ def rebuild_academic_plan_json(plan_name):
     data = {
         "metadata": {
             "grade": plan.grade, "stream": plan.stream, "season": plan.season, 
-            "updated_at": str(frappe.utils.now())
+            "updated_at": str(now)
         },
         "subjects": subjects_list
     }
     # استخدام slugify لضمان اسم ملف متوافق
     file_name = f"plan_{slugify(plan.grade)}_{slugify(plan.stream or 'general')}_{slugify(plan.season)}.json"
     save_static_file("plans", file_name, data)
+    frappe.db.set_value("Game Academic Plan", plan_name, "modified", now, update_modified=False)
+
 
 def rebuild_subject_structure_json(subject_id):
     if not frappe.db.exists("Game Subject", subject_id): return
