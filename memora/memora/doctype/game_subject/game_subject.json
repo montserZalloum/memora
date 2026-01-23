@@ -11,7 +11,8 @@
   "is_published",
   "is_paid",
   "full_price",
-  "discounted_price"
+  "discounted_price",
+  "has_free_content"
  ],
  "fields": [
   {
@@ -48,12 +49,19 @@
    "fieldname": "discounted_price",
    "fieldtype": "Currency",
    "label": "Discounted Price"
+  },
+  {
+   "default": "0",
+   "fieldname": "has_free_content",
+   "fieldtype": "Check",
+   "label": "Has Free Content",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-22 17:35:04.257574",
+ "modified": "2026-01-23 12:32:45.360212",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Game Subject",

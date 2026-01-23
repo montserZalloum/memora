@@ -161,11 +161,35 @@ def rebuild_container_content_json(container_type, container_id):
 
     filter_key = "topic" if container_type == "Topic" else "unit"
     lessons = frappe.get_all("Game Lesson", filters={filter_key: container_id,"is_published": 1}, 
-        fields=["name", "title", "lesson_type", "modified"], order_by="idx asc")
+        fields=["name", "title", "modified"], order_by="idx asc")
 
-    for lesson in lessons:
-        lesson["version"] = int(lesson.modified.timestamp())
-        del lesson["modified"]
+    if lessons:
+        # 2. جلب جميع الـ stages لكل هذه الدروس في استعلام واحد
+        lesson_names = [d.name for d in lessons]
+        
+        # نأتي باسم الـ DocType الخاص بالـ Child Table برمجياً
+        child_doctype = frappe.get_meta("Game Lesson").get_field("stages").options
+        
+        all_stages = frappe.get_all(child_doctype,
+            filters={
+                "parent": ["in", lesson_names],
+                "parenttype": "Game Lesson",
+                "parentfield": "stages"
+            },
+            fields=["*"], # يمكنك تحديد حقول معينة بدلاً من * لتقليل حجم الملف
+            order_by="idx asc"
+        )
+
+        # 3. تنظيم الـ stages في قاموس (Dictionary) ليسهل ربطها
+        from collections import defaultdict
+        stages_by_lesson = defaultdict(list)
+        for stage in all_stages:
+            stages_by_lesson[stage.parent].append(stage)
+
+
+        for lesson in lessons:
+            lesson["version"] = int(lesson.modified.timestamp())
+            del lesson["modified"]
 
     save_static_file(folder, f"content_{container_id}.json", {
         "id": container_id,
