@@ -103,10 +103,6 @@ def get_student_plan_version(user):
     
     # ✅ الاسم يجب أن يكون مطابقاً لما تم حفظه: شرطات (-) وامتداد (.json)
     file_name = f"plan_{grade_slug}_{stream_slug}_{season_slug}.json"
-    frappe.log_error(
-        title="Academic Cache Debug",
-        message=f"DEBUG WRITER: {file_name}"
-    )
     
     # 3. مفتاح Redis
     version_key = f"version:plans:{file_name}"
@@ -125,10 +121,6 @@ def get_student_plan_version(user):
         # تخزين القيمة في Redis للمستقبل
         frappe.cache().set_value(version_key, version)
 
-    frappe.log_error(
-        title="Academic Cache Debug",
-        message=f"DEBUG WRITER: {file_name}"
-    )
         
     return version
 

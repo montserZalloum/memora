@@ -129,6 +129,7 @@ def rebuild_academic_plan_json(plan_name):
 def rebuild_subject_structure_json(subject_id):
     if not frappe.db.exists("Game Subject", subject_id): return
     
+    # 1. جلب التراكات
     tracks = frappe.get_all("Game Learning Track", 
         filters={"subject": subject_id, "is_published": 1}, 
         fields=["name", "track_name", "is_paid"], order_by="idx asc")
@@ -138,19 +139,50 @@ def rebuild_subject_structure_json(subject_id):
         return
 
     track_names = [t.name for t in tracks]
+
+    # 2. جلب الوحدات (Bulk Query)
     all_units = frappe.get_all("Game Unit", 
         filters={"learning_track": ["in", track_names], "is_published": 1}, 
         fields=["name", "title", "is_free_preview", "structure_type", "modified", "learning_track"], 
         order_by="idx asc")
 
+    if not all_units:
+        save_static_file("subjects", f"structure_{subject_id}.json", {"subject_id": subject_id, "tracks": tracks})
+        return
+
+    # =================================================================================
+    # 🔥 التعديل الجوهري: فحص التوبيكات المجانية دفعة واحدة
+    # =================================================================================
+    # نستخرج قائمة بأسماء الوحدات التي بداخلها "توبيك مجاني واحد على الأقل"
+    unit_names = [u.name for u in all_units]
+    
+    # نستخدم set للسرعة القصوى في البحث
+    units_containing_free_topics = set(frappe.db.sql("""
+        SELECT unit FROM `tabGame Topic`
+        WHERE unit IN %s 
+        AND is_free_preview = 1 
+        AND is_published = 1
+    """, (unit_names,), pluck=True))
+    # =================================================================================
+
     units_by_track = {}
     for u in all_units:
+        # المنطق الجديد: الوحدة تعتبر مجانية للعرض إذا كانت هي مجانية OR تحتوي توبيك مجاني
+        if u.is_free_preview == 1 or u.name in units_containing_free_topics:
+            u["is_free_preview"] = 1
+        else:
+            u["is_free_preview"] = 0
+
+        # تحويل التاريخ وحذفه
         u["version"] = int(u.modified.timestamp())
         del u["modified"]
+
+        # التجميع
         if u.learning_track not in units_by_track:
             units_by_track[u.learning_track] = []
         units_by_track[u.learning_track].append(u)
 
+    # 4. دمج البيانات النهائية
     for t in tracks:
         t["units"] = units_by_track.get(t.name, [])
 
@@ -253,23 +285,34 @@ def trigger_lesson_update(doc, method=None):
 
 def trigger_topic_update(doc, method=None):
     topic_id = doc.name
+    
+    # 1. تحديث أو حذف ملف التوبيك نفسه (Level 3)
     if method == "on_trash" or not doc.is_published:
         delete_static_file("topics", f"content_{topic_id}.json")
     else:
         frappe.enqueue(rebuild_container_content_json, container_type="Topic", container_id=topic_id, 
                        enqueue_after_commit=True, job_id=f"topic_content_{topic_id}")
     
-    # الحصول على subject_id بضربة SQL نظيفة
+    # 2. الحصول على subject_id
     res = frappe.db.sql("""
-        SELECT lt.subject FROM `tabGame Unit` u
+        SELECT lt.subject 
+        FROM `tabGame Unit` u
         JOIN `tabGame Learning Track` lt ON u.learning_track = lt.name
         WHERE u.name = %s
     """, (doc.unit,), as_dict=True)
     
     if res:
         s_id = res[0].subject
+        
+        # 🔥 الإضافة السحرية: تحديث وقت تعديل الوحدة الأم يدوياً
+        # هذا سيجعل الـ version يتغير في ملف الهيكل الجديد
+        frappe.db.sql("UPDATE `tabGame Unit` SET modified = NOW() WHERE name = %s", (doc.unit,))
+        
+        # 3. الآن نهز الهيكل، وسيأخذ الوقت الجديد
         frappe.enqueue(rebuild_subject_structure_json, subject_id=s_id, 
                        enqueue_after_commit=True, job_id=f"struct_{s_id}")
+        
+        # 4. فحص المجاني للمادة
         frappe.enqueue(update_subject_free_status, subject_id=s_id, 
                        enqueue_after_commit=True, job_id=f"free_status_{s_id}")
 
