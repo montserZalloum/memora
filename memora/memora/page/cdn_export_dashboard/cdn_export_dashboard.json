@@ -1,0 +1,20 @@
+{
+  "creation": "2026-01-25 13:35:00.000000",
+  "docstatus": 0,
+  "doctype": "Page",
+  "icon": "icon-dashboard",
+  "idx": 0,
+  "modified": "2026-01-25 13:35:00.000000",
+  "modified_by": "Administrator",
+  "module": "Memora",
+  "name": "cdn-export-dashboard",
+  "owner": "Administrator",
+  "page_length": 0,
+  "roles": [
+    {
+      "role": "System Manager"
+    }
+  ],
+  "show_sidebar": 0,
+  "title": "CDN Export Dashboard"
+}

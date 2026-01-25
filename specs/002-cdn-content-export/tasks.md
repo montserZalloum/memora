@@ -57,14 +57,14 @@ Based on plan.md, this is a Frappe app with structure:
 
 ### Core Services
 
-- [ ] T013 Implement CDN client factory in memora/services/cdn_export/cdn_uploader.py with get_cdn_client() and test_connection()
-- [ ] T014 [P] Implement Redis queue management in memora/services/cdn_export/change_tracker.py with add_plan_to_queue(), get_pending_plans(), MariaDB fallback
-- [ ] T015 [P] Implement Redis locking in memora/services/cdn_export/change_tracker.py with acquire_lock(), release_lock(), move_to_dead_letter()
+- [X] T013 Implement CDN client factory in memora/services/cdn_export/cdn_uploader.py with get_cdn_client() and test_connection()
+- [X] T014 [P] Implement Redis queue management in memora/services/cdn_export/change_tracker.py with add_plan_to_queue(), get_pending_plans(), MariaDB fallback
+- [X] T015 [P] Implement Redis locking in memora/services/cdn_export/change_tracker.py with acquire_lock(), release_lock(), move_to_dead_letter()
 
 ### Unit Tests (TDD Required)
 
-- [ ] T016 [P] Write unit tests for access calculator (FAIL first) in memora/tests/unit/cdn_export/test_access_calculator.py covering all access level scenarios
-- [ ] T017 [P] Write unit tests for dependency resolver (FAIL first) in memora/tests/unit/cdn_export/test_dependency_resolver.py covering hierarchy traversal
+- [X] T016 [P] Write unit tests for access calculator (FAIL first) in memora/tests/unit/cdn_export/test_access_calculator.py covering all access level scenarios
+- [X] T017 [P] Write unit tests for dependency resolver (FAIL first) in memora/tests/unit/cdn_export/test_dependency_resolver.py covering hierarchy traversal
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 
@@ -78,13 +78,13 @@ Based on plan.md, this is a Frappe app with structure:
 
 ### Implementation for User Story 1
 
-- [ ] T018 [US1] Implement dependency resolver in memora/services/cdn_export/dependency_resolver.py with get_affected_plan_ids() per research.md
-- [ ] T019 [US1] Implement JSON generator base in memora/services/cdn_export/json_generator.py with generate_manifest(), generate_subject_json(), generate_unit_json(), generate_lesson_json()
-- [ ] T020 [US1] Implement upload functions in memora/services/cdn_export/cdn_uploader.py with upload_json(), delete_json(), delete_folder()
-- [ ] T021 [US1] Implement batch processor in memora/services/cdn_export/batch_processor.py with process_pending_plans(), rebuild_plan() orchestration
-- [ ] T022 [US1] Add doc_events to memora/hooks.py for content DocTypes (Subject, Track, Unit, Topic, Lesson, Lesson Stage) calling change_tracker handlers
-- [ ] T023 [US1] Add scheduler_events to memora/hooks.py with cron "*/5 * * * *" calling batch_processor.process_pending_plans
-- [ ] T024 [US1] Add threshold trigger check in change_tracker.py to enqueue immediate processing when 50 plans reached
+- [X] T018 [US1] Implement dependency resolver in memora/services/cdn_export/dependency_resolver.py with get_affected_plan_ids() per research.md
+- [X] T019 [US1] Implement JSON generator base in memora/services/cdn_export/json_generator.py with generate_manifest(), generate_subject_json(), generate_unit_json(), generate_lesson_json()
+- [X] T020 [US1] Implement upload functions in memora/services/cdn_export/cdn_uploader.py with upload_json(), delete_json(), delete_folder()
+- [X] T021 [US1] Implement batch processor in memora/services/cdn_export/batch_processor.py with process_pending_plans(), rebuild_plan() orchestration
+- [X] T022 [US1] Add doc_events to memora/hooks.py for content DocTypes (Subject, Track, Unit, Topic, Lesson, Lesson Stage) calling change_tracker handlers
+- [X] T023 [US1] Add scheduler_events to memora/hooks.py with cron "*/5 * * * *" calling batch_processor.process_pending_plans
+- [X] T024 [US1] Add threshold trigger check in change_tracker.py to enqueue immediate processing when 50 plans reached
 
 **Checkpoint**: User Story 1 complete - content changes trigger CDN sync within 5 minutes
 
@@ -98,11 +98,11 @@ Based on plan.md, this is a Frappe app with structure:
 
 ### Implementation for User Story 2
 
-- [ ] T025 [US2] Implement access calculator in memora/services/cdn_export/access_calculator.py with calculate_access_level() per research.md (must pass T016 tests)
-- [ ] T026 [US2] Implement override processor in memora/services/cdn_export/access_calculator.py with apply_plan_overrides() handling Hide, Set Free, Set Sold Separately actions
-- [ ] T027 [US2] Update json_generator.py to call access_calculator for each node and exclude hidden content
-- [ ] T028 [US2] Update json_generator.py to inject access control fields (is_published, access_level, required_item, is_sold_separately, parent_item_required) per contracts/
-- [ ] T029 [US2] Add doc_events for Memora Plan Override to hooks.py triggering plan rebuild on override changes
+- [X] T025 [US2] Implement access calculator in memora/services/cdn_export/access_calculator.py with calculate_access_level() per research.md (must pass T016 tests)
+- [X] T026 [US2] Implement override processor in memora/services/cdn_export/access_calculator.py with apply_plan_overrides() handling Hide, Set Free, Set Sold Separately actions
+- [X] T027 [US2] Update json_generator.py to call access_calculator for each node and exclude hidden content
+- [X] T028 [US2] Update json_generator.py to inject access control fields (is_published, access_level, required_item, is_sold_separately, parent_item_required) per contracts/
+- [X] T029 [US2] Add doc_events for Memora Plan Override to hooks.py triggering plan rebuild on override changes
 
 **Checkpoint**: User Stories 1 AND 2 complete - plan-specific content with correct access levels
 
@@ -116,11 +116,11 @@ Based on plan.md, this is a Frappe app with structure:
 
 ### Implementation for User Story 3
 
-- [ ] T030 [US3] Implement on_content_delete handler in memora/services/cdn_export/change_tracker.py handling on_trash and after_delete events
-- [ ] T031 [US3] Implement on_restore handler in change_tracker.py treating restore as new insert
-- [ ] T032 [US3] Implement delete_plan_folder() in cdn_uploader.py for complete plan deletion
-- [ ] T033 [US3] Add on_trash, after_delete, on_restore events to hooks.py doc_events for all content DocTypes
-- [ ] T034 [US3] Add plan deletion handling to hooks.py for Memora Academic Plan on_trash and after_delete
+- [X] T030 [US3] Implement on_content_delete handler in memora/services/cdn_export/change_tracker.py handling on_trash and after_delete events
+- [X] T031 [US3] Implement on_restore handler in change_tracker.py treating restore as new insert
+- [X] T032 [US3] Implement delete_plan_folder() in cdn_uploader.py for complete plan deletion
+- [X] T033 [US3] Add on_trash, after_delete, on_restore events to hooks.py doc_events for all content DocTypes
+- [X] T034 [US3] Add plan deletion handling to hooks.py for Memora Academic Plan on_trash and after_delete
 
 **Checkpoint**: User Story 3 complete - deletions properly clean up CDN
 
@@ -134,10 +134,10 @@ Based on plan.md, this is a Frappe app with structure:
 
 ### Implementation for User Story 4
 
-- [ ] T035 [US4] Implement signed URL generation in memora/services/cdn_export/cdn_uploader.py with generate_signed_url() for video content (4-hour expiry)
-- [ ] T036 [US4] Update json_generator.py generate_lesson_json() to replace video URLs in stage config with signed URLs
-- [ ] T037 [US4] Validate generated JSON against contracts/manifest.schema.json, subject.schema.json, unit.schema.json, lesson.schema.json in batch_processor.py
-- [ ] T038 [P] [US4] Write contract tests in memora/tests/contract/test_json_schemas.py validating output against JSON schemas
+- [X] T035 [US4] Implement signed URL generation in memora/services/cdn_export/cdn_uploader.py with generate_signed_url() for video content (4-hour expiry)
+- [X] T036 [US4] Update json_generator.py generate_lesson_json() to replace video URLs in stage config with signed URLs
+- [X] T037 [US4] Validate generated JSON against contracts/manifest.schema.json, subject.schema.json, unit.schema.json, lesson.schema.json in batch_processor.py
+- [X] T038 [P] [US4] Write contract tests in memora/tests/contract/test_json_schemas.py validating output against JSON schemas
 
 **Checkpoint**: User Story 4 complete - full access control metadata in all JSON
 
@@ -151,10 +151,10 @@ Based on plan.md, this is a Frappe app with structure:
 
 ### Implementation for User Story 5
 
-- [ ] T039 [US5] Implement search indexer in memora/services/cdn_export/search_indexer.py with generate_search_index()
-- [ ] T040 [US5] Implement index sharding logic in search_indexer.py splitting by subject when >500 lessons
-- [ ] T041 [US5] Update batch_processor.py rebuild_plan() to call search_indexer after content JSON generation
-- [ ] T042 [US5] Validate generated search index against contracts/search_index.schema.json
+- [X] T039 [US5] Implement search indexer in memora/services/cdn_export/search_indexer.py with generate_search_index()
+- [X] T040 [US5] Implement index sharding logic in search_indexer.py splitting by subject when >500 lessons
+- [X] T041 [US5] Update batch_processor.py rebuild_plan() to call search_indexer after content JSON generation
+- [X] T042 [US5] Validate generated search index against contracts/search_index.schema.json
 
 **Checkpoint**: User Story 5 complete - search index available for all plans
 
@@ -168,10 +168,10 @@ Based on plan.md, this is a Frappe app with structure:
 
 ### Implementation for User Story 6
 
-- [ ] T043 [US6] Implement cache purge in memora/services/cdn_export/cdn_uploader.py with purge_cdn_cache() calling Cloudflare API
-- [ ] T044 [US6] Update cdn_uploader.py upload_json() to collect uploaded URLs for batch purge
-- [ ] T045 [US6] Update batch_processor.py to call purge_cdn_cache() after all uploads complete
-- [ ] T046 [US6] Implement version timestamp generation in json_generator.py for manifest version field
+- [X] T043 [US6] Implement cache purge in memora/services/cdn_export/cdn_uploader.py with purge_cdn_cache() calling Cloudflare API
+- [X] T044 [US6] Update cdn_uploader.py upload_json() to collect uploaded URLs for batch purge
+- [X] T045 [US6] Update batch_processor.py to call purge_cdn_cache() after all uploads complete
+- [X] T046 [US6] Implement version timestamp generation in json_generator.py for manifest version field
 
 **Checkpoint**: User Story 6 complete - cache invalidation within 60 seconds
 
@@ -185,10 +185,10 @@ Based on plan.md, this is a Frappe app with structure:
 
 ### Implementation for User Story 7
 
-- [ ] T047 [US7] Implement CDN Sync Log creation in batch_processor.py for each plan build (status transitions per data-model.md)
-- [ ] T048 [US7] Implement retry logic in batch_processor.py with exponential backoff (3 retries, then dead-letter)
-- [ ] T049 [US7] Create admin API endpoints in memora/api/cdn_admin.py with get_queue_status(), get_recent_failures(), retry_dead_letter()
-- [ ] T050 [US7] Add dashboard page at memora/memora/page/cdn_export_dashboard/ showing queue count, recent logs, dead-letter items
+- [X] T047 [US7] Implement CDN Sync Log creation in batch_processor.py for each plan build (status transitions per data-model.md)
+- [X] T048 [US7] Implement retry logic in batch_processor.py with exponential backoff (3 retries, then dead-letter)
+- [X] T049 [US7] Create admin API endpoints in memora/api/cdn_admin.py with get_queue_status(), get_recent_failures(), retry_dead_letter()
+- [X] T050 [US7] Add dashboard page at memora/memora/page/cdn_export_dashboard/ showing queue count, recent logs, dead-letter items
 
 **Checkpoint**: User Story 7 complete - full monitoring visibility
 
