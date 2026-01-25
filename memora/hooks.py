@@ -143,34 +143,189 @@ after_migrate = [
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+# CDN CONTENT EXPORT - Document Event Handlers
+# ============================================
+# These events track changes to educational content and trigger CDN synchronization.
+#
+# FLOW:
+#   1. Content change (on_update, on_trash, after_delete, on_restore)
+#   2. Handler queues affected plans to Redis queue or fallback MariaDB
+#   3. Scheduler processes queue every 5 minutes or at 50-plan threshold
+#   4. Plans rebuild JSON files and upload to CDN
+#   5. Cache is purged on CDN (Cloudflare)
+#
+# HANDLERS:
+#   - on_update: Content modified - queue plans for rebuild
+#   - on_trash: Content marked for deletion - queue plans for rebuild
+#   - after_delete: Content permanently deleted - queue plans for rebuild
+#   - on_restore: Trashed content restored - queue plans for rebuild (treats as new)
+#
+# ERROR HANDLING:
+#   - All handlers catch exceptions and log via frappe.log_error()
+#   - Redis queue operations have MariaDB fallback (CDN Sync Log table)
+#   - Locks prevent concurrent plan builds
+#
+# DEPENDENCY RESOLUTION:
+#   - Uses get_affected_plan_ids() from dependency_resolver
+#   - Walks up content hierarchy (Lesson -> Topic -> Unit -> Track -> Subject -> Plan)
+#   - Prevents duplicate plan entries via Redis Set
+#
+doc_events = {
+	# SUBJECT CONTENT HIERARCHY
+	# ========================
+	# Changes to subjects affect all plans using that subject
+	"Memora Subject": {
+		# on_update: Triggered when subject name, description, image, access fields change
+		"on_update": "memora.services.cdn_export.change_tracker.on_subject_update",
+		# on_trash: Subject moved to trash - queues plans for rebuild
+		"on_trash": "memora.services.cdn_export.change_tracker.on_subject_delete",
+		# after_delete: Subject permanently deleted from database - queues plans for rebuild
+		"after_delete": "memora.services.cdn_export.change_tracker.on_subject_delete",
+		# on_restore: Trashed subject restored - treats as new content, queues plans
+		"on_restore": "memora.services.cdn_export.change_tracker.on_content_restore"
+	},
+
+	# TRACK CONTENT HIERARCHY
+	# ======================
+	# Tracks belong to subjects; changes affect parent subject's plans
+	"Memora Track": {
+		# on_update: Track properties or access fields changed
+		"on_update": "memora.services.cdn_export.change_tracker.on_track_update",
+		# on_trash/after_delete: Track removed - parent unit references updated on rebuild
+		"on_trash": "memora.services.cdn_export.change_tracker.on_track_delete",
+		"after_delete": "memora.services.cdn_export.change_tracker.on_track_delete",
+		"on_restore": "memora.services.cdn_export.change_tracker.on_content_restore"
+	},
+
+	# UNIT CONTENT HIERARCHY
+	# =====================
+	# Units belong to tracks; changes affect ancestor subject's plans
+	"Memora Unit": {
+		# on_update: Unit name, description, or fields changed
+		"on_update": "memora.services.cdn_export.change_tracker.on_unit_update",
+		# on_trash/after_delete: Unit removed - parent track references cleaned up
+		"on_trash": "memora.services.cdn_export.change_tracker.on_unit_delete",
+		"after_delete": "memora.services.cdn_export.change_tracker.on_unit_delete",
+		"on_restore": "memora.services.cdn_export.change_tracker.on_content_restore"
+	},
+
+	# TOPIC CONTENT HIERARCHY
+	# ======================
+	# Topics belong to units; changes affect ancestor subject's plans
+	"Memora Topic": {
+		# on_update: Topic name or fields changed
+		"on_update": "memora.services.cdn_export.change_tracker.on_topic_update",
+		# on_trash/after_delete: Topic removed - unit's topic list updated
+		"on_trash": "memora.services.cdn_export.change_tracker.on_topic_delete",
+		"after_delete": "memora.services.cdn_export.change_tracker.on_topic_delete",
+		"on_restore": "memora.services.cdn_export.change_tracker.on_content_restore"
+	},
+
+	# LESSON CONTENT (LEAF NODE)
+	# ==========================
+	# Lessons belong to topics; most common changes trigger plan rebuilds
+	"Memora Lesson": {
+		# on_update: Lesson content, title, or stages modified
+		"on_update": "memora.services.cdn_export.change_tracker.on_lesson_update",
+		# on_trash/after_delete: Lesson removed - topic removes from lessons list
+		"on_trash": "memora.services.cdn_export.change_tracker.on_lesson_delete",
+		"after_delete": "memora.services.cdn_export.change_tracker.on_lesson_delete",
+		"on_restore": "memora.services.cdn_export.change_tracker.on_content_restore"
+	},
+
+	# LESSON STAGE CONTENT
+	# ====================
+	# Lesson stages (child table) contain video configs and interactive content
+	"Memora Lesson Stage": {
+		# on_update: Stage content, video URL, or quiz changed
+		"on_update": "memora.services.cdn_export.change_tracker.on_lesson_stage_update",
+		# on_trash/after_delete: Stage removed from lesson - triggers parent lesson rebuild
+		"on_trash": "memora.services.cdn_export.change_tracker.on_lesson_stage_delete",
+		"after_delete": "memora.services.cdn_export.change_tracker.on_lesson_stage_delete",
+		"on_restore": "memora.services.cdn_export.change_tracker.on_content_restore"
+	},
+
+	# PLAN MANAGEMENT
+	# ===============
+	# Academic Plans reference subject content; plan changes trigger own rebuild
+	"Memora Academic Plan": {
+		# on_update: Plan published status, grade, season, or subject assignments changed
+		"on_update": "memora.services.cdn_export.change_tracker.on_plan_update",
+		# on_trash/after_delete: Plan deleted - entire plan folder removed from CDN
+		"on_trash": "memora.services.cdn_export.change_tracker.on_plan_delete",
+		"after_delete": "memora.services.cdn_export.change_tracker.on_plan_delete"
+	},
+
+	# PLAN ACCESS OVERRIDES
+	# =====================
+	# Plan overrides (Hide, Set Free, Set Sold Separately) affect access levels in JSON
+	"Memora Plan Override": {
+		# on_update: Override action or target changed - parent plan requires rebuild
+		"on_update": "memora.services.cdn_export.change_tracker.on_override_update",
+		# on_trash: Override removed - parent plan access levels revert, trigger rebuild
+		"on_trash": "memora.services.cdn_export.change_tracker.on_override_update"
+	}
+}
 
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"memora.tasks.all"
-# 	],
-# 	"daily": [
-# 		"memora.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"memora.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"memora.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"memora.tasks.monthly"
-# 	],
-# }
+# CDN CONTENT EXPORT - Scheduler Events
+# ======================================
+# Background job processing for CDN content generation and upload
+#
+# SCHEDULER: process_pending_plans
+# --------------------------------
+# - Frequency: Every hour (via Frappe hourly scheduler)
+# - NOTE: The batch_interval_minutes in CDN Settings is for documentation only.
+#   Actual frequency is hourly per Frappe scheduler constraints.
+#   For more frequent processing, modify this to "All" or use Cron frequency.
+# - Max plans per run: 10 (prevents overload)
+# - Early trigger: Processes immediately if 50+ plans queued (threshold)
+#   This happens via frappe.enqueue() call in change_tracker.py
+# - Processing:
+#   1. Acquire exclusive lock for each plan (prevents concurrent builds)
+#   2. Create CDN Sync Log entry with "Processing" status
+#   3. Generate JSON files (manifest, subjects, units, lessons, search index)
+#   4. Validate JSON against schemas
+#   5. Upload files to S3/Cloudflare R2
+#   6. Purge Cloudflare cache (if configured)
+#   7. Update CDN Sync Log with success/failure status
+#
+# RETRY LOGIC:
+# - Retry 1: 2 minutes delay (exponential backoff: 2^1)
+# - Retry 2: 4 minutes delay (exponential backoff: 2^2)
+# - Retry 3: 8 minutes delay (exponential backoff: 2^3)
+# - After 3 failures: Move to dead-letter queue for manual intervention
+#
+# QUEUE MANAGEMENT:
+# - Primary: Redis Set "cdn_export:pending_plans" (fast, in-memory)
+# - Fallback: CDN Sync Log table with is_fallback=1 flag (when Redis down)
+# - Dead-letter: Redis Hash "cdn_export:dead_letter" (failed plans)
+# - Locking: Redis key "cdn_export:lock:{plan_id}" with 5-min TTL
+#
+# ERROR HANDLING:
+# - All errors logged to frappe error log
+# - Sync status tracked in CDN Sync Log DocType
+# - Failed uploads don't block other plan processing
+# - Cache purge failures non-blocking (content still updated)
+#
+# MONITORING:
+# - View status: Memora > CDN Export Status (dashboard)
+# - View logs: Memora > CDN Sync Log (list view)
+# - Dead-letter: API endpoint /api/method/memora.api.cdn_admin.get_queue_status
+#
+# CONFIGURATION (via CDN Settings):
+# - batch_interval_minutes: For future use - currently fixed to hourly by Frappe scheduler (default: 5)
+# - batch_threshold: Immediate processing when queue >= this via frappe.enqueue() (default: 50)
+# - enabled: Master switch to enable/disable CDN export (default: 0)
+# NOTE: For more frequent processing, deploy custom scheduler or use "All" frequency
+#
+scheduler_events = {
+	"Hourly": [
+		"memora.services.cdn_export.batch_processor.process_pending_plans"
+	]
+}
 
 # Testing
 # -------

@@ -1,0 +1,121 @@
+{
+  "actions": [],
+  "allow_rename": 0,
+  "autoname": "hash",
+  "creation": "2026-01-25 10:00:00.000000",
+  "doctype": "DocType",
+  "editable_grid": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "plan_id",
+    "status",
+    "started_at",
+    "completed_at",
+    "files_uploaded",
+    "files_deleted",
+    "error_message",
+    "retry_count",
+    "next_retry_at",
+    "is_fallback",
+    "triggered_by"
+  ],
+  "fields": [
+    {
+      "fieldname": "plan_id",
+      "fieldtype": "Link",
+      "label": "Plan",
+      "options": "Memora Academic Plan",
+      "reqd": 1,
+      "search_index": 1
+    },
+    {
+      "default": "Queued",
+      "fieldname": "status",
+      "fieldtype": "Select",
+      "label": "Status",
+      "options": "Queued\nProcessing\nSuccess\nFailed\nDead Letter",
+      "reqd": 1,
+      "search_index": 1
+    },
+    {
+      "fieldname": "started_at",
+      "fieldtype": "Datetime",
+      "label": "Started At"
+    },
+    {
+      "fieldname": "completed_at",
+      "fieldtype": "Datetime",
+      "label": "Completed At"
+    },
+    {
+      "default": "0",
+      "fieldname": "files_uploaded",
+      "fieldtype": "Int",
+      "label": "Files Uploaded"
+    },
+    {
+      "default": "0",
+      "fieldname": "files_deleted",
+      "fieldtype": "Int",
+      "label": "Files Deleted"
+    },
+    {
+      "fieldname": "error_message",
+      "fieldtype": "Small Text",
+      "label": "Error Message"
+    },
+    {
+      "default": "0",
+      "fieldname": "retry_count",
+      "fieldtype": "Int",
+      "label": "Retry Count"
+    },
+    {
+      "fieldname": "next_retry_at",
+      "fieldtype": "Datetime",
+      "label": "Next Retry At"
+    },
+    {
+      "default": "0",
+      "fieldname": "is_fallback",
+      "fieldtype": "Check",
+      "label": "Is Fallback",
+      "search_index": 1
+    },
+    {
+      "fieldname": "triggered_by",
+      "fieldtype": "Select",
+      "label": "Triggered By",
+      "options": "Scheduler\nThreshold\nManual\nFallback Recovery"
+    }
+  ],
+  "grid_page_length": 50,
+  "index_web_pages_for_search": 0,
+  "links": [],
+  "modified": "2026-01-25 10:00:00.000000",
+  "modified_by": "Administrator",
+  "module": "Memora",
+  "name": "CDN Sync Log",
+  "naming_rule": "Random",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "create": 1,
+      "delete": 0,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "System Manager",
+      "share": 1,
+      "write": 1
+    }
+  ],
+  "row_format": "Dynamic",
+  "rows_threshold_for_grid_search": 20,
+  "show_title_field_in_link": 0,
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "states": []
+}

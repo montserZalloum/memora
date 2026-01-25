@@ -1,0 +1,1 @@
+- Always load and rely on Serena MCP for full project context and cross-file understanding.

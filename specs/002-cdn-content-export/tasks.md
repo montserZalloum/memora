@@ -198,11 +198,11 @@ Based on plan.md, this is a Frappe app with structure:
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T051 Write integration test in memora/tests/integration/test_cdn_export_flow.py covering full create->update->delete cycle
-- [ ] T052 [P] Add error handling and logging throughout all service modules using frappe.log_error()
-- [ ] T053 [P] Run memora/specs/002-cdn-content-export/quickstart.md validation - verify all setup steps work
-- [ ] T054 Update memora/hooks.py comments documenting all doc_events and scheduler_events
-- [ ] T055 Run bench migrate and verify all new DocTypes created successfully
+- [X] T051 Write integration test in memora/tests/integration/test_cdn_export_flow.py covering full create->update->delete cycle
+- [X] T052 [P] Add error handling and logging throughout all service modules using frappe.log_error()
+- [X] T053 [P] Run memora/specs/002-cdn-content-export/quickstart.md validation - verify all setup steps work
+- [X] T054 Update memora/hooks.py comments documenting all doc_events and scheduler_events
+- [X] T055 Run bench migrate and verify all new DocTypes created successfully
 
 ---
 

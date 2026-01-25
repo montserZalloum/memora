@@ -69,7 +69,7 @@ bench migrate
 Once enabled, the system automatically:
 1. Tracks changes on content DocTypes via document hooks
 2. Queues affected Plan IDs in Redis
-3. Processes queue every 5 minutes (or at 50 plans)
+3. Processes queue hourly via scheduler (or immediately when 50+ plans queued)
 4. Uploads JSON files to CDN
 5. Invalidates cache
 

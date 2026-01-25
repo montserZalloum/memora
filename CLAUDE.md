@@ -26,7 +26,7 @@ Python 3.10+ (Frappe Framework): Follow standard conventions
 ## Recent Changes
 - 002-cdn-content-export: Added Python 3.10+ (Frappe Framework v14/v15) + Frappe Framework, Redis (frappe.cache), boto3 (S3/R2), RQ (background jobs)
 
-- 001-doctype-schema: Added Python 3.10+ (Frappe Framework) + Frappe Framework (v14/v15), ERPNext (for Item/Invoice links)
-
 <!-- MANUAL ADDITIONS START -->
+## AI Workflow
+- Use **Serena MCP** for all code search and symbol navigation.
 <!-- MANUAL ADDITIONS END -->

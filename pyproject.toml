@@ -7,9 +7,11 @@ description = "gamefication"
 requires-python = ">=3.10"
 readme = "README.md"
 dynamic = ["version"]
-dependencies = [
+ dependencies = [
     # "frappe~=15.0.0" # Installed and managed by bench.
-]
+    "boto3>=1.26.0",  # AWS SDK for CDN operations
+    "jsonschema>=4.0.0",  # JSON schema validation for contract tests
+ ]
 
 [build-system]
 requires = ["flit_core >=3.4,<4"]

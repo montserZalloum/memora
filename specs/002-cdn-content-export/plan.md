@@ -5,7 +5,7 @@
 
 ## Summary
 
-Build an automated static JSON generation system that exports educational content from Frappe/MariaDB to CDN (S3/Cloudflare R2). The system tracks changes via Redis Sets, batches rebuilds every 5 minutes or 50 plans, applies plan-specific overrides for access control, and maintains cache invalidation. This implements the "Generator Pattern" from the constitution - compiling complex hierarchical content into static JSON payloads via background jobs.
+Build an automated static JSON generation system that exports educational content from Frappe/MariaDB to CDN (S3/Cloudflare R2). The system tracks changes via Redis Sets, batches rebuilds hourly (with immediate processing at 50-plan threshold), applies plan-specific overrides for access control, and maintains cache invalidation. This implements the "Generator Pattern" from the constitution - compiling complex hierarchical content into static JSON payloads via background jobs.
 
 ## Technical Context
 

@@ -6,7 +6,7 @@ from frappe.utils import now_datetime, add_to_date
 from frappe import log_error
 from .change_tracker import (
     get_pending_plans, acquire_lock, release_lock, move_to_dead_letter,
-    add_plan_to_fallback_queue
+    add_plan_to_fallback_queue, add_plan_to_queue
 )
 from .json_generator import get_content_paths_for_plan
 from .cdn_uploader import get_cdn_client, upload_plan_files, get_cdn_base_url
@@ -59,7 +59,14 @@ def process_pending_plans(max_plans=10):
                 # Plan is already being processed
                 results['skipped'] += 1
                 continue
+        except:
+            try:
+                release_lock(plan_id)
+            except:
+                pass
+            continue
 
+        try:
             # Create sync log entry
             sync_log = frappe.get_doc({
                 'doctype': 'CDN Sync Log',
@@ -108,7 +115,7 @@ def process_pending_plans(max_plans=10):
             results['errors'].append(f"Plan {plan_id}: {str(e)}")
             results['failed'] += 1
 
-            # Ensure lock is released even on error
+        finally:
             try:
                 release_lock(plan_id)
             except:
@@ -201,7 +208,7 @@ def trigger_plan_rebuild(doctype, docname):
 
         # Add all affected plans to queue
         for plan_id in affected_plans:
-            add_plan_to_fallback_queue(plan_id)  # Use fallback for robustness
+            add_plan_to_queue(plan_id)
 
         # Check threshold and trigger immediate processing if needed
         settings = frappe.get_single("CDN Settings")
