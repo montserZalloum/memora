@@ -1,1 +1,0 @@
-# DocType definitions module

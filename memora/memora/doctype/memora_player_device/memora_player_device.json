@@ -1,0 +1,50 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "hash",
+ "creation": "2026-01-24 13:00:36.039724",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "device_id",
+  "device_name",
+  "is_trusted"
+ ],
+ "fields": [
+  {
+   "fieldname": "device_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Device ID",
+   "reqd": 1
+  },
+  {
+   "fieldname": "device_name",
+   "fieldtype": "Data",
+   "label": "Device Name"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_trusted",
+   "fieldtype": "Check",
+   "label": "Is Trusted"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-01-25 09:50:48.940610",
+ "modified_by": "Administrator",
+ "module": "Memora",
+ "name": "Memora Player Device",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

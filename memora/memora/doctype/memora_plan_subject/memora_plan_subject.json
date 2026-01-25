@@ -1,0 +1,43 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-01-24 13:00:35.659915",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "subject",
+  "sort_order"
+ ],
+ "fields": [
+  {
+   "fieldname": "subject",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Subject",
+   "options": "Memora Subject",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-01-24 13:00:35.659915",
+ "modified_by": "Administrator",
+ "module": "Memora",
+ "name": "Memora Plan Subject",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

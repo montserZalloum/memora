@@ -1,0 +1,77 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:MPG-{YYYY}-{#####}",
+ "creation": "2026-01-24 13:07:16.254008",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "academic_plan",
+  "grant_type",
+  "unlocked_components"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item Code",
+   "options": "Item",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "academic_plan",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Academic Plan",
+   "options": "Memora Academic Plan",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "grant_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Grant Type",
+   "options": "Full Plan Access\nSpecific Components",
+   "reqd": 1
+  },
+  {
+   "fieldname": "unlocked_components",
+   "fieldtype": "Table",
+   "label": "Unlocked Components",
+   "options": "Memora Grant Component"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-01-25 09:46:03.476464",
+ "modified_by": "Administrator",
+ "module": "Memora",
+ "name": "Memora Product Grant",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

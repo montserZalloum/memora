@@ -1,0 +1,121 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:MST-{#####}",
+ "creation": "2026-01-24 13:07:16.993734",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "player",
+  "transaction_type",
+  "payment_method",
+  "status",
+  "transaction_id",
+  "amount",
+  "receipt_image",
+  "related_grant",
+  "erpnext_invoice"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Naming Series",
+   "options": "SUB-TX-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "fieldname": "player",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Player",
+   "options": "Memora Player Profile",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "transaction_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Transaction Type",
+   "options": "Purchase\nRenewal\nUpgrade",
+   "reqd": 1
+  },
+  {
+   "fieldname": "payment_method",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Payment Method",
+   "options": "Payment Gateway\nManual-Admin\nVoucher",
+   "reqd": 1
+  },
+  {
+   "default": "Pending Approval",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Pending Approval\nCompleted\nFailed\nCancelled",
+   "reqd": 1
+  },
+  {
+   "fieldname": "transaction_id",
+   "fieldtype": "Data",
+   "label": "Transaction ID"
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Amount"
+  },
+  {
+   "fieldname": "receipt_image",
+   "fieldtype": "Attach Image",
+   "label": "Receipt Image"
+  },
+  {
+   "fieldname": "related_grant",
+   "fieldtype": "Link",
+   "label": "Related Grant",
+   "options": "Memora Product Grant",
+   "search_index": 1
+  },
+  {
+   "fieldname": "erpnext_invoice",
+   "fieldtype": "Link",
+   "label": "ERPNext Invoice",
+   "options": "Sales Invoice",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-01-25 09:41:08.615559",
+ "modified_by": "Administrator",
+ "module": "Memora",
+ "name": "Memora Subscription Transaction",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

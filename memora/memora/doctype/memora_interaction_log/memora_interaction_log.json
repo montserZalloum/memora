@@ -1,0 +1,99 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:MLI-{YYYY}-{MM}-{DD}-{########}",
+ "creation": "2026-01-24 13:07:16.698893",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "player",
+  "academic_plan",
+  "question_id",
+  "student_answer",
+  "correct_answer",
+  "is_correct",
+  "time_taken",
+  "timestamp"
+ ],
+ "fields": [
+  {
+   "fieldname": "player",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Player",
+   "options": "Memora Player Profile",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "academic_plan",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Academic Plan",
+   "options": "Memora Academic Plan",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "question_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Question ID",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "student_answer",
+   "fieldtype": "Data",
+   "label": "Student Answer"
+  },
+  {
+   "fieldname": "correct_answer",
+   "fieldtype": "Data",
+   "label": "Correct Answer"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_correct",
+   "fieldtype": "Check",
+   "label": "Is Correct"
+  },
+  {
+   "fieldname": "time_taken",
+   "fieldtype": "Int",
+   "label": "Time Taken (seconds)"
+  },
+  {
+   "default": "now",
+   "fieldname": "timestamp",
+   "fieldtype": "Datetime",
+   "label": "Timestamp"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-01-25 09:42:49.700728",
+ "modified_by": "Administrator",
+ "module": "Memora",
+ "name": "Memora Interaction Log",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

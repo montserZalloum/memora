@@ -1,0 +1,70 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-01-24 13:07:16.538838",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "player",
+  "total_xp",
+  "current_streak",
+  "last_played_at"
+ ],
+ "fields": [
+  {
+   "fieldname": "player",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Player",
+   "options": "Memora Player Profile",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "total_xp",
+   "fieldtype": "Int",
+   "label": "Total XP"
+  },
+  {
+   "default": "0",
+   "fieldname": "current_streak",
+   "fieldtype": "Int",
+   "label": "Current Streak"
+  },
+  {
+   "fieldname": "last_played_at",
+   "fieldtype": "Datetime",
+   "label": "Last Played At"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-01-25 09:43:35.491312",
+ "modified_by": "Administrator",
+ "module": "Memora",
+ "name": "Memora Player Wallet",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

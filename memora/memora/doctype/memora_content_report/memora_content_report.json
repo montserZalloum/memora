@@ -1,0 +1,88 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "hash",
+ "creation": "2026-01-24 13:22:41.294435",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "player",
+  "report_type",
+  "context_lesson",
+  "question_id",
+  "description",
+  "status"
+ ],
+ "fields": [
+  {
+   "fieldname": "player",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Player",
+   "options": "Memora Player Profile",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "report_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Report Type",
+   "options": "Wrong Answer\nContent Error\nTechnical Bug\nTypo\nOther",
+   "reqd": 1
+  },
+  {
+   "fieldname": "context_lesson",
+   "fieldtype": "Link",
+   "label": "Context Lesson",
+   "options": "Memora Lesson",
+   "search_index": 1
+  },
+  {
+   "fieldname": "question_id",
+   "fieldtype": "Data",
+   "label": "Question ID"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Open\nIn Progress\nResolved\nIgnored"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-01-25 09:38:40.997087",
+ "modified_by": "Administrator",
+ "module": "Memora",
+ "name": "Memora Content Report",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
