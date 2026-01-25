@@ -1,7 +1,8 @@
 node_modules/
 dist/
 build/
-*.log
-.env*
 coverage/
 *.min.js
+*.min.css
+.env*
+.env.*

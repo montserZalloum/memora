@@ -293,10 +293,12 @@ doc_events = {
 #   7. Update CDN Sync Log with success/failure status
 #
 # RETRY LOGIC:
-# - Retry 1: 2 minutes delay (exponential backoff: 2^1)
-# - Retry 2: 4 minutes delay (exponential backoff: 2^2)
-# - Retry 3: 8 minutes delay (exponential backoff: 2^3)
-# - After 3 failures: Move to dead-letter queue for manual intervention
+# - Retry 1: 30 seconds delay
+# - Retry 2: 1 minute delay
+# - Retry 3: 2 minutes delay
+# - Retry 4: 5 minutes delay
+# - Retry 5: 15 minutes delay
+# - After 5 failures: Move to dead-letter queue for manual intervention
 #
 # QUEUE MANAGEMENT:
 # - Primary: Redis Set "cdn_export:pending_plans" (fast, in-memory)
@@ -323,7 +325,11 @@ doc_events = {
 #
 scheduler_events = {
 	"Hourly": [
-		"memora.services.cdn_export.batch_processor.process_pending_plans"
+		"memora.services.cdn_export.batch_processor.process_pending_plans",
+		"memora.services.cdn_export.health_checker.hourly_health_check"
+	],
+	"Daily": [
+		"memora.services.cdn_export.health_checker.daily_full_scan"
 	]
 }
 

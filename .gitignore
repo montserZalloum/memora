@@ -1,12 +1,46 @@
+# Universal
 .DS_Store
-*.pyc
-*.egg-info
+Thumbs.db
+*.tmp
 *.swp
-tags
-node_modules
-__pycache__
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
 .venv/
 venv/
 dist/
+*.egg-info/
+
+# Node.js
+node_modules/
+build/
 *.log
 .env*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Frappe
+sites/
+*.pyc
+*.pyo
+*.swp
+.vscode
+*.patch
+.mypy_cache/
+.pytest_cache/
+.coverage
+junit.xml
+coverage.xml
+.web-assets*
+assets/
+app.css
+app.js
+desk.css
+desk.js
+.next/
+next-build/
+out/

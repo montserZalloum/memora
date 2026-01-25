@@ -61,3 +61,8 @@ class CDNSettings(Document):
 			self.batch_threshold = 50
 		if not self.signed_url_expiry_hours or self.signed_url_expiry_hours < 1:
 			self.signed_url_expiry_hours = 4
+
+	def on_update(self):
+		"""Invalidate CDN settings cache when settings change."""
+		from memora.services.cdn_export.url_resolver import invalidate_settings_cache
+		invalidate_settings_cache()

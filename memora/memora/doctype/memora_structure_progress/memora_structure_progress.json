@@ -1,6 +1,5 @@
 {
  "actions": [],
- "allow_rename": 1,
  "autoname": "hash",
  "creation": "2026-01-24 13:22:41.139297",
  "doctype": "DocType",
@@ -8,11 +7,13 @@
  "engine": "InnoDB",
  "field_order": [
   "player",
-  "target_doctype",
-  "target_name",
-  "status",
-  "stars",
-  "completed_at"
+  "academic_plan",
+  "subject",
+  "passed_lessons_data",
+  "last_lesson_completed",
+  "completion_percentage",
+  "total_xp_earned",
+  "last_synced_at"
  ],
  "fields": [
   {
@@ -25,45 +26,48 @@
    "search_index": 1
   },
   {
-   "fieldname": "target_doctype",
+   "fieldname": "academic_plan",
    "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Target DocType",
-   "options": "DocType",
-   "reqd": 1
+   "label": "Academic Plan",
+   "options": "Memora Academic Plan"
   },
   {
-   "fieldname": "target_name",
-   "fieldtype": "Dynamic Link",
-   "in_list_view": 1,
-   "label": "Target Name",
-   "options": "target_doctype",
-   "reqd": 1,
-   "search_index": 1
+   "fieldname": "subject",
+   "fieldtype": "Link",
+   "label": "Subject",
+   "options": "Memora Subject"
   },
   {
-   "default": "Locked",
-   "fieldname": "status",
-   "fieldtype": "Select",
-   "label": "Status",
-   "options": "Locked\nUnlocked\nCompleted"
+   "fieldname": "passed_lessons_data",
+   "fieldtype": "JSON",
+   "label": "Passed Lessons Data"
   },
   {
-   "default": "0",
-   "fieldname": "stars",
+   "fieldname": "last_lesson_completed",
+   "fieldtype": "Link",
+   "label": "Last Lesson Completed",
+   "options": "Memora Lesson"
+  },
+  {
+   "fieldname": "completion_percentage",
+   "fieldtype": "Float",
+   "label": "Completion Percentage"
+  },
+  {
+   "fieldname": "total_xp_earned",
    "fieldtype": "Int",
-   "label": "Stars"
+   "label": "Total Xp Earned"
   },
   {
-   "fieldname": "completed_at",
+   "fieldname": "last_synced_at",
    "fieldtype": "Datetime",
-   "label": "Completed At"
+   "label": "Last Synced At"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-25 09:39:07.068485",
+ "modified": "2026-01-25 20:18:42.699139",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Memora Structure Progress",

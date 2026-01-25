@@ -5,6 +5,7 @@ from frappe.utils import now_datetime
 from .dependency_resolver import get_affected_plan_ids
 from .access_calculator import calculate_access_level, apply_plan_overrides
 from .search_indexer import generate_search_index, generate_subject_shard, SHARD_THRESHOLD
+from .url_resolver import get_content_url
 
 def generate_manifest(plan_doc):
     """
@@ -22,7 +23,7 @@ def generate_manifest(plan_doc):
         "version": int(now_datetime().timestamp()),
         "generated_at": now_datetime().isoformat(),
         "subjects": [],
-        "search_index_url": f"plans/{plan_doc.name}/search_index.json"
+        "search_index_url": get_content_url(f"plans/{plan_doc.name}/search_index.json")
     }
 
     if plan_doc.season:
@@ -62,7 +63,7 @@ def generate_manifest(plan_doc):
             "id": subject.name,
             "title": subject.title,
             "sort_order": ps.sort_order,
-            "url": f"subjects/{subject.name}.json"
+            "url": get_content_url(f"subjects/{subject.name}.json")
         }
 
         if subject.description:
@@ -565,7 +566,7 @@ def get_content_paths_for_plan(plan_name):
         subject_data = generate_subject_json(subject, plan_id=plan_name)
         if subject_data is None:
             continue
-        
+
         all_files[f"subjects/{subject.name}.json"] = subject_data
 
         for track in [t for t in tracks if t.parent_subject == subject.name]:
@@ -573,7 +574,7 @@ def get_content_paths_for_plan(plan_name):
                 unit_data = generate_unit_json(unit, plan_id=plan_name)
                 if unit_data is None:
                     continue
-                
+
                 all_files[f"units/{unit.name}.json"] = unit_data
 
                 for topic in [t for t in topics if t.parent_unit == unit.name]:
@@ -581,7 +582,13 @@ def get_content_paths_for_plan(plan_name):
                         lesson_data = generate_lesson_json(lesson, plan_id=plan_name)
                         if lesson_data is None:
                             continue
-                        
+
                         all_files[f"lessons/{lesson.name}.json"] = lesson_data
+
+    for path, data in all_files.items():
+        from .local_storage import write_content_file
+        success, error = write_content_file(path, data)
+        if not success:
+            frappe.log_error(f"Failed to write local file {path}: {error}", "Local Storage Write Failed")
 
     return all_files

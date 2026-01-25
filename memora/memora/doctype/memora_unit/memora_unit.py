@@ -4,6 +4,10 @@
 # import frappe
 from frappe.model.document import Document
 
+from memora.services.cdn_export.local_storage import delete_content_file
+
 
 class MemoraUnit(Document):
-	pass
+	def on_trash(self):
+		"""Delete local unit file when unit is deleted."""
+		delete_content_file(f"units/{self.name}.json")

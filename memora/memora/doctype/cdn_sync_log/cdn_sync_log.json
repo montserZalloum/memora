@@ -13,6 +13,10 @@
     "completed_at",
     "files_uploaded",
     "files_deleted",
+    "local_path",
+    "local_hash",
+    "cdn_hash",
+    "sync_verified",
     "error_message",
     "retry_count",
     "next_retry_at",
@@ -58,6 +62,27 @@
       "fieldname": "files_deleted",
       "fieldtype": "Int",
       "label": "Files Deleted"
+    },
+    {
+      "fieldname": "local_path",
+      "fieldtype": "Data",
+      "label": "Local Path"
+    },
+    {
+      "fieldname": "local_hash",
+      "fieldtype": "Data",
+      "label": "Local Hash"
+    },
+    {
+      "fieldname": "cdn_hash",
+      "fieldtype": "Data",
+      "label": "CDN Hash"
+    },
+    {
+      "default": "0",
+      "fieldname": "sync_verified",
+      "fieldtype": "Check",
+      "label": "Sync Verified"
     },
     {
       "fieldname": "error_message",

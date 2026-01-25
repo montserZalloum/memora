@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://memora.app/schemas/local-storage/health-check.schema.json",
+  "title": "Health Check Report",
+  "description": "Output format for local storage health checks",
+  "type": "object",
+  "required": ["timestamp", "disk_free_percent", "disk_ok", "status"],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of health check"
+    },
+    "disk_free_percent": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Percentage of disk space remaining"
+    },
+    "disk_ok": {
+      "type": "boolean",
+      "description": "True if disk space is above 10% threshold"
+    },
+    "sample_files_checked": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of files sampled in quick check"
+    },
+    "total_files_expected": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total files expected based on database records (full scan only)"
+    },
+    "total_files_found": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total files found on filesystem (full scan only)"
+    },
+    "missing_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of paths that should exist but don't"
+    },
+    "orphan_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of paths that exist but have no database record"
+    },
+    "hash_mismatches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "local_hash", "cdn_hash"],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "local_hash": {
+            "type": "string"
+          },
+          "cdn_hash": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Files where local and CDN hashes don't match"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["healthy", "warning", "critical"],
+      "description": "Overall health status"
+    },
+    "action_taken": {
+      "type": "string",
+      "description": "Description of any automatic remediation performed"
+    }
+  },
+  "definitions": {
+    "quickCheck": {
+      "description": "Minimal properties for hourly quick check",
+      "required": ["timestamp", "disk_free_percent", "disk_ok", "sample_files_checked", "status"]
+    },
+    "fullScan": {
+      "description": "Full properties for daily comprehensive scan",
+      "required": ["timestamp", "disk_free_percent", "disk_ok", "total_files_expected", "total_files_found", "missing_files", "orphan_files", "status"]
+    }
+  }
+}

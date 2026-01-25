@@ -9,7 +9,8 @@ from .change_tracker import (
     add_plan_to_fallback_queue, add_plan_to_queue
 )
 from .json_generator import get_content_paths_for_plan
-from .cdn_uploader import get_cdn_client, upload_plan_files, get_cdn_base_url
+from .cdn_uploader import get_cdn_client, upload_plan_files, upload_plan_files_from_local, get_cdn_base_url
+from .local_storage import write_content_file, get_file_hash, get_local_base_path
 from .dependency_resolver import get_affected_plan_ids
 
 try:
@@ -90,17 +91,24 @@ def process_pending_plans(max_plans=10):
                 sync_log.retry_count = (sync_log.retry_count or 0) + 1
                 sync_log.save(ignore_permissions=True)
 
-                if sync_log.retry_count >= 3:
-                    # Move to dead letter after 3 failed attempts
+                # Exponential backoff schedule: [30s, 1m, 2m, 5m, 15m] (5 retries total)
+                BACKOFF_SCHEDULE = [30, 60, 120, 300, 900]  # seconds
+                
+                if sync_log.retry_count >= len(BACKOFF_SCHEDULE):
+                    # All retries exhausted - mark as Dead Letter and send alert
                     move_to_dead_letter(plan_id, f"Failed after {sync_log.retry_count} retries")
                     sync_log.status = 'Dead Letter'
                     sync_log.save(ignore_permissions=True)
+                    
+                    # Send alert to system managers
+                    from .health_checker import send_sync_failure_alert
+                    send_sync_failure_alert(sync_log.name)
+                    
                     results['failed'] += 1
                 else:
-                    # Calculate exponential backoff: 2^(retry_count) minutes
-                    # Retry 1: 2 minutes, Retry 2: 4 minutes, Retry 3: 8 minutes
-                    backoff_minutes = 2 ** sync_log.retry_count
-                    next_retry_at = add_to_date(now_datetime(), backoff_minutes, 'minutes')
+                    # Calculate next retry time using backoff schedule
+                    delay_seconds = BACKOFF_SCHEDULE[sync_log.retry_count]
+                    next_retry_at = add_to_date(now_datetime(), delay_seconds, 'seconds')
 
                     # Store retry schedule in sync log for visibility
                     sync_log.next_retry_at = next_retry_at
@@ -143,8 +151,19 @@ def _rebuild_plan(plan_id):
         client = get_cdn_client(settings)
         bucket = settings.bucket_name
 
-        # Generate all files for this plan
+        # Generate all files for this plan (also writes to local storage)
         files_data = get_content_paths_for_plan(plan_id)
+
+        # Build files_info with local paths
+        base_path = get_local_base_path()
+        files_info = {}
+        
+        for path, data in files_data.items():
+            local_path = os.path.join(base_path, path)
+            files_info[path] = {
+                "local_path": local_path,
+                "data": data
+            }
 
         # Validate all generated JSON against schemas
         if JSONSCHEMA_AVAILABLE:
@@ -154,11 +173,48 @@ def _rebuild_plan(plan_id):
                 log_error(error_msg, "JSON Schema Validation Failed")
                 return False
 
-        # Upload all files
-        uploaded_urls, upload_errors = upload_plan_files(client, bucket, plan_id, files_data)
+        # Upload all files from local storage
+        uploaded_urls, upload_results, upload_errors = upload_plan_files_from_local(
+            client, bucket, plan_id, files_info
+        )
 
         if upload_errors:
             raise Exception(f"Upload errors: {'; '.join(upload_errors)}")
+
+        # Get sync log to update with hash information
+        sync_log = frappe.db.get_value(
+            "CDN Sync Log",
+            {"plan_id": plan_id, "status": "Processing"},
+            "name"
+        )
+        
+        if sync_log:
+            sync_log_doc = frappe.get_doc("CDN Sync Log", sync_log)
+            
+            # Track local paths, local hashes, CDN hashes, and sync verification
+            all_sync_verified = True
+            
+            for path, result in upload_results.items():
+                if result["success"]:
+                    local_path = result["local_path"]
+                    cdn_hash = result["etag"]
+                    
+                    # Calculate local hash
+                    local_hash = get_file_hash(path)
+                    
+                    # Compare hashes
+                    sync_verified = (local_hash == cdn_hash)
+                    
+                    if not sync_verified:
+                        all_sync_verified = False
+                        frappe.log_error(
+                            f"Hash mismatch for {path}: local={local_hash}, cdn={cdn_hash}",
+                            "CDN Sync Hash Mismatch"
+                        )
+            
+            sync_log_doc.sync_verified = 1 if all_sync_verified else 0
+            sync_log_doc.files_uploaded = len(uploaded_urls)
+            sync_log_doc.save(ignore_permissions=True)
 
         # Purge CDN cache for uploaded files
         if uploaded_urls and settings.cloudflare_zone_id and settings.get_password('cloudflare_api_token'):

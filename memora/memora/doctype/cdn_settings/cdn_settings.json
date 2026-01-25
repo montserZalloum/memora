@@ -7,6 +7,7 @@
   "engine": "InnoDB",
   "field_order": [
     "enabled",
+    "local_fallback_mode",
     "storage_provider",
     "endpoint_url",
     "bucket_name",
@@ -25,6 +26,12 @@
       "fieldname": "enabled",
       "fieldtype": "Check",
       "label": "Enabled"
+    },
+    {
+      "default": "0",
+      "fieldname": "local_fallback_mode",
+      "fieldtype": "Check",
+      "label": "Local Fallback Mode"
     },
     {
       "fieldname": "storage_provider",

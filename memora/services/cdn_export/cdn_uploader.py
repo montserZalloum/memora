@@ -65,10 +65,44 @@ def upload_json(client, bucket, key, data):
             ContentType='application/json; charset=utf-8',
             CacheControl='public, max-age=300'  # 5 min cache, invalidated on update
         )
-        return True, None
+        return True, None, None
     except Exception as e:
         frappe.log_error(f"Failed to upload JSON to {key}: {str(e)}", "CDN Upload Failed")
-        return False, str(e)
+        return False, str(e), None
+
+
+def upload_json_from_file(client, bucket, key, file_path):
+    """Upload JSON from local file path with proper content type and cache control.
+    
+    Args:
+        client: S3 client instance
+        bucket (str): Bucket name
+        key (str): Object key (path in bucket)
+        file_path (str): Absolute path to local file to upload
+    
+    Returns:
+        tuple: (success, error_message, etag)
+            - success (bool): True if upload succeeded
+            - error_message (str | None): Error message if failed, None if successful
+            - etag (str | None): ETag from CDN response for hash verification
+    """
+    try:
+        with open(file_path, 'rb') as f:
+            response = client.put_object(
+                Bucket=bucket,
+                Key=key,
+                Body=f.read(),
+                ContentType='application/json; charset=utf-8',
+                CacheControl='public, max-age=300'  # 5 min cache, invalidated on update
+            )
+        etag = response.get('ETag', '').strip('"')
+        return True, None, etag
+    except FileNotFoundError:
+        frappe.log_error(f"Local file not found for upload: {file_path}", "CDN Upload Failed")
+        return False, f"Local file not found: {file_path}", None
+    except Exception as e:
+        frappe.log_error(f"Failed to upload JSON from file {file_path} to {key}: {str(e)}", "CDN Upload Failed")
+        return False, str(e), None
 
 def delete_json(client, bucket, key):
     """Delete a JSON file from CDN."""
@@ -155,7 +189,7 @@ def upload_plan_files(client, bucket, plan_name, files_data):
     errors = []
 
     for path, data in files_data.items():
-        success, error = upload_json(client, bucket, path, data)
+        success, error, _ = upload_json(client, bucket, path, data)
         if success:
             # Generate full CDN URL for cache purging
             settings = frappe.get_single("CDN Settings")
@@ -165,6 +199,61 @@ def upload_plan_files(client, bucket, plan_name, files_data):
             errors.append(f"{path}: {error}")
 
     return uploaded_urls, errors
+
+
+def upload_plan_files_from_local(client, bucket, plan_name, files_info):
+    """
+    Upload files from local storage for a plan and return upload results.
+
+    Args:
+        client: S3 client instance
+        bucket (str): Bucket name
+        plan_name (str): Plan document name
+        files_info (dict): Dictionary of {path: {"local_path": str, "data": dict}}
+
+    Returns:
+        tuple: (uploaded_urls, upload_results, errors)
+            - uploaded_urls (list): List of full CDN URLs for cache purging
+            - upload_results (dict): Dictionary of {path: {"success": bool, "etag": str, "error": str | None}}
+            - errors (list): List of error messages
+    """
+    uploaded_urls = []
+    upload_results = {}
+    errors = []
+
+    from memora.services.cdn_export.local_storage import get_local_base_path
+
+    for path, info in files_info.items():
+        local_path = info.get("local_path")
+        
+        if local_path:
+            # Upload from local file
+            success, error, etag = upload_json_from_file(client, bucket, path, local_path)
+            upload_results[path] = {
+                "success": success,
+                "etag": etag,
+                "error": error,
+                "local_path": local_path
+            }
+        else:
+            # Fallback to in-memory upload
+            success, error, _ = upload_json(client, bucket, path, info.get("data", {}))
+            upload_results[path] = {
+                "success": success,
+                "etag": None,
+                "error": error,
+                "local_path": None
+            }
+
+        if success:
+            # Generate full CDN URL for cache purging
+            settings = frappe.get_single("CDN Settings")
+            full_url = f"{settings.cdn_base_url}/{path}"
+            uploaded_urls.append(full_url)
+        else:
+            errors.append(f"{path}: {error}")
+
+    return uploaded_urls, upload_results, errors
 
 def get_cdn_base_url(settings):
     """Get the base URL for CDN content."""
