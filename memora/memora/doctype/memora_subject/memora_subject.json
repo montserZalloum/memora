@@ -11,6 +11,8 @@
   "color_code",
   "is_published",
   "is_free_preview",
+  "is_public",
+  "required_item",
   "sort_order",
   "image",
   "description"
@@ -39,6 +41,19 @@
    "fieldname": "is_free_preview",
    "fieldtype": "Check",
    "label": "Is Free Preview"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_public",
+   "fieldtype": "Check",
+   "label": "Is Public"
+  },
+  {
+   "fieldname": "required_item",
+   "fieldtype": "Link",
+   "label": "Required Item",
+   "options": "Item",
+   "search_index": 1
   },
   {
    "default": "0",

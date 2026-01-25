@@ -10,6 +10,8 @@
   "title",
   "parent_subject",
   "is_sold_separately",
+  "required_item",
+  "parent_item_required",
   "is_published",
   "is_free_preview",
   "sort_order",
@@ -38,6 +40,19 @@
    "fieldname": "is_sold_separately",
    "fieldtype": "Check",
    "label": "Is Sold Separately"
+  },
+  {
+   "fieldname": "required_item",
+   "fieldtype": "Link",
+   "label": "Required Item",
+   "options": "Item",
+   "search_index": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "parent_item_required",
+   "fieldtype": "Check",
+   "label": "Parent Item Required"
   },
   {
    "default": "0",

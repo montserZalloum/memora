@@ -28,10 +28,10 @@ Based on plan.md, this is a Frappe app with structure:
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Add boto3 dependency to pyproject.toml
-- [ ] T002 [P] Create services directory structure at memora/services/cdn_export/__init__.py
-- [ ] T003 [P] Create test directory structure at memora/tests/unit/cdn_export/__init__.py
-- [ ] T004 [P] Create integration test directory at memora/tests/integration/__init__.py
+- [X] T001 Add boto3 dependency to pyproject.toml
+- [X] T002 [P] Create services directory structure at memora/services/cdn_export/__init__.py
+- [X] T003 [P] Create test directory structure at memora/tests/unit/cdn_export/__init__.py
+- [X] T004 [P] Create integration test directory at memora/tests/integration/__init__.py
 
 ---
 
@@ -43,17 +43,17 @@ Based on plan.md, this is a Frappe app with structure:
 
 ### DocTypes
 
-- [ ] T005 Create CDN Settings Single DocType at memora/memora/doctype/cdn_settings/cdn_settings.json with fields per data-model.md
-- [ ] T006 [P] Create CDN Settings controller at memora/memora/doctype/cdn_settings/cdn_settings.py with validation logic
-- [ ] T007 [P] Create CDN Sync Log DocType at memora/memora/doctype/cdn_sync_log/cdn_sync_log.json with indexed fields per data-model.md
-- [ ] T008 [P] Create CDN Sync Log controller at memora/memora/doctype/cdn_sync_log/cdn_sync_log.py
+- [X] T005 Create CDN Settings Single DocType at memora/memora/doctype/cdn_settings/cdn_settings.json with fields per data-model.md
+- [X] T006 [P] Create CDN Settings controller at memora/memora/doctype/cdn_settings/cdn_settings.py with validation logic
+- [X] T007 [P] Create CDN Sync Log DocType at memora/memora/doctype/cdn_sync_log/cdn_sync_log.json with indexed fields per data-model.md
+- [X] T008 [P] Create CDN Sync Log controller at memora/memora/doctype/cdn_sync_log/cdn_sync_log.py
 
 ### Schema Updates
 
-- [ ] T009 Add is_public field (Check) to Memora Subject DocType at memora/memora/doctype/memora_subject/memora_subject.json
-- [ ] T010 [P] Add required_item field (Link to Item) to Memora Subject DocType
-- [ ] T011 [P] Add required_item field (Link to Item) to Memora Track DocType at memora/memora/doctype/memora_track/memora_track.json
-- [ ] T012 [P] Add parent_item_required field (Check) to Memora Track DocType
+- [x] T009 Add is_public field (Check) to Memora Subject DocType at memora/memora/doctype/memora_subject/memora_subject.json
+- [x] T010 [P] Add required_item field (Link to Item) to Memora Subject DocType
+- [x] T011 [P] Add required_item field (Link to Item) to Memora Track DocType at memora/memora/doctype/memora_track/memora_track.json
+- [x] T012 [P] Add parent_item_required field (Check) to Memora Track DocType
 
 ### Core Services
 
