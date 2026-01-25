@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://memora.app/schemas/cdn/manifest.schema.json",
+  "title": "Plan Manifest",
+  "description": "Index of all subjects in an academic plan",
+  "type": "object",
+  "required": ["plan_id", "title", "version", "generated_at", "subjects"],
+  "properties": {
+    "plan_id": {
+      "type": "string",
+      "description": "Unique plan identifier (Frappe document name)"
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable plan title"
+    },
+    "season": {
+      "type": "string",
+      "description": "Academic season/year"
+    },
+    "grade": {
+      "type": "string",
+      "description": "Grade level"
+    },
+    "stream": {
+      "type": "string",
+      "description": "Academic stream (e.g., Scientific, Literary)"
+    },
+    "version": {
+      "type": "integer",
+      "description": "Manifest version (Unix timestamp)"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 generation timestamp"
+    },
+    "subjects": {
+      "type": "array",
+      "description": "List of subjects in this plan",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "sort_order", "url"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Subject document name"
+          },
+          "title": {
+            "type": "string"
+          },
+          "color_code": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "image": {
+            "type": "string",
+            "format": "uri"
+          },
+          "sort_order": {
+            "type": "integer"
+          },
+          "url": {
+            "type": "string",
+            "description": "Relative path to subject JSON"
+          },
+          "access": {
+            "$ref": "#/definitions/accessControl"
+          }
+        }
+      }
+    },
+    "search_index_url": {
+      "type": "string",
+      "description": "Relative path to search index JSON"
+    }
+  },
+  "definitions": {
+    "accessControl": {
+      "type": "object",
+      "required": ["is_published", "access_level"],
+      "properties": {
+        "is_published": {
+          "type": "boolean"
+        },
+        "access_level": {
+          "type": "string",
+          "enum": ["public", "authenticated", "paid", "free_preview"]
+        },
+        "required_item": {
+          "type": "string",
+          "description": "ERPNext Item Code (only when access_level is 'paid')"
+        },
+        "is_sold_separately": {
+          "type": "boolean"
+        },
+        "parent_item_required": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

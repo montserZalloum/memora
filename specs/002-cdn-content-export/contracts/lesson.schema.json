@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://memora.app/schemas/cdn/lesson.schema.json",
+  "title": "Lesson Content",
+  "description": "Lesson with stages (metadata only, sensitive URLs signed)",
+  "type": "object",
+  "required": ["id", "title", "version", "generated_at", "stages", "access"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Lesson document name"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "image": {
+      "type": "string",
+      "format": "uri"
+    },
+    "sort_order": {
+      "type": "integer"
+    },
+    "version": {
+      "type": "integer"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "signed_url_expiry": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When signed URLs in this lesson expire"
+    },
+    "access": {
+      "$ref": "#/definitions/accessControl"
+    },
+    "parent": {
+      "type": "object",
+      "properties": {
+        "topic_id": { "type": "string" },
+        "topic_title": { "type": "string" },
+        "unit_id": { "type": "string" },
+        "unit_title": { "type": "string" },
+        "track_id": { "type": "string" },
+        "track_title": { "type": "string" },
+        "subject_id": { "type": "string" },
+        "subject_title": { "type": "string" }
+      }
+    },
+    "stages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/stage"
+      }
+    },
+    "navigation": {
+      "type": "object",
+      "properties": {
+        "previous_lesson": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "title": { "type": "string" },
+            "url": { "type": "string" }
+          }
+        },
+        "next_lesson": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "title": { "type": "string" },
+            "url": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "accessControl": {
+      "type": "object",
+      "required": ["is_published", "access_level"],
+      "properties": {
+        "is_published": { "type": "boolean" },
+        "access_level": {
+          "type": "string",
+          "enum": ["public", "authenticated", "paid", "free_preview"]
+        },
+        "required_item": { "type": "string" },
+        "is_sold_separately": { "type": "boolean" },
+        "parent_item_required": { "type": "boolean" }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "required": ["idx", "title", "type"],
+      "properties": {
+        "idx": {
+          "type": "integer",
+          "description": "Stage order (1-based)"
+        },
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["Video", "Question", "Text", "Interactive"]
+        },
+        "config": {
+          "type": "object",
+          "description": "Type-specific configuration (video URLs are signed)"
+        }
+      }
+    }
+  }
+}

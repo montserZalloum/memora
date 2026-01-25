@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://memora.app/schemas/cdn/search_index.schema.json",
+  "title": "Search Index",
+  "description": "Lightweight search index for client-side lesson search",
+  "type": "object",
+  "required": ["plan_id", "version", "generated_at"],
+  "oneOf": [
+    {
+      "description": "Single index (< 500 lessons)",
+      "required": ["entries"],
+      "properties": {
+        "plan_id": { "type": "string" },
+        "version": { "type": "integer" },
+        "generated_at": { "type": "string", "format": "date-time" },
+        "total_lessons": { "type": "integer" },
+        "is_sharded": { "const": false },
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/searchEntry" }
+        }
+      }
+    },
+    {
+      "description": "Sharded index (>= 500 lessons)",
+      "required": ["shards"],
+      "properties": {
+        "plan_id": { "type": "string" },
+        "version": { "type": "integer" },
+        "generated_at": { "type": "string", "format": "date-time" },
+        "total_lessons": { "type": "integer" },
+        "is_sharded": { "const": true },
+        "shards": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/shardReference" }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "searchEntry": {
+      "type": "object",
+      "required": ["lesson_id", "lesson_name", "subject_id", "subject_name", "unit_id"],
+      "properties": {
+        "lesson_id": {
+          "type": "string",
+          "description": "Lesson document name"
+        },
+        "lesson_name": {
+          "type": "string",
+          "description": "Lesson title for search"
+        },
+        "subject_id": {
+          "type": "string"
+        },
+        "subject_name": {
+          "type": "string"
+        },
+        "unit_id": {
+          "type": "string"
+        },
+        "unit_name": {
+          "type": "string"
+        },
+        "topic_id": {
+          "type": "string"
+        },
+        "topic_name": {
+          "type": "string"
+        }
+      }
+    },
+    "shardReference": {
+      "type": "object",
+      "required": ["subject_id", "subject_name", "url", "lesson_count"],
+      "properties": {
+        "subject_id": {
+          "type": "string"
+        },
+        "subject_name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "description": "Relative path to subject shard JSON"
+        },
+        "lesson_count": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

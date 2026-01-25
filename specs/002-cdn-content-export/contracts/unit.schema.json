@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://memora.app/schemas/cdn/unit.schema.json",
+  "title": "Unit Content",
+  "description": "Unit with topics and lesson references",
+  "type": "object",
+  "required": ["id", "title", "version", "generated_at", "topics", "access"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unit document name"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "image": {
+      "type": "string",
+      "format": "uri"
+    },
+    "badge_image": {
+      "type": "string",
+      "format": "uri"
+    },
+    "sort_order": {
+      "type": "integer"
+    },
+    "version": {
+      "type": "integer"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "access": {
+      "$ref": "#/definitions/accessControl"
+    },
+    "parent": {
+      "type": "object",
+      "properties": {
+        "track_id": { "type": "string" },
+        "track_title": { "type": "string" },
+        "subject_id": { "type": "string" },
+        "subject_title": { "type": "string" }
+      }
+    },
+    "topics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/topic"
+      }
+    },
+    "stats": {
+      "type": "object",
+      "properties": {
+        "total_topics": { "type": "integer" },
+        "total_lessons": { "type": "integer" }
+      }
+    }
+  },
+  "definitions": {
+    "accessControl": {
+      "type": "object",
+      "required": ["is_published", "access_level"],
+      "properties": {
+        "is_published": { "type": "boolean" },
+        "access_level": {
+          "type": "string",
+          "enum": ["public", "authenticated", "paid", "free_preview"]
+        },
+        "required_item": { "type": "string" },
+        "is_sold_separately": { "type": "boolean" },
+        "parent_item_required": { "type": "boolean" }
+      }
+    },
+    "topic": {
+      "type": "object",
+      "required": ["id", "title", "sort_order", "lessons", "access"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "image": { "type": "string", "format": "uri" },
+        "sort_order": { "type": "integer" },
+        "access": { "$ref": "#/definitions/accessControl" },
+        "lessons": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/lessonSummary" }
+        }
+      }
+    },
+    "lessonSummary": {
+      "type": "object",
+      "required": ["id", "title", "sort_order", "url", "access"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "image": { "type": "string", "format": "uri" },
+        "sort_order": { "type": "integer" },
+        "url": {
+          "type": "string",
+          "description": "Relative path to lesson JSON"
+        },
+        "access": { "$ref": "#/definitions/accessControl" },
+        "stage_count": { "type": "integer" }
+      }
+    }
+  }
+}
