@@ -1,11 +1,15 @@
 import frappe
 import json
+import os
 from datetime import datetime, timedelta
 from frappe.utils import now_datetime
 from .dependency_resolver import get_affected_plan_ids
 from .access_calculator import calculate_access_level, apply_plan_overrides
 from .search_indexer import generate_search_index, generate_subject_shard, SHARD_THRESHOLD
 from .url_resolver import get_content_url
+
+# Schema directory for JSON validation
+SCHEMA_DIR = os.path.join(os.path.dirname(__file__), 'schemas')
 
 def generate_manifest(plan_doc):
     """
@@ -1298,3 +1302,177 @@ def get_content_paths_for_plan(plan_name):
 			frappe.log_error(f"Failed to write local file {path}: {error}", "CDN JSON Generation")
 
 	return all_files
+
+
+def generate_bitmap_json(subject_doc):
+	"""
+	Generate subject bitmap JSON with lesson → bit_index mappings (Phase 7: User Story 5).
+	
+	The bitmap file maps each lesson in a subject to its bit_index in the progress engine,
+	enabling efficient progress tracking via bitmaps. This file is shared across plans.
+	
+	Args:
+		subject_doc (frappe.doc): Memora Subject document
+	
+	Returns:
+		dict: Bitmap data conforming to subject_bitmap.schema.json
+	"""
+	import frappe
+	
+	# Get all tracks for this subject
+	tracks = frappe.get_all(
+		"Memora Track",
+		filters={"parent_subject": subject_doc.name},
+		fields=["name"]
+	)
+	
+	track_ids = [t.name for t in tracks]
+	
+	# Get all units for these tracks
+	units = frappe.get_all(
+		"Memora Unit",
+		filters={"parent_track": ["in", track_ids]},
+		fields=["name"]
+	)
+	
+	unit_ids = [u.name for u in units]
+	
+	# Get all topics for these units
+	topics = frappe.get_all(
+		"Memora Topic",
+		filters={"parent_unit": ["in", unit_ids]},
+		fields=["name"]
+	)
+	
+	topic_ids = [t.name for t in topics]
+	
+	# Get all lessons for these topics (ordered by creation/index)
+	lessons = frappe.get_all(
+		"Memora Lesson",
+		filters={"parent_topic": ["in", topic_ids], "docstatus": 1},  # Only submitted lessons
+		fields=["name", "parent_topic"],
+		order_by="creation"
+	)
+	
+	# Build bitmap with bit_index for each lesson
+	bitmap_data = {
+		"subject_id": subject_doc.name,
+		"version": int(now_datetime().timestamp()),
+		"generated_at": now_datetime().isoformat(),
+		"total_lessons": len(lessons),
+		"mappings": {}
+	}
+	
+	for idx, lesson in enumerate(lessons):
+		bitmap_data["mappings"][lesson.name] = {
+			"bit_index": idx,
+			"topic_id": lesson.parent_topic
+		}
+	
+	# Validate against schema
+	is_valid, errors = validate_subject_bitmap_against_schema(bitmap_data)
+	if not is_valid:
+		frappe.log_error(
+			f"Generated bitmap JSON for {subject_doc.name} failed schema validation: {errors}",
+			"CDN JSON Generation"
+		)
+	
+	frappe.log_error(
+		f"[INFO] Generated bitmap JSON for {subject_doc.name} with {len(lessons)} lessons",
+		"CDN JSON Generation"
+	)
+	
+	return bitmap_data
+
+
+def validate_subject_bitmap_against_schema(bitmap_data):
+	"""
+	Validate bitmap JSON against subject_bitmap.schema.json.
+	
+	Args:
+		bitmap_data (dict): Bitmap JSON to validate
+	
+	Returns:
+		tuple: (is_valid, errors) where errors is list of validation errors
+	"""
+	try:
+		import jsonschema
+		
+		schema_path = os.path.join(SCHEMA_DIR, "subject_bitmap.schema.json")
+		with open(schema_path, "r") as f:
+			schema = json.load(f)
+		
+		jsonschema.validate(bitmap_data, schema)
+		return True, []
+	except Exception as e:
+		return False, [str(e)]
+
+
+def get_atomic_content_paths_for_plan(plan_name):
+	"""
+	Get all atomic file paths that need to be generated for a plan (Phase 7: User Story 5).
+	
+	Returns structured path information for all atomic files: manifest, hierarchies,
+	bitmaps, topics, and shared lessons.
+	
+	Args:
+		plan_name (str): Plan document name
+	
+	Returns:
+		dict: Structure with paths for {manifest, hierarchies, bitmaps, topics, lessons}
+	"""
+	import frappe
+	
+	# Get all plan subjects
+	plan_subjects = frappe.get_all(
+		"Memora Academic Plan Subject",
+		filters={"parent": plan_name},
+		fields=["subject"]
+	)
+	
+	subject_ids = [ps.subject for ps in plan_subjects]
+	
+	# Get all topics for these subjects (via tracks → units)
+	tracks = frappe.get_all(
+		"Memora Track",
+		filters={"parent_subject": ["in", subject_ids]},
+		fields=["name"]
+	)
+	
+	track_ids = [t.name for t in tracks]
+	
+	units = frappe.get_all(
+		"Memora Unit",
+		filters={"parent_track": ["in", track_ids]},
+		fields=["name"]
+	)
+	
+	unit_ids = [u.name for u in units]
+	
+	topics = frappe.get_all(
+		"Memora Topic",
+		filters={"parent_unit": ["in", unit_ids]},
+		fields=["name"]
+	)
+	
+	topic_ids = [t.name for t in topics]
+	
+	# Get all lessons
+	lessons = frappe.get_all(
+		"Memora Lesson",
+		filters={"parent_topic": ["in", topic_ids], "docstatus": 1},
+		fields=["name"]
+	)
+	
+	lesson_ids = [l.name for l in lessons]
+	
+	# Build paths dictionary
+	paths = {
+		"manifest": f"plans/{plan_name}/manifest.json",
+		"hierarchies": [f"plans/{plan_name}/{subj}_h.json" for subj in subject_ids],
+		"bitmaps": [f"plans/{plan_name}/{subj}_b.json" for subj in subject_ids],
+		"topics": [f"plans/{plan_name}/{t}.json" for t in topic_ids],
+		"lessons": [f"lessons/{l}.json" for l in lesson_ids]
+	}
+	
+	return paths

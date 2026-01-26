@@ -180,5 +180,136 @@ class TestLinearModeCalculator(unittest.TestCase):
         node.name = "node_no_linear"
         self.assertEqual(calculate_linear_mode(node), False)
 
+class TestAccessControlIntegration(unittest.TestCase):
+	"""Integration tests for access control inheritance and override precedence - Phase 8: User Story 6"""
+
+	def test_paid_subject_inheritance_to_children(self):
+		"""T070: Paid subject makes all children inherit paid access"""
+		# Setup subject as paid
+		subject = Mock()
+		subject.name = "SUBJ-PAID"
+		subject.is_public = False
+		subject.is_free_preview = False
+		subject.required_item = "ITEM-PAID"
+		subject_access = calculate_access_level(subject)
+		self.assertEqual(subject_access, "paid")
+
+		# Track should inherit paid
+		track = Mock()
+		track.name = "TRACK-CHILD"
+		track.is_public = False
+		track.is_free_preview = False
+		track.required_item = None
+		track_access = calculate_access_level(track, parent_access=subject_access)
+		self.assertEqual(track_access, "paid")
+
+		# Unit should inherit paid
+		unit = Mock()
+		unit.name = "UNIT-CHILD"
+		unit.is_public = False
+		unit.is_free_preview = False
+		unit.required_item = None
+		unit_access = calculate_access_level(unit, parent_access=track_access)
+		self.assertEqual(unit_access, "paid")
+
+	def test_is_free_preview_piercing(self):
+		"""T071: is_free_preview on node pierces down to all descendants"""
+		# Free preview node
+		unit = Mock()
+		unit.name = "UNIT-PREVIEW"
+		unit.is_public = False
+		unit.is_free_preview = True
+		unit.required_item = None
+		unit_access = calculate_access_level(unit, parent_access="paid")
+		self.assertEqual(unit_access, "free_preview")
+
+		# Child topic should inherit free_preview (pierce)
+		topic = Mock()
+		topic.name = "TOPIC-CHILD"
+		topic.is_public = False
+		topic.is_free_preview = False
+		topic.required_item = None
+		topic_access = calculate_access_level(topic, parent_access=unit_access)
+		self.assertEqual(topic_access, "free_preview")
+
+	def test_is_sold_separately_creates_independent_island(self):
+		"""T072: is_sold_separately at track level creates independent paid scope"""
+		# Subject is public
+		subject = Mock()
+		subject.name = "SUBJ-PUBLIC"
+		subject.is_public = True
+		subject.is_free_preview = False
+		subject.required_item = None
+		subject_access = calculate_access_level(subject)
+		self.assertEqual(subject_access, "public")
+
+		# Normal track inherits public
+		track_normal = Mock()
+		track_normal.name = "TRACK-NORMAL"
+		track_normal.is_public = False
+		track_normal.is_free_preview = False
+		track_normal.required_item = None
+		track_normal_access = calculate_access_level(track_normal, parent_access=subject_access)
+		self.assertEqual(track_normal_access, "public")
+
+		# Sold separately track becomes paid despite parent being public
+		# (is_sold_separately flag makes it independent)
+		track_sold = Mock()
+		track_sold.name = "TRACK-SOLD"
+		track_sold.is_public = False
+		track_sold.is_free_preview = False
+		track_sold.required_item = "ITEM-TRACK-SOLD"
+		track_sold_access = calculate_access_level(track_sold, parent_access=subject_access)
+		self.assertEqual(track_sold_access, "paid")
+
+	def test_override_precedence(self):
+		"""T073: Override precedence: Set Access Level > Set Free > is_free_preview > required_item > inheritance"""
+		node = Mock()
+		node.name = "PRIORITY-TEST"
+		node.is_public = False
+		node.is_free_preview = False
+		node.required_item = "ITEM-001"
+		parent_access = "paid"
+
+		# 1. Without override, required_item takes precedence
+		access = calculate_access_level(node, parent_access=parent_access)
+		self.assertEqual(access, "paid")
+
+		# 2. Set Free override (middle priority) should override required_item
+		override_set_free = Mock()
+		override_set_free.action = "Set Free"
+		overrides = {"PRIORITY-TEST": override_set_free}
+		access = calculate_access_level(node, parent_access=parent_access, plan_overrides=overrides)
+		self.assertEqual(access, "free_preview")
+
+		# 3. Set Access Level override (highest priority) should override everything
+		override_set_level = Mock()
+		override_set_level.action = "Set Access Level"
+		override_set_level.override_value = "authenticated"
+		overrides = {"PRIORITY-TEST": override_set_level}
+		access = calculate_access_level(node, parent_access=parent_access, plan_overrides=overrides)
+		self.assertEqual(access, "authenticated")
+
+	def test_required_item_propagation(self):
+		"""T074: required_item propagates to children unless overridden"""
+		# Track requires item
+		track = Mock()
+		track.name = "TRACK-ITEM"
+		track.is_public = False
+		track.is_free_preview = False
+		track.required_item = "PROD-TRACK"
+		track_access = calculate_access_level(track)
+		self.assertEqual(track_access, "paid")
+
+		# Unit child should inherit required_item context (access = paid)
+		unit = Mock()
+		unit.name = "UNIT-CHILD"
+		unit.is_public = False
+		unit.is_free_preview = False
+		unit.required_item = None
+		unit_access = calculate_access_level(unit, parent_access=track_access)
+		self.assertEqual(unit_access, "paid")
+
+
 if __name__ == '__main__':
     unittest.main()

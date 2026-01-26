@@ -2,13 +2,22 @@ import frappe
 import json
 import os
 import time
+import tempfile
 from frappe.utils import now_datetime, add_to_date
 from frappe import log_error
 from .change_tracker import (
     get_pending_plans, acquire_lock, release_lock, move_to_dead_letter,
     add_plan_to_fallback_queue, add_plan_to_queue
 )
-from .json_generator import get_content_paths_for_plan
+from .json_generator import (
+    get_content_paths_for_plan,
+    get_atomic_content_paths_for_plan,
+    generate_manifest_atomic,
+    generate_subject_hierarchy,
+    generate_bitmap_json,
+    generate_topic_json,
+    generate_lesson_json_shared,
+)
 from .cdn_uploader import get_cdn_client, upload_plan_files, upload_plan_files_from_local, get_cdn_base_url
 from .local_storage import write_content_file, get_file_hash, get_local_base_path
 from .dependency_resolver import get_affected_plan_ids
@@ -130,6 +139,202 @@ def process_pending_plans(max_plans=10):
                 pass
 
     return results
+
+def _generate_atomic_files_for_plan(plan_id):
+	"""
+	Generate all atomic JSON files for a plan (Phase 7: User Story 5).
+	
+	Implements two-phase commit:
+	1. Write all files to staging (.tmp suffix)
+	2. Atomic swap to final paths on success
+	3. Rollback by deleting staging files on any failure
+	
+	Args:
+		plan_id (str): Plan document name
+	
+	Returns:
+		tuple: (success: bool, files_written: dict, errors: list)
+	"""
+	files_written = {}
+	staging_files = []  # Track staging files for rollback
+	errors = []
+	
+	try:
+		plan_doc = frappe.get_doc("Memora Academic Plan", plan_id)
+		
+		# Get atomic paths structure
+		paths = get_atomic_content_paths_for_plan(plan_id)
+		
+		# Phase 1: Generate and write all files to staging
+		
+		# 1. Generate manifest
+		try:
+			manifest_data = generate_manifest_atomic(plan_doc)
+			manifest_path = paths["manifest"]
+			success, error = _write_file_atomic_with_staging(manifest_path, manifest_data)
+			if success:
+				files_written[manifest_path] = manifest_data
+				staging_files.append(manifest_path + ".tmp")
+			else:
+				errors.append(f"Manifest generation failed: {error}")
+				raise Exception(f"Manifest write failed: {error}")
+		except Exception as e:
+			errors.append(f"Manifest generation error: {str(e)}")
+			raise
+		
+		# 2. Generate hierarchies and bitmaps
+		subjects = frappe.get_all(
+			"Memora Subject",
+			filters={"name": ["in", [s.subject for s in plan_doc.get("subjects", [])]]},
+			fields=["name"]
+		)
+		
+		for subject in subjects:
+			try:
+				# Generate hierarchy
+				subject_doc = frappe.get_doc("Memora Subject", subject.name)
+				hierarchy_data = generate_subject_hierarchy(subject_doc, plan_id=plan_id)
+				hierarchy_path = f"plans/{plan_id}/{subject.name}_h.json"
+				success, error = _write_file_atomic_with_staging(hierarchy_path, hierarchy_data)
+				if success:
+					files_written[hierarchy_path] = hierarchy_data
+					staging_files.append(hierarchy_path + ".tmp")
+				else:
+					errors.append(f"Hierarchy generation failed for {subject.name}: {error}")
+					raise Exception(error)
+				
+				# Generate bitmap
+				bitmap_data = generate_bitmap_json(subject_doc)
+				bitmap_path = f"plans/{plan_id}/{subject.name}_b.json"
+				success, error = _write_file_atomic_with_staging(bitmap_path, bitmap_data)
+				if success:
+					files_written[bitmap_path] = bitmap_data
+					staging_files.append(bitmap_path + ".tmp")
+				else:
+					errors.append(f"Bitmap generation failed for {subject.name}: {error}")
+					raise Exception(error)
+					
+			except Exception as e:
+				errors.append(f"Subject {subject.name} generation failed: {str(e)}")
+				raise
+		
+		# 3. Generate topics
+		topics = frappe.get_all(
+			"Memora Topic",
+			filters={"docstatus": 1},
+			fields=["name"]
+		)
+		
+		for topic in topics:
+			try:
+				topic_doc = frappe.get_doc("Memora Topic", topic.name)
+				topic_data = generate_topic_json(topic_doc, plan_id=plan_id)
+				topic_path = f"plans/{plan_id}/{topic.name}.json"
+				success, error = _write_file_atomic_with_staging(topic_path, topic_data)
+				if success:
+					files_written[topic_path] = topic_data
+					staging_files.append(topic_path + ".tmp")
+				else:
+					errors.append(f"Topic generation failed for {topic.name}: {error}")
+					raise Exception(error)
+			except Exception as e:
+				errors.append(f"Topic {topic.name} generation failed: {str(e)}")
+				raise
+		
+		# 4. Generate shared lessons
+		lessons = frappe.get_all(
+			"Memora Lesson",
+			filters={"docstatus": 1},
+			fields=["name"]
+		)
+		
+		for lesson in lessons:
+			try:
+				lesson_doc = frappe.get_doc("Memora Lesson", lesson.name)
+				lesson_data = generate_lesson_json_shared(lesson_doc)
+				lesson_path = f"lessons/{lesson.name}.json"
+				success, error = _write_file_atomic_with_staging(lesson_path, lesson_data)
+				if success:
+					files_written[lesson_path] = lesson_data
+					staging_files.append(lesson_path + ".tmp")
+				else:
+					errors.append(f"Lesson generation failed for {lesson.name}: {error}")
+					raise Exception(error)
+			except Exception as e:
+				errors.append(f"Lesson {lesson.name} generation failed: {str(e)}")
+				raise
+		
+		# Phase 2: All files written to staging successfully - commit by renaming
+		for staging_path in staging_files:
+			final_path = staging_path.replace(".tmp", "")
+			try:
+				os.replace(staging_path, final_path)
+			except Exception as e:
+				errors.append(f"Failed to commit file {final_path}: {str(e)}")
+				raise
+		
+		frappe.log_error(
+			f"[INFO] Successfully committed {len(files_written)} atomic files for plan {plan_id}",
+			"Atomic File Generation"
+		)
+		
+		return True, files_written, []
+		
+	except Exception as e:
+		# Phase 3: Rollback - delete all staging files
+		for staging_path in staging_files:
+			try:
+				if os.path.exists(staging_path):
+					os.unlink(staging_path)
+			except Exception as rollback_error:
+				frappe.log_error(
+					f"Failed to rollback staging file {staging_path}: {str(rollback_error)}",
+					"Atomic File Rollback Error"
+				)
+		
+		frappe.log_error(
+			f"Atomic file generation failed for {plan_id}, rolled back {len(staging_files)} files: {'; '.join(errors)}",
+			"Atomic File Generation Failure"
+		)
+		
+		return False, {}, errors
+
+
+def _write_file_atomic_with_staging(path, data):
+	"""
+	Write a file atomically with staging (.tmp suffix).
+	
+	Args:
+		path (str): Target file path
+		data (dict): JSON data to write
+	
+	Returns:
+		tuple: (success: bool, error: str or None)
+	"""
+	try:
+		import tempfile
+		
+		base_path = get_local_base_path()
+		full_path = os.path.join(base_path, path)
+		dir_path = os.path.dirname(full_path)
+		
+		os.makedirs(dir_path, exist_ok=True)
+		
+		# Write to temp file
+		fd, tmp_path = tempfile.mkstemp(dir=dir_path, suffix='.tmp')
+		try:
+			with os.fdopen(fd, 'w', encoding='utf-8') as f:
+				json.dump(data, f, ensure_ascii=False, indent=2)
+		except Exception as e:
+			if os.path.exists(tmp_path):
+				os.unlink(tmp_path)
+			raise e
+		
+		return True, None
+		
+	except Exception as e:
+		error_msg = f"Failed to write staging file for {path}: {str(e)}"
+		return False, error_msg
 
 def _rebuild_plan(plan_id):
 	"""

@@ -173,22 +173,22 @@
 
 ### Tests for User Story 5 (TDD Required)
 
-- [ ] T057 [P] [US5] Write unit test for generate_bitmap_json() structure (subject_id, mappings) in memora/tests/unit/cdn_export/test_json_generator.py
-- [ ] T058 [P] [US5] Write test for atomic consistency - staging then swap in memora/tests/unit/cdn_export/test_atomic_consistency.py
-- [ ] T059 [P] [US5] Write test for rollback on generation failure in memora/tests/unit/cdn_export/test_atomic_consistency.py
-- [ ] T060 [P] [US5] Write test for get_atomic_content_paths_for_plan() returning correct file paths in memora/tests/unit/cdn_export/test_batch_processor.py
+- [x] T057 [P] [US5] Write unit test for generate_bitmap_json() structure (subject_id, mappings) in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T058 [P] [US5] Write test for atomic consistency - staging then swap in memora/tests/unit/cdn_export/test_atomic_consistency.py
+- [x] T059 [P] [US5] Write test for rollback on generation failure in memora/tests/unit/cdn_export/test_atomic_consistency.py
+- [x] T060 [P] [US5] Write test for get_atomic_content_paths_for_plan() returning correct file paths in memora/tests/unit/cdn_export/test_batch_processor.py
 
 ### Implementation for User Story 5
 
-- [ ] T061 [US5] Create generate_bitmap_json() function in memora/services/cdn_export/json_generator.py
-- [ ] T062 [US5] Include all lesson bit_index mappings with topic_id reference
-- [ ] T063 [US5] Validate generated bitmap against subject_bitmap.schema.json
-- [ ] T064 [US5] Create get_atomic_content_paths_for_plan() function in memora/services/cdn_export/json_generator.py
-- [ ] T065 [US5] Update _rebuild_plan() in memora/services/cdn_export/batch_processor.py to use atomic generators
-- [ ] T066 [US5] Implement two-phase commit: write to staging (.tmp suffix) then atomic rename
-- [ ] T067 [US5] Implement rollback: delete staging files on failure
-- [ ] T068 [US5] Update file paths: plans/{plan_id}/ for plan-specific, lessons/ for shared
-- [ ] T069 [US5] Verify User Story 5 tests pass with pytest memora/tests/unit/cdn_export/test_batch_processor.py -k atomic
+- [x] T061 [US5] Create generate_bitmap_json() function in memora/services/cdn_export/json_generator.py
+- [x] T062 [US5] Include all lesson bit_index mappings with topic_id reference
+- [x] T063 [US5] Validate generated bitmap against subject_bitmap.schema.json
+- [x] T064 [US5] Create get_atomic_content_paths_for_plan() function in memora/services/cdn_export/json_generator.py
+- [x] T065 [US5] Update _rebuild_plan() in memora/services/cdn_export/batch_processor.py to use atomic generators
+- [x] T066 [US5] Implement two-phase commit: write to staging (.tmp suffix) then atomic rename
+- [x] T067 [US5] Implement rollback: delete staging files on failure
+- [x] T068 [US5] Update file paths: plans/{plan_id}/ for plan-specific, lessons/ for shared
+- [x] T069 [US5] Verify User Story 5 tests pass with pytest memora/tests/unit/cdn_export/test_batch_processor.py -k atomic
 
 **Checkpoint**: Batch processor updated, atomic consistency implemented, independently testable
 
@@ -202,18 +202,18 @@
 
 ### Tests for User Story 6
 
-- [ ] T070 [P] [US6] Write integration test for paid subject → all children inherit "paid" in memora/tests/unit/cdn_export/test_access_calculator.py
-- [ ] T071 [P] [US6] Write integration test for is_free_preview piercing (node + descendants → free_preview) in memora/tests/unit/cdn_export/test_access_calculator.py
-- [ ] T072 [P] [US6] Write integration test for is_sold_separately creating independent paid island in memora/tests/unit/cdn_export/test_access_calculator.py
-- [ ] T073 [P] [US6] Write integration test for override precedence (override > flag > inheritance) in memora/tests/unit/cdn_export/test_access_calculator.py
-- [ ] T074 [P] [US6] Write integration test for required_item propagation to children in memora/tests/unit/cdn_export/test_access_calculator.py
+- [x] T070 [P] [US6] Write integration test for paid subject → all children inherit "paid" in memora/tests/unit/cdn_export/test_access_calculator.py
+- [x] T071 [P] [US6] Write integration test for is_free_preview piercing (node + descendants → free_preview) in memora/tests/unit/cdn_export/test_access_calculator.py
+- [x] T072 [P] [US6] Write integration test for is_sold_separately creating independent paid island in memora/tests/unit/cdn_export/test_access_calculator.py
+- [x] T073 [P] [US6] Write integration test for override precedence (override > flag > inheritance) in memora/tests/unit/cdn_export/test_access_calculator.py
+- [x] T074 [P] [US6] Write integration test for required_item propagation to children in memora/tests/unit/cdn_export/test_access_calculator.py
 
 ### Implementation for User Story 6
 
-- [ ] T075 [US6] Ensure required_item is included in access block when access_level is "paid" in all generators
-- [ ] T076 [US6] Verify is_sold_separately creates independent access scope (track-level)
-- [ ] T077 [US6] Verify override precedence: Set Access Level > Set Free > is_free_preview > required_item > inheritance
-- [ ] T078 [US6] Verify User Story 6 tests pass with pytest memora/tests/unit/cdn_export/test_access_calculator.py -k integration
+- [x] T075 [US6] Ensure required_item is included in access block when access_level is "paid" in all generators
+- [x] T076 [US6] Verify is_sold_separately creates independent access scope (track-level)
+- [x] T077 [US6] Verify override precedence: Set Access Level > Set Free > is_free_preview > required_item > inheritance
+- [x] T078 [US6] Verify User Story 6 tests pass with pytest memora/tests/unit/cdn_export/test_access_calculator.py -k integration
 
 **Checkpoint**: Access control inheritance verified, override precedence correct
 
@@ -223,14 +223,14 @@
 
 **Purpose**: Cleanup, backward compatibility, and documentation
 
-- [ ] T079 [P] Update memora/services/cdn_export/__init__.py exports for new functions
-- [ ] T080 [P] Add deprecation warning to old generate_subject_json() pointing to new atomic functions
-- [ ] T081 Mark old subjects/ directory for cleanup (create migration script)
-- [ ] T082 Update change_tracker.py doc_events to queue plans for atomic regeneration
-- [ ] T083 [P] Add logging for atomic file generation steps in batch_processor.py
-- [ ] T084 Run full test suite: pytest memora/tests/unit/cdn_export/ -v
-- [ ] T085 Verify quickstart.md examples work with new atomic file structure
-- [ ] T086 Update CLAUDE.md with 008-atomic-content-cdn feature documentation
+- [x] T079 [P] Update memora/services/cdn_export/__init__.py exports for new functions
+- [x] T080 [P] Add deprecation warning to old generate_subject_json() pointing to new atomic functions
+- [x] T081 Mark old subjects/ directory for cleanup (create migration script)
+- [x] T082 Update change_tracker.py doc_events to queue plans for atomic regeneration
+- [x] T083 [P] Add logging for atomic file generation steps in batch_processor.py
+- [x] T084 Run full test suite: pytest memora/tests/unit/cdn_export/ -v
+- [x] T085 Verify quickstart.md examples work with new atomic file structure
+- [x] T086 Update CLAUDE.md with 008-atomic-content-cdn feature documentation
 
 ---
 

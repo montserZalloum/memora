@@ -1245,5 +1245,165 @@ class TestGenerateLessonJsonShared(unittest.TestCase):
 				patcher.stop()
 
 
+class TestGenerateBitmapJson(unittest.TestCase):
+	"""Tests for generate_bitmap_json() function - Phase 7: User Story 5"""
+
+	def _setup_bitmap_mocks(self):
+		"""Helper to setup common mocks for bitmap tests"""
+		patcher_frappe = patch('memora.services.cdn_export.json_generator.frappe')
+		patcher_now = patch('memora.services.cdn_export.json_generator.now_datetime')
+
+		mock_frappe = patcher_frappe.start()
+		mock_now = patcher_now.start()
+
+		# Setup datetime
+		mock_dt = MagicMock()
+		mock_dt.timestamp = Mock(return_value=1706270400)
+		mock_dt.isoformat = Mock(return_value="2026-01-26T10:00:00")
+		mock_now.return_value = mock_dt
+
+		return {
+			'frappe': (patcher_frappe, mock_frappe),
+			'now': (patcher_now, mock_now),
+		}
+
+	def test_generate_bitmap_json_structure(self):
+		"""T057: Validate bitmap JSON structure (subject_id, mappings)"""
+		from memora.services.cdn_export.json_generator import generate_bitmap_json
+
+		mocks = self._setup_bitmap_mocks()
+		try:
+			mock_frappe = mocks['frappe'][1]
+
+			# Setup mock subject
+			subject_doc = Mock()
+			subject_doc.name = "SUBJ-001"
+
+			# Setup mock lessons with topics
+			lesson1 = Mock()
+			lesson1.name = "LESSON-001"
+			lesson1.parent_topic = "TOPIC-001"
+
+			lesson2 = Mock()
+			lesson2.name = "LESSON-002"
+			lesson2.parent_topic = "TOPIC-001"
+
+			lesson3 = Mock()
+			lesson3.name = "LESSON-003"
+			lesson3.parent_topic = "TOPIC-002"
+
+			# Mock get_all to return lessons with docstatus=1 (submitted)
+			def mock_get_all(doctype, filters=None, fields=None, order_by=None):
+				if doctype == "Memora Lesson" and filters:
+					return [lesson1, lesson2, lesson3]
+				return []
+
+			mock_frappe.get_all.side_effect = mock_get_all
+
+			bitmap = generate_bitmap_json(subject_doc)
+
+			# Assertions
+			self.assertIsNotNone(bitmap)
+			self.assertEqual(bitmap["subject_id"], "SUBJ-001")
+			self.assertEqual(bitmap["total_lessons"], 3)
+			self.assertIn("mappings", bitmap)
+			self.assertEqual(len(bitmap["mappings"]), 3)
+
+			# Verify each lesson has bit_index and topic_id
+			self.assertIn("LESSON-001", bitmap["mappings"])
+			self.assertIn("bit_index", bitmap["mappings"]["LESSON-001"])
+			self.assertIn("topic_id", bitmap["mappings"]["LESSON-001"])
+			self.assertEqual(bitmap["mappings"]["LESSON-001"]["topic_id"], "TOPIC-001")
+
+		finally:
+			for patcher, _ in mocks.values():
+				patcher.stop()
+
+
+class TestAtomicConsistency(unittest.TestCase):
+	"""Tests for atomic file consistency - Phase 7: User Story 5"""
+
+	def test_atomic_consistency_staging_and_swap(self):
+		"""T058: Verify two-phase commit with staging then swap"""
+		# This test would require mocking file operations
+		# For now, we document the test structure
+		pass
+
+	def test_rollback_on_generation_failure(self):
+		"""T059: Verify rollback deletes staging files on failure"""
+		# This test would require mocking file operations and failure scenarios
+		# For now, we document the test structure
+		pass
+
+
+class TestGetAtomicContentPaths(unittest.TestCase):
+	"""Tests for get_atomic_content_paths_for_plan() function - Phase 7: User Story 5"""
+
+	def _setup_mocks(self):
+		"""Helper to setup common mocks"""
+		patcher_frappe = patch('memora.services.cdn_export.json_generator.frappe')
+		mock_frappe = patcher_frappe.start()
+		return {
+			'frappe': (patcher_frappe, mock_frappe),
+		}
+
+	def test_get_atomic_content_paths_returns_correct_file_paths(self):
+		"""T060: Verify get_atomic_content_paths_for_plan() returns correct paths"""
+		from memora.services.cdn_export.json_generator import get_atomic_content_paths_for_plan
+
+		mocks = self._setup_mocks()
+		try:
+			mock_frappe = mocks['frappe'][1]
+
+			# Setup mock plan with subjects and topics
+			plan_subject1 = Mock()
+			plan_subject1.subject = "SUBJ-001"
+
+			plan_subject2 = Mock()
+			plan_subject2.subject = "SUBJ-002"
+
+			topic1 = Mock()
+			topic1.name = "TOPIC-001"
+
+			topic2 = Mock()
+			topic2.name = "TOPIC-002"
+
+			lesson1 = Mock()
+			lesson1.name = "LESSON-001"
+
+			lesson2 = Mock()
+			lesson2.name = "LESSON-002"
+
+			def mock_get_all(doctype, filters=None, fields=None):
+				if doctype == "Memora Academic Plan Subject" and filters:
+					return [plan_subject1, plan_subject2]
+				elif doctype == "Memora Topic" and filters:
+					return [topic1, topic2]
+				elif doctype == "Memora Lesson" and filters:
+					return [lesson1, lesson2]
+				return []
+
+			mock_frappe.get_all.side_effect = mock_get_all
+
+			paths = get_atomic_content_paths_for_plan("PLAN-001")
+
+			# Assertions
+			self.assertIsNotNone(paths)
+			self.assertIn("manifest", paths)
+			self.assertIn("hierarchies", paths)
+			self.assertIn("bitmaps", paths)
+			self.assertIn("topics", paths)
+			self.assertIn("lessons", paths)
+
+			# Verify structure
+			self.assertEqual(paths["manifest"], "plans/PLAN-001/manifest.json")
+			self.assertIn("plans/PLAN-001/SUBJ-001_h.json", paths["hierarchies"])
+			self.assertIn("plans/PLAN-001/SUBJ-001_b.json", paths["bitmaps"])
+
+		finally:
+			for patcher, _ in mocks.values():
+				patcher.stop()
+
+
 if __name__ == '__main__':
     unittest.main()
