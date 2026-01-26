@@ -1,10 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://memora.app/schemas/cdn/lesson.schema.json",
-  "title": "Lesson Content",
-  "description": "Lesson with stages (metadata only, sensitive URLs signed)",
+  "$id": "https://memora.app/schemas/cdn/008/lesson.schema.json",
+  "title": "Lesson Content (Shared)",
+  "description": "Shared lesson content with stages - plan-agnostic, no access control",
   "type": "object",
-  "required": ["id", "title", "version", "generated_at", "stages", "access"],
+  "required": ["id", "title", "version", "generated_at", "stages", "navigation"],
   "properties": {
     "id": {
       "type": "string",
@@ -20,36 +20,13 @@
       "type": "string",
       "format": "uri"
     },
-    "sort_order": {
-      "type": "integer"
-    },
     "version": {
-      "type": "integer"
+      "type": "integer",
+      "description": "File version (Unix timestamp)"
     },
     "generated_at": {
       "type": "string",
       "format": "date-time"
-    },
-    "signed_url_expiry": {
-      "type": "string",
-      "format": "date-time",
-      "description": "When signed URLs in this lesson expire"
-    },
-    "access": {
-      "$ref": "#/definitions/accessControl"
-    },
-    "parent": {
-      "type": "object",
-      "properties": {
-        "topic_id": { "type": "string" },
-        "topic_title": { "type": "string" },
-        "unit_id": { "type": "string" },
-        "unit_title": { "type": "string" },
-        "track_id": { "type": "string" },
-        "track_title": { "type": "string" },
-        "subject_id": { "type": "string" },
-        "subject_title": { "type": "string" }
-      }
     },
     "stages": {
       "type": "array",
@@ -59,47 +36,23 @@
     },
     "navigation": {
       "type": "object",
+      "required": ["is_standalone"],
       "properties": {
-        "previous_lesson": {
-          "type": "object",
-          "properties": {
-            "id": { "type": "string" },
-            "title": { "type": "string" },
-            "url": { "type": "string" }
-          }
-        },
-        "next_lesson": {
-          "type": "object",
-          "properties": {
-            "id": { "type": "string" },
-            "title": { "type": "string" },
-            "url": { "type": "string" }
-          }
+        "is_standalone": {
+          "type": "boolean",
+          "description": "Always true for shared lessons - navigation determined by topic context"
         }
       }
     }
   },
   "definitions": {
-    "accessControl": {
-      "type": "object",
-      "required": ["is_published", "access_level"],
-      "properties": {
-        "is_published": { "type": "boolean" },
-        "access_level": {
-          "type": "string",
-          "enum": ["public", "authenticated", "paid", "free_preview"]
-        },
-        "required_item": { "type": "string" },
-        "is_sold_separately": { "type": "boolean" },
-        "parent_item_required": { "type": "boolean" }
-      }
-    },
     "stage": {
       "type": "object",
-      "required": ["idx", "title", "type"],
+      "required": ["idx", "title", "type", "config"],
       "properties": {
         "idx": {
           "type": "integer",
+          "minimum": 1,
           "description": "Stage order (1-based)"
         },
         "title": {
@@ -107,11 +60,27 @@
         },
         "type": {
           "type": "string",
-          "enum": ["Video", "Question", "Text", "Interactive"]
+          "enum": ["Video", "Question", "Text", "Interactive"],
+          "description": "Stage type determining config structure"
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0,
+          "description": "XP weight multiplier for this stage"
+        },
+        "target_time": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Expected completion time in seconds"
+        },
+        "is_skippable": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether stage can be skipped"
         },
         "config": {
           "type": "object",
-          "description": "Type-specific configuration (video URLs are signed)"
+          "description": "Type-specific configuration data"
         }
       }
     }

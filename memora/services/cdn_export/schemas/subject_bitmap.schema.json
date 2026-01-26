@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://memora.app/schemas/cdn/008/subject_bitmap.schema.json",
+  "title": "Subject Bitmap",
+  "description": "Progress engine bit mappings for all lessons in a subject",
+  "type": "object",
+  "required": ["subject_id", "version", "generated_at", "total_lessons", "mappings"],
+  "properties": {
+    "subject_id": {
+      "type": "string",
+      "description": "Subject document name"
+    },
+    "version": {
+      "type": "integer",
+      "description": "File version (Unix timestamp)"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "total_lessons": {
+      "type": "integer",
+      "description": "Total number of lessons in this subject (for bitmap size)"
+    },
+    "mappings": {
+      "type": "object",
+      "description": "Mapping of lesson_id to bit_index and topic",
+      "additionalProperties": {
+        "$ref": "#/definitions/lessonMapping"
+      }
+    }
+  },
+  "definitions": {
+    "lessonMapping": {
+      "type": "object",
+      "required": ["bit_index", "topic_id"],
+      "properties": {
+        "bit_index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "0-based index in the progress bitmap"
+        },
+        "topic_id": {
+          "type": "string",
+          "description": "Parent topic document name"
+        }
+      }
+    }
+  }
+}

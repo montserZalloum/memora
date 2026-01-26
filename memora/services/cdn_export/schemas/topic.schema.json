@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://memora.app/schemas/cdn/008/topic.schema.json",
+  "title": "Topic Content",
+  "description": "Topic with lesson list and bit_index references",
+  "type": "object",
+  "required": ["id", "title", "is_linear", "version", "generated_at", "parent", "access", "lessons"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Topic document name"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "image": {
+      "type": "string",
+      "format": "uri"
+    },
+    "is_linear": {
+      "type": "boolean",
+      "description": "Whether topic enforces linear lesson progression"
+    },
+    "version": {
+      "type": "integer",
+      "description": "File version (Unix timestamp)"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "parent": {
+      "type": "object",
+      "required": ["unit_id", "unit_title", "track_id", "track_title", "subject_id", "subject_title"],
+      "properties": {
+        "unit_id": { "type": "string" },
+        "unit_title": { "type": "string" },
+        "track_id": { "type": "string" },
+        "track_title": { "type": "string" },
+        "subject_id": { "type": "string" },
+        "subject_title": { "type": "string" }
+      }
+    },
+    "access": {
+      "$ref": "#/definitions/accessControl"
+    },
+    "lessons": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/lessonEntry"
+      }
+    }
+  },
+  "definitions": {
+    "accessControl": {
+      "type": "object",
+      "required": ["is_published", "access_level"],
+      "properties": {
+        "is_published": { "type": "boolean" },
+        "access_level": {
+          "type": "string",
+          "enum": ["public", "authenticated", "paid", "free_preview"]
+        },
+        "required_item": { "type": "string" }
+      }
+    },
+    "lessonEntry": {
+      "type": "object",
+      "required": ["id", "title", "bit_index", "lesson_url", "access", "stage_count"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Lesson document name"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "bit_index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Progress engine bit index for this lesson"
+        },
+        "lesson_url": {
+          "type": "string",
+          "description": "Relative path to shared lesson JSON"
+        },
+        "access": {
+          "$ref": "#/definitions/accessControl"
+        },
+        "stage_count": {
+          "type": "integer",
+          "description": "Number of stages in this lesson"
+        }
+      }
+    }
+  }
+}
