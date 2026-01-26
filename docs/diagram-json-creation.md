@@ -120,3 +120,15 @@ graph TD
         Fallback --> App
         Write -.-> Engine[الباك اند يقرأ محلياً لحساب التقدم والذاكرة]
     end
+
+/public/memora_content/
+  ├── /plans/
+  │    └── /{plan_id}/
+  │         ├── manifest.json              (فهرس الخطة)
+  │         ├── /subjects/
+  │         │    ├── {sub_id}_h.json       (الهيكل: Subject > Track > Unit > Topic)
+  │         │    └── {sub_id}_b.json       (خريطة البتات - للمحرك فقط)
+  │         └── /topics/
+  │              └── {topic_id}.json       (قائمة دروس التوبيك)
+  └── /lessons/
+       └── {lesson_id}.json                (محتوى الدرس - Stages)

@@ -206,6 +206,247 @@ def validate_manifest_against_schema(manifest):
     except Exception as e:
         return False, [f"Schema validation error: {str(e)}"]
 
+def generate_subject_hierarchy(subject_doc, plan_id=None):
+    """
+    Generate subject hierarchy JSON (Phase 4: User Story 2).
+    
+    Generates {subject_id}_h.json with tracks → units → topics structure,
+    NO lessons embedded. Each topic includes topic_url pointing to separate topic JSON
+    and lesson_count for UI display without loading lesson details.
+
+    Args:
+        subject_doc (frappe.doc): Memora Subject document
+        plan_id (str, optional): Plan ID for override lookup
+
+    Returns:
+        dict or None: Subject hierarchy data conforming to subject_hierarchy.schema.json,
+                      or None if subject is hidden by override
+    """
+    plan_overrides = apply_plan_overrides(plan_id) if plan_id else {}
+    
+    subject_access = calculate_access_level(subject_doc, parent_access=None, plan_overrides=plan_overrides)
+    if subject_access is None:
+        frappe.log_error(
+            f"[WARN] Subject {subject_doc.name} skipped - access level is None (likely hidden by plan override)",
+            "CDN JSON Generation"
+        )
+        return None
+
+    hierarchy = {
+        "id": subject_doc.name,
+        "title": subject_doc.title,
+        "is_linear": subject_doc.is_linear if hasattr(subject_doc, "is_linear") else True,
+        "version": int(now_datetime().timestamp()),
+        "generated_at": now_datetime().isoformat(),
+        "access": {
+            "is_published": subject_doc.is_published,
+            "access_level": subject_access
+        },
+        "tracks": []
+    }
+
+    if subject_doc.description:
+        hierarchy["description"] = subject_doc.description
+    if subject_doc.image:
+        hierarchy["image"] = subject_doc.image
+    if subject_doc.color_code:
+        hierarchy["color_code"] = subject_doc.color_code
+
+    # Include required_item if access level is paid
+    if subject_access == "paid" and hasattr(subject_doc, "required_item") and subject_doc.required_item:
+        hierarchy["access"]["required_item"] = subject_doc.required_item
+
+    # Fetch all tracks for this subject
+    tracks = frappe.get_all(
+        "Memora Track",
+        filters={"parent_subject": subject_doc.name},
+        fields=["name", "title", "description", "is_linear"],
+        order_by="name"
+    )
+
+    # Fetch all units and organize by track
+    track_ids = [track.name for track in tracks]
+    all_units = frappe.get_all(
+        "Memora Unit",
+        filters={"parent_track": ["in", track_ids]},
+        fields=["name", "title", "description", "parent_track", "is_linear"],
+    )
+    units_by_track = {}
+    for unit in all_units:
+        if unit.parent_track not in units_by_track:
+            units_by_track[unit.parent_track] = []
+        units_by_track[unit.parent_track].append(unit)
+
+    # Fetch all topics and organize by unit
+    unit_ids = [unit.name for unit in all_units]
+    all_topics = frappe.get_all(
+        "Memora Topic",
+        filters={"parent_unit": ["in", unit_ids]},
+        fields=["name", "title", "description", "parent_unit", "is_linear"],
+    )
+    topics_by_unit = {}
+    for topic in all_topics:
+        if topic.parent_unit not in topics_by_unit:
+            topics_by_unit[topic.parent_unit] = []
+        topics_by_unit[topic.parent_unit].append(topic)
+
+    # Count lessons per topic (without loading lesson details)
+    topic_ids = [topic.name for topic in all_topics]
+    all_lessons = frappe.get_all(
+        "Memora Lesson",
+        filters={"parent_topic": ["in", topic_ids]},
+        fields=["parent_topic"],
+    )
+    lesson_count_by_topic = {}
+    for lesson in all_lessons:
+        if lesson.parent_topic not in lesson_count_by_topic:
+            lesson_count_by_topic[lesson.parent_topic] = 0
+        lesson_count_by_topic[lesson.parent_topic] += 1
+
+    # Track statistics
+    stats = {
+        "total_tracks": 0,
+        "total_units": 0,
+        "total_topics": 0,
+        "total_lessons": len(all_lessons)
+    }
+
+    # Build hierarchy: tracks → units → topics (NO lessons)
+    for track in tracks:
+        track_access = calculate_access_level(track, parent_access=subject_access, plan_overrides=plan_overrides)
+        
+        if track_access is None:
+            continue  # Skip hidden tracks
+
+        track_data = {
+            "id": track.name,
+            "title": track.title,
+            "is_linear": track.is_linear if hasattr(track, "is_linear") else True,
+            "access": {
+                "is_published": True,
+                "access_level": track_access
+            },
+            "units": []
+        }
+
+        if track.description:
+            track_data["description"] = track.description
+        if hasattr(track, "image") and track.image:
+            track_data["image"] = track.image
+
+        if track_access == "paid" and hasattr(track, "required_item") and track.required_item:
+            track_data["access"]["required_item"] = track.required_item
+
+        for unit in units_by_track.get(track.name, []):
+            unit_access = calculate_access_level(unit, parent_access=track_access, plan_overrides=plan_overrides)
+            
+            if unit_access is None:
+                continue  # Skip hidden units
+
+            unit_data = {
+                "id": unit.name,
+                "title": unit.title,
+                "is_linear": unit.is_linear if hasattr(unit, "is_linear") else True,
+                "access": {
+                    "is_published": True,
+                    "access_level": unit_access
+                },
+                "topics": []
+            }
+
+            if unit.description:
+                unit_data["description"] = unit.description
+            if hasattr(unit, "image") and unit.image:
+                unit_data["image"] = unit.image
+            if hasattr(unit, "badge_image") and unit.badge_image:
+                unit_data["badge_image"] = unit.badge_image
+
+            if unit_access == "paid" and hasattr(unit, "required_item") and unit.required_item:
+                unit_data["access"]["required_item"] = unit.required_item
+
+            for topic in topics_by_unit.get(unit.name, []):
+                topic_access = calculate_access_level(topic, parent_access=unit_access, plan_overrides=plan_overrides)
+                
+                if topic_access is None:
+                    continue  # Skip hidden topics
+
+                # Calculate lesson count for this topic
+                topic_lesson_count = lesson_count_by_topic.get(topic.name, 0)
+
+                topic_data = {
+                    "id": topic.name,
+                    "title": topic.title,
+                    "is_linear": topic.is_linear if hasattr(topic, "is_linear") else True,
+                    "topic_url": get_content_url(f"plans/{plan_id}/{topic.name}.json") if plan_id else f"plans/shared/{topic.name}.json",
+                    "access": {
+                        "is_published": True,
+                        "access_level": topic_access
+                    },
+                    "lesson_count": topic_lesson_count
+                }
+
+                if topic.description:
+                    topic_data["description"] = topic.description
+                if hasattr(topic, "image") and topic.image:
+                    topic_data["image"] = topic.image
+
+                if topic_access == "paid" and hasattr(topic, "required_item") and topic.required_item:
+                    topic_data["access"]["required_item"] = topic.required_item
+
+                unit_data["topics"].append(topic_data)
+                stats["total_topics"] += 1
+
+            if unit_data["topics"]:  # Only add unit if it has visible topics
+                track_data["units"].append(unit_data)
+                stats["total_units"] += 1
+
+        if track_data["units"]:  # Only add track if it has visible units
+            hierarchy["tracks"].append(track_data)
+            stats["total_tracks"] += 1
+
+    # Add stats to hierarchy
+    hierarchy["stats"] = stats
+
+    frappe.log_error(
+        f"[INFO] Generated subject hierarchy for {subject_doc.name} with {stats['total_tracks']} tracks, "
+        f"{stats['total_units']} units, {stats['total_topics']} topics",
+        "CDN JSON Generation"
+    )
+    return hierarchy
+
+def validate_subject_hierarchy_against_schema(hierarchy):
+    """
+    Validate generated subject hierarchy against subject_hierarchy.schema.json.
+    
+    Args:
+        hierarchy (dict): Hierarchy data to validate
+        
+    Returns:
+        tuple: (is_valid: bool, errors: list of error messages)
+    """
+    import jsonschema
+    import os
+    
+    schema_path = os.path.join(
+        os.path.dirname(__file__),
+        "schemas",
+        "subject_hierarchy.schema.json"
+    )
+    
+    try:
+        with open(schema_path, "r") as f:
+            schema = json.load(f)
+    except Exception as e:
+        return False, [f"Failed to load subject_hierarchy schema: {str(e)}"]
+    
+    try:
+        jsonschema.validate(instance=hierarchy, schema=schema)
+        return True, []
+    except jsonschema.ValidationError as e:
+        return False, [str(e)]
+    except Exception as e:
+        return False, [f"Schema validation error: {str(e)}"]
+
 def generate_subject_json(subject_doc, plan_id=None):
 	"""
 	Generate subject JSON with complete content hierarchy.

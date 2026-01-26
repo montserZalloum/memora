@@ -21,10 +21,11 @@ class TestGenerateManifestAtomic(unittest.TestCase):
         mock_calc = patcher_calc.start()
         mock_url = patcher_url.start()
 
-        # Setup datetime
-        mock_now.return_value = datetime(2026, 1, 26, 10, 0, 0)
-        mock_now.return_value.timestamp = Mock(return_value=1706270400)
-        mock_now.return_value.isoformat = Mock(return_value="2026-01-26T10:00:00")
+        # Setup datetime - create a mock with timestamp and isoformat methods
+        mock_dt = MagicMock()
+        mock_dt.timestamp = Mock(return_value=1706270400)
+        mock_dt.isoformat = Mock(return_value="2026-01-26T10:00:00")
+        mock_now.return_value = mock_dt
 
         # Setup URL resolver
         mock_url.side_effect = lambda x: x
@@ -246,6 +247,409 @@ class TestGenerateManifestAtomic(unittest.TestCase):
             self.assertIn("season", manifest)
             self.assertIn("grade", manifest)
             self.assertIn("stream", manifest)
+
+        finally:
+            for patcher, _ in mocks.values():
+                patcher.stop()
+
+
+def validate_subject_hierarchy_against_schema(hierarchy):
+    """
+    Validate generated hierarchy against subject_hierarchy.schema.json.
+
+    Args:
+        hierarchy (dict): Hierarchy data to validate
+
+    Returns:
+        tuple: (is_valid: bool, errors: list of error messages)
+    """
+    import jsonschema
+    import os
+
+    schema_path = os.path.join(
+        os.path.dirname(__file__),
+        "../../services/cdn_export/schemas",
+        "subject_hierarchy.schema.json"
+    )
+
+    try:
+        with open(schema_path, "r") as f:
+            schema = json.load(f)
+    except Exception as e:
+        return False, [f"Failed to load subject_hierarchy schema: {str(e)}"]
+
+    try:
+        jsonschema.validate(instance=hierarchy, schema=schema)
+        return True, []
+    except jsonschema.ValidationError as e:
+        return False, [str(e)]
+    except Exception as e:
+        return False, [f"Schema validation error: {str(e)}"]
+
+
+class TestGenerateSubjectHierarchy(unittest.TestCase):
+    """Tests for generate_subject_hierarchy() function - Phase 4: User Story 2"""
+
+    def _setup_hierarchy_mocks(self):
+        """Helper to setup common mocks for hierarchy tests"""
+        patcher_frappe = patch('memora.services.cdn_export.json_generator.frappe')
+        patcher_now = patch('memora.services.cdn_export.json_generator.now_datetime')
+        patcher_overrides = patch('memora.services.cdn_export.json_generator.apply_plan_overrides')
+        patcher_calc = patch('memora.services.cdn_export.json_generator.calculate_access_level')
+        patcher_url = patch('memora.services.cdn_export.json_generator.get_content_url')
+
+        mock_frappe = patcher_frappe.start()
+        mock_now = patcher_now.start()
+        mock_overrides = patcher_overrides.start()
+        mock_calc = patcher_calc.start()
+        mock_url = patcher_url.start()
+
+        # Setup datetime - create a mock with timestamp and isoformat methods
+        mock_dt = MagicMock()
+        mock_dt.timestamp = Mock(return_value=1706270400)
+        mock_dt.isoformat = Mock(return_value="2026-01-26T10:00:00")
+        mock_now.return_value = mock_dt
+
+        # Setup URL resolver
+        mock_url.side_effect = lambda x: x
+
+        # Setup overrides
+        mock_overrides.return_value = {}
+
+        return {
+            'frappe': (patcher_frappe, mock_frappe),
+            'now': (patcher_now, mock_now),
+            'overrides': (patcher_overrides, mock_overrides),
+            'calc': (patcher_calc, mock_calc),
+            'url': (patcher_url, mock_url)
+        }
+
+    def test_generate_subject_hierarchy_excludes_lessons(self):
+        """T021: generate_subject_hierarchy() excludes lessons from output"""
+        from memora.services.cdn_export.json_generator import generate_subject_hierarchy
+
+        mocks = self._setup_hierarchy_mocks()
+        try:
+            mock_frappe = mocks['frappe'][1]
+            mock_calc = mocks['calc'][1]
+
+            # Setup mock subject
+            subject_doc = Mock()
+            subject_doc.name = "SUBJ-MATH"
+            subject_doc.title = "Mathematics"
+            subject_doc.description = "Math subject"
+            subject_doc.image = None
+            subject_doc.color_code = None
+            subject_doc.is_published = True
+            subject_doc.is_linear = False
+
+            # Setup mock track
+            track = Mock()
+            track.name = "TRACK-001"
+            track.title = "Track 1"
+            track.is_linear = True
+
+            # Setup mock unit
+            unit = Mock()
+            unit.name = "UNIT-001"
+            unit.title = "Unit 1"
+            unit.is_linear = False
+            unit.parent_track = "TRACK-001"
+
+            # Setup mock topic
+            topic = Mock()
+            topic.name = "TOPIC-001"
+            topic.title = "Topic 1"
+            topic.is_linear = True
+            topic.parent_unit = "UNIT-001"
+
+            # Setup mock lesson
+            lesson = Mock()
+            lesson.name = "LESSON-001"
+            lesson.title = "Lesson 1"
+            lesson.parent_topic = "TOPIC-001"
+
+            # Mock the retrieval calls in order:
+            # 1. Tracks for subject
+            # 2. Units for those tracks
+            # 3. Topics for those units
+            # 4. Lessons for those topics
+            mock_frappe.get_all.side_effect = [
+                [track],  # Memora Track for subject
+                [unit],   # Memora Unit for tracks
+                [topic],  # Memora Topic for units
+                [lesson]  # Memora Lesson for topics
+            ]
+
+            # Mock access level calculations: subject, track, unit, topic
+            mock_calc.side_effect = ["paid", "paid", "paid", "paid"]
+
+            hierarchy = generate_subject_hierarchy(subject_doc, plan_id="PLAN-001")
+
+            # Verify lessons are NOT in topics
+            self.assertIsNotNone(hierarchy)
+            self.assertIn("tracks", hierarchy)
+            self.assertEqual(len(hierarchy["tracks"]), 1)
+
+            # Traverse the hierarchy
+            track_data = hierarchy["tracks"][0]
+            self.assertIn("units", track_data)
+            self.assertEqual(len(track_data["units"]), 1)
+
+            unit_data = track_data["units"][0]
+            self.assertIn("topics", unit_data)
+            self.assertEqual(len(unit_data["topics"]), 1)
+
+            topic_data = unit_data["topics"][0]
+            # Should NOT have lessons in hierarchy
+            self.assertNotIn("lessons", topic_data)
+            # Should have topic_url instead
+            self.assertIn("topic_url", topic_data)
+
+        finally:
+            for patcher, _ in mocks.values():
+                patcher.stop()
+
+    def test_hierarchy_is_linear_at_every_level(self):
+        """T022: is_linear flag present at every hierarchy level"""
+        from memora.services.cdn_export.json_generator import generate_subject_hierarchy
+
+        mocks = self._setup_hierarchy_mocks()
+        try:
+            mock_frappe = mocks['frappe'][1]
+            mock_calc = mocks['calc'][1]
+
+            # Setup subject with is_linear
+            subject_doc = Mock()
+            subject_doc.name = "SUBJ-MATH"
+            subject_doc.title = "Mathematics"
+            subject_doc.description = None
+            subject_doc.image = None
+            subject_doc.color_code = None
+            subject_doc.is_published = True
+            subject_doc.is_linear = True  # Subject is linear
+
+            track = Mock()
+            track.name = "TRACK-001"
+            track.title = "Track 1"
+            track.is_linear = False  # Track is not linear
+
+            unit = Mock()
+            unit.name = "UNIT-001"
+            unit.title = "Unit 1"
+            unit.is_linear = True  # Unit is linear
+            unit.parent_track = "TRACK-001"
+
+            topic = Mock()
+            topic.name = "TOPIC-001"
+            topic.title = "Topic 1"
+            topic.is_linear = False  # Topic is not linear
+            topic.parent_unit = "UNIT-001"
+
+            mock_frappe.get_all.side_effect = [
+                [track],
+                [unit],
+                [topic],
+                []  # No lessons
+            ]
+
+            mock_calc.side_effect = ["paid", "paid", "paid", "paid"]
+
+            hierarchy = generate_subject_hierarchy(subject_doc, plan_id="PLAN-001")
+
+            # Verify is_linear at every level
+            self.assertEqual(hierarchy["is_linear"], True)
+            self.assertEqual(hierarchy["tracks"][0]["is_linear"], False)
+            self.assertEqual(hierarchy["tracks"][0]["units"][0]["is_linear"], True)
+            self.assertEqual(hierarchy["tracks"][0]["units"][0]["topics"][0]["is_linear"], False)
+
+        finally:
+            for patcher, _ in mocks.values():
+                patcher.stop()
+
+    def test_hierarchy_topic_url_generation(self):
+        """T023: topic_url generation pointing to topic JSON files"""
+        from memora.services.cdn_export.json_generator import generate_subject_hierarchy
+
+        mocks = self._setup_hierarchy_mocks()
+        try:
+            mock_frappe = mocks['frappe'][1]
+            mock_calc = mocks['calc'][1]
+            mock_url = mocks['url'][1]
+
+            subject_doc = Mock()
+            subject_doc.name = "SUBJ-MATH"
+            subject_doc.title = "Mathematics"
+            subject_doc.description = None
+            subject_doc.image = None
+            subject_doc.color_code = None
+            subject_doc.is_published = True
+            subject_doc.is_linear = False
+
+            track = Mock()
+            track.name = "TRACK-001"
+            track.title = "Track 1"
+            track.is_linear = False
+
+            unit = Mock()
+            unit.name = "UNIT-001"
+            unit.title = "Unit 1"
+            unit.is_linear = False
+            unit.parent_track = "TRACK-001"
+
+            topic = Mock()
+            topic.name = "TOPIC-001"
+            topic.title = "Topic 1"
+            topic.is_linear = False
+            topic.parent_unit = "UNIT-001"
+
+            mock_frappe.get_all.side_effect = [
+                [track],
+                [unit],
+                [topic],
+                []
+            ]
+
+            mock_calc.side_effect = ["paid", "paid", "paid", "paid"]
+
+            # URL resolver should format topic paths correctly
+            mock_url.side_effect = lambda x: x
+
+            hierarchy = generate_subject_hierarchy(subject_doc, plan_id="PLAN-001")
+
+            topic_data = hierarchy["tracks"][0]["units"][0]["topics"][0]
+
+            # Verify topic_url is present and formatted correctly
+            self.assertIn("topic_url", topic_data)
+            self.assertIn("plans", topic_data["topic_url"])
+            self.assertIn("PLAN-001", topic_data["topic_url"])
+            self.assertIn("TOPIC-001.json", topic_data["topic_url"])
+
+        finally:
+            for patcher, _ in mocks.values():
+                patcher.stop()
+
+    def test_hidden_nodes_excluded_from_hierarchy(self):
+        """T024: Hidden nodes (topics) excluded from hierarchy"""
+        from memora.services.cdn_export.json_generator import generate_subject_hierarchy
+
+        mocks = self._setup_hierarchy_mocks()
+        try:
+            mock_frappe = mocks['frappe'][1]
+            mock_calc = mocks['calc'][1]
+
+            subject_doc = Mock()
+            subject_doc.name = "SUBJ-MATH"
+            subject_doc.title = "Mathematics"
+            subject_doc.description = None
+            subject_doc.image = None
+            subject_doc.color_code = None
+            subject_doc.is_published = True
+            subject_doc.is_linear = False
+
+            track = Mock()
+            track.name = "TRACK-001"
+            track.title = "Track 1"
+            track.is_linear = False
+
+            unit = Mock()
+            unit.name = "UNIT-001"
+            unit.title = "Unit 1"
+            unit.is_linear = False
+            unit.parent_track = "TRACK-001"
+
+            # Two topics: one visible, one hidden
+            topic1 = Mock()
+            topic1.name = "TOPIC-001"
+            topic1.title = "Topic 1"
+            topic1.is_linear = False
+            topic1.parent_unit = "UNIT-001"
+
+            topic2 = Mock()
+            topic2.name = "TOPIC-HIDDEN"
+            topic2.title = "Hidden Topic"
+            topic2.is_linear = False
+            topic2.parent_unit = "UNIT-001"
+
+            mock_frappe.get_all.side_effect = [
+                [track],
+                [unit],
+                [topic1, topic2],
+                []  # No lessons
+            ]
+
+            # Calls to calculate_access_level in order:
+            # 1. Subject → "paid"
+            # 2. Track → "paid"
+            # 3. Unit → "paid"
+            # 4. Topic1 → "paid" (visible)
+            # 5. Topic2 → None (hidden, will be skipped)
+            mock_calc.side_effect = ["paid", "paid", "paid", "paid", None]
+
+            hierarchy = generate_subject_hierarchy(subject_doc, plan_id="PLAN-001")
+
+            # Only topic1 should be included in the unit
+            self.assertEqual(len(hierarchy["tracks"]), 1)
+            self.assertEqual(len(hierarchy["tracks"][0]["units"]), 1)
+            self.assertEqual(len(hierarchy["tracks"][0]["units"][0]["topics"]), 1)
+            self.assertEqual(hierarchy["tracks"][0]["units"][0]["topics"][0]["id"], "TOPIC-001")
+
+        finally:
+            for patcher, _ in mocks.values():
+                patcher.stop()
+
+    def test_access_level_inheritance(self):
+        """T025: Access level inheritance (paid subject → paid children)"""
+        from memora.services.cdn_export.json_generator import generate_subject_hierarchy
+
+        mocks = self._setup_hierarchy_mocks()
+        try:
+            mock_frappe = mocks['frappe'][1]
+            mock_calc = mocks['calc'][1]
+
+            subject_doc = Mock()
+            subject_doc.name = "SUBJ-MATH"
+            subject_doc.title = "Mathematics"
+            subject_doc.description = None
+            subject_doc.image = None
+            subject_doc.color_code = None
+            subject_doc.is_published = True
+            subject_doc.is_linear = False
+
+            track = Mock()
+            track.name = "TRACK-001"
+            track.title = "Track 1"
+            track.is_linear = False
+
+            unit = Mock()
+            unit.name = "UNIT-001"
+            unit.title = "Unit 1"
+            unit.is_linear = False
+            unit.parent_track = "TRACK-001"
+
+            topic = Mock()
+            topic.name = "TOPIC-001"
+            topic.title = "Topic 1"
+            topic.is_linear = False
+            topic.parent_unit = "UNIT-001"
+
+            mock_frappe.get_all.side_effect = [
+                [track],
+                [unit],
+                [topic],
+                []
+            ]
+
+            # All should inherit "paid" from subject
+            mock_calc.side_effect = ["paid", "paid", "paid", "paid"]
+
+            hierarchy = generate_subject_hierarchy(subject_doc, plan_id="PLAN-001")
+
+            # Verify access_level inheritance
+            self.assertEqual(hierarchy["access"]["access_level"], "paid")
+            self.assertEqual(hierarchy["tracks"][0]["access"]["access_level"], "paid")
+            self.assertEqual(hierarchy["tracks"][0]["units"][0]["access"]["access_level"], "paid")
+            self.assertEqual(hierarchy["tracks"][0]["units"][0]["topics"][0]["access"]["access_level"], "paid")
 
         finally:
             for patcher, _ in mocks.values():

@@ -89,21 +89,21 @@
 
 ### Tests for User Story 2 (TDD Required)
 
-- [ ] T021 [P] [US2] Write unit test for generate_subject_hierarchy() excluding lessons from output in memora/tests/unit/cdn_export/test_json_generator.py
-- [ ] T022 [P] [US2] Write unit test for is_linear flag at every hierarchy level in memora/tests/unit/cdn_export/test_json_generator.py
-- [ ] T023 [P] [US2] Write unit test for topic_url generation pointing to topic JSON files in memora/tests/unit/cdn_export/test_json_generator.py
-- [ ] T024 [P] [US2] Write unit test for Hidden nodes excluded from hierarchy in memora/tests/unit/cdn_export/test_json_generator.py
-- [ ] T025 [P] [US2] Write unit test for access level inheritance (paid subject → paid children) in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T021 [P] [US2] Write unit test for generate_subject_hierarchy() excluding lessons from output in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T022 [P] [US2] Write unit test for is_linear flag at every hierarchy level in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T023 [P] [US2] Write unit test for topic_url generation pointing to topic JSON files in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T024 [P] [US2] Write unit test for Hidden nodes excluded from hierarchy in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T025 [P] [US2] Write unit test for access level inheritance (paid subject → paid children) in memora/tests/unit/cdn_export/test_json_generator.py
 
 ### Implementation for User Story 2
 
-- [ ] T026 [US2] Create generate_subject_hierarchy() function in memora/services/cdn_export/json_generator.py (replaces monolithic generate_subject_json for hierarchy)
-- [ ] T027 [US2] Implement is_linear extraction from DocTypes and apply "Set Linear" overrides
-- [ ] T028 [US2] Generate topic_url values pointing to plans/{plan_id}/{topic_id}.json
-- [ ] T029 [US2] Calculate lesson_count per topic without loading lesson details
-- [ ] T030 [US2] Add stats block (total_tracks, total_units, total_topics, total_lessons)
-- [ ] T031 [US2] Validate generated hierarchy against subject_hierarchy.schema.json
-- [ ] T032 [US2] Verify User Story 2 tests pass with pytest memora/tests/unit/cdn_export/test_json_generator.py -k hierarchy
+- [x] T026 [US2] Create generate_subject_hierarchy() function in memora/services/cdn_export/json_generator.py (replaces monolithic generate_subject_json for hierarchy)
+- [x] T027 [US2] Implement is_linear extraction from DocTypes and apply "Set Linear" overrides
+- [x] T028 [US2] Generate topic_url values pointing to plans/{plan_id}/{topic_id}.json
+- [x] T029 [US2] Calculate lesson_count per topic without loading lesson details
+- [x] T030 [US2] Add stats block (total_tracks, total_units, total_topics, total_lessons)
+- [x] T031 [US2] Validate generated hierarchy against subject_hierarchy.schema.json
+- [x] T032 [US2] Verify User Story 2 tests pass with pytest memora/tests/unit/cdn_export/test_json_generator.py -k hierarchy
 
 **Checkpoint**: Hierarchy generation working, lessons excluded, independently testable
 
