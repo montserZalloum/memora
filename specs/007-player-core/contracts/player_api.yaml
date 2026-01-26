@@ -1,0 +1,529 @@
+openapi: 3.0.3
+info:
+  title: Memora Player Core API
+  description: |
+    API endpoints for Player Core feature: identity management, device authorization,
+    and session management.
+
+    **Security Model**:
+    - All endpoints require Frappe session authentication
+    - Device-specific endpoints require X-Device-ID header
+    - Rate limiting applied per-user per-endpoint
+
+  version: 1.0.0
+  contact:
+    name: Memora Development Team
+
+servers:
+  - url: https://memora.example.com/api/method/memora.api.player
+    description: Production server
+  - url: http://localhost:8000/api/method/memora.api.player
+    description: Development server
+
+security:
+  - FrappeAuth: []
+
+paths:
+  /get_profile:
+    get:
+      summary: Get player profile
+      description: |
+        Retrieve the authenticated student's player profile including authorized devices.
+
+        **FR-004**: Player profile persists across sessions
+      operationId: getProfile
+      tags:
+        - Profile
+      security:
+        - FrappeAuth: []
+      responses:
+        '200':
+          description: Player profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Player profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Player profile does not exist for this user"
+
+  /register_device:
+    post:
+      summary: Register a new authorized device
+      description: |
+        Admin-only endpoint to authorize a new device for a student.
+
+        **FR-009**: Only administrators can add devices
+        **FR-005b**: Maximum 2 devices per student
+        **FR-009a**: Cannot add third device without removing existing
+
+        **Rate Limit**: 3 requests per hour per admin
+      operationId: registerDevice
+      tags:
+        - Devices
+      security:
+        - FrappeAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - student_email
+                - device_id
+                - device_name
+              properties:
+                student_email:
+                  type: string
+                  format: email
+                  description: Student's email (Frappe User.name)
+                  example: "student@example.com"
+                device_id:
+                  type: string
+                  format: uuid
+                  description: UUID v4 of the device
+                  example: "550e8400-e29b-41d4-a716-446655440000"
+                device_name:
+                  type: string
+                  minLength: 3
+                  maxLength: 100
+                  description: Human-readable device name
+                  example: "Samsung Galaxy S21"
+      responses:
+        '200':
+          description: Device registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Device registered successfully"
+                  device_id:
+                    type: string
+                    format: uuid
+                  authorized_devices_count:
+                    type: integer
+                    minimum: 1
+                    maximum: 2
+        '400':
+          description: Validation error or device limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                deviceLimitExceeded:
+                  value:
+                    error: "Maximum 2 authorized devices allowed per student"
+                invalidUuid:
+                  value:
+                    error: "Invalid device ID format. Must be UUID v4."
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /remove_device:
+    post:
+      summary: Remove an authorized device
+      description: |
+        Admin-only endpoint to deauthorize a device for a student.
+
+        **FR-009**: Only administrators can remove devices
+
+        **Side Effects**:
+        - Invalidates active session if student was logged in on this device
+        - Removes device from Redis cache immediately
+
+        **Rate Limit**: 10 requests per hour per admin
+      operationId: removeDevice
+      tags:
+        - Devices
+      security:
+        - FrappeAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - student_email
+                - device_id
+              properties:
+                student_email:
+                  type: string
+                  format: email
+                device_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Device removed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Device removed and session invalidated"
+        '400':
+          description: Device not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Device not found in authorized list"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /check_device_authorization:
+    get:
+      summary: Check if current device is authorized
+      description: |
+        Validate that the current device (from X-Device-ID header) is authorized
+        for the authenticated student.
+
+        **FR-007**: Reject unauthorized devices
+        **FR-010**: Complete check in <2ms (Redis-backed)
+
+        Used by client apps on startup to determine if login is allowed.
+      operationId: checkDeviceAuthorization
+      tags:
+        - Devices
+      security:
+        - FrappeAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: Device authorization status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authorized:
+                    type: boolean
+                    description: True if device is authorized
+                  device_count:
+                    type: integer
+                    description: Total authorized devices for this student
+                    minimum: 0
+                    maximum: 2
+              examples:
+                authorized:
+                  value:
+                    authorized: true
+                    device_count: 2
+                unauthorized:
+                  value:
+                    authorized: false
+                    device_count: 1
+        '400':
+          description: Missing device ID header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "X-Device-ID header required"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /login:
+    post:
+      summary: Student login with device authorization
+      description: |
+        Authenticate student and validate device. Creates session if device is authorized.
+
+        **FR-005a**: First device auto-authorized on account creation
+        **FR-011**: Enforces single active session
+        **FR-012**: Invalidates previous session on new login
+
+        **Flow**:
+        1. Validate credentials (Frappe built-in)
+        2. Check if device is authorized (or auto-authorize if first login)
+        3. Create new session in Redis
+        4. Invalidate previous session (kick out other device)
+
+        **Rate Limit**: 5 requests per minute per IP
+      operationId: login
+      tags:
+        - Authentication
+      security: []  # Public endpoint (credentials in body)
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - usr
+                - pwd
+              properties:
+                usr:
+                  type: string
+                  format: email
+                  description: Student email
+                  example: "student@example.com"
+                pwd:
+                  type: string
+                  format: password
+                  description: Student password
+                  example: "securePassword123"
+                device_name:
+                  type: string
+                  description: Optional device name for first login auto-authorization
+                  example: "iPhone 13"
+      responses:
+        '200':
+          description: Login successful
+          headers:
+            Set-Cookie:
+              description: Frappe session cookie
+              schema:
+                type: string
+                example: "sid=abc123xyz; HttpOnly; Secure"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Logged in successfully"
+                  session_id:
+                    type: string
+                  is_first_device:
+                    type: boolean
+                    description: True if this was the first device auto-authorization
+                  devices_authorized:
+                    type: integer
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Invalid credentials"
+        '403':
+          description: Device not authorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Unauthorized device. Contact administrator to authorize this device."
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /logout:
+    post:
+      summary: Logout and invalidate session
+      description: |
+        Logout the authenticated student and invalidate their session in Redis.
+
+        **FR-013**: Invalidate session immediately
+      operationId: logout
+      tags:
+        - Authentication
+      security:
+        - FrappeAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Logged out successfully"
+
+  /validate_session:
+    get:
+      summary: Validate current session
+      description: |
+        Check if the current session is still valid (not replaced by login from another device).
+
+        **FR-014**: Session validation on every authenticated request
+        **FR-016**: Complete validation in <2ms (Redis)
+
+        **Used by**: Client apps on every API call to detect session invalidation
+      operationId: validateSession
+      tags:
+        - Authentication
+      security:
+        - FrappeAuth: []
+      responses:
+        '200':
+          description: Session is valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                    example: true
+                  session_id:
+                    type: string
+        '401':
+          description: Session invalidated (logged in from another device)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Session invalidated on another device"
+
+components:
+  schemas:
+    PlayerProfile:
+      type: object
+      properties:
+        name:
+          type: string
+          description: DocType primary key
+          example: "PLAYER-00001"
+        user:
+          type: string
+          format: email
+          description: Linked Frappe User
+          example: "student@example.com"
+        grade:
+          type: string
+          description: Linked Memora Grade
+          example: "Grade 10"
+        stream:
+          type: string
+          nullable: true
+          description: Linked Memora Stream
+          example: "Science"
+        season:
+          type: string
+          description: Linked Memora Season
+          example: "2025-2026"
+        academic_plan:
+          type: string
+          description: Linked Memora Academic Plan
+          example: "Grade 10 Science Plan"
+        photo:
+          type: string
+          format: uri
+          nullable: true
+          description: Profile photo URL
+          example: "/files/student_photo.jpg"
+        authorized_devices:
+          type: array
+          maxItems: 2
+          items:
+            $ref: '#/components/schemas/AuthorizedDevice'
+
+    AuthorizedDevice:
+      type: object
+      properties:
+        device_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        device_name:
+          type: string
+          example: "iPhone 13"
+        added_on:
+          type: string
+          format: date-time
+          example: "2026-01-26T14:32:15Z"
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+        exc_type:
+          type: string
+          description: Exception type (for debugging)
+          example: "PermissionError"
+
+  parameters:
+    DeviceId:
+      name: X-Device-ID
+      in: header
+      required: true
+      description: UUID v4 identifying the client device
+      schema:
+        type: string
+        format: uuid
+      example: "550e8400-e29b-41d4-a716-446655440000"
+
+  responses:
+    Unauthorized:
+      description: Not authenticated (missing or invalid session)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Authentication required"
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Only System Manager can perform this action"
+
+    RateLimitExceeded:
+      description: Too many requests
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Request limit per window
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Remaining requests in window
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          description: Unix timestamp when limit resets
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Rate limit exceeded: 5 requests per minute"
+
+  securitySchemes:
+    FrappeAuth:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: |
+        Frappe session cookie obtained via login endpoint.
+        Automatically managed by Frappe framework.

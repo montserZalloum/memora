@@ -5,16 +5,16 @@
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
- "field_order": [
-  "user",
-  "display_name",
-  "grade",
-  "stream",
-  "season",
-  "avatar",
-  "current_plan",
-  "devices"
- ],
+  "field_order": [
+   "user",
+   "display_name",
+   "grade",
+   "stream",
+   "season",
+   "avatar",
+   "current_plan",
+   "authorized_devices"
+  ],
  "fields": [
   {
    "fieldname": "user",
@@ -42,12 +42,12 @@
    "options": "Memora Academic Plan",
    "search_index": 1
   },
-  {
-   "fieldname": "devices",
-   "fieldtype": "Table",
-   "label": "Devices",
-   "options": "Memora Player Device"
-  },
+   {
+    "fieldname": "authorized_devices",
+    "fieldtype": "Table",
+    "label": "Authorized Devices",
+    "options": "Memora Authorized Device"
+   },
   {
    "fieldname": "grade",
    "fieldtype": "Link",

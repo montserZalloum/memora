@@ -1,0 +1,420 @@
+openapi: 3.0.3
+info:
+  title: Memora Player Wallet API
+  description: |
+    API endpoints for Player Wallet: XP accumulation, streak tracking, and wallet queries.
+
+    **Performance Requirements**:
+    - XP display latency: <1s (FR-019, SC-006)
+    - Cache-first strategy: Always display Redis data (FR-019a, Clarification #5)
+    - Batch sync: 15-min interval to MariaDB (FR-035)
+
+  version: 1.0.0
+
+servers:
+  - url: https://memora.example.com/api/method/memora.api.player
+    description: Production server
+  - url: http://localhost:8000/api/method/memora.api.player
+    description: Development server
+
+security:
+  - FrappeAuth: []
+  - DeviceAuth: []
+
+paths:
+  /get_wallet:
+    get:
+      summary: Get student wallet (XP and streak)
+      description: |
+        Retrieve the authenticated student's wallet state from Redis cache.
+
+        **FR-019**: XP reflected immediately in student view
+        **FR-019a**: Always display cache data as authoritative
+        **SC-006**: Response time <1 second
+
+        **Cache-first**: Reads from Redis; never queries MariaDB directly.
+
+        **Rate Limit**: 60 requests per minute per student
+      operationId: getWallet
+      tags:
+        - Wallet
+      security:
+        - FrappeAuth: []
+        - DeviceAuth: []
+      responses:
+        '200':
+          description: Wallet retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wallet'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Device not authorized or session invalidated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /add_xp:
+    post:
+      summary: Add XP to student wallet
+      description: |
+        Award experience points to the authenticated student for completing an activity.
+
+        **FR-019**: XP updated immediately in cache
+        **FR-020**: No data loss during rapid activity
+        **FR-021**: Concurrent updates handled safely
+        **FR-033**: Write to Redis immediately, queue for DB sync
+        **FR-034**: Add user to pending sync queue
+
+        **Atomicity**: Uses Redis HINCRBY for atomic increments
+
+        **Rate Limit**: 10 requests per minute per student (prevents rapid-fire fake completions)
+      operationId: addXp
+      tags:
+        - Wallet
+      security:
+        - FrappeAuth: []
+        - DeviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - xp_amount
+                - activity_type
+              properties:
+                xp_amount:
+                  type: integer
+                  minimum: 1
+                  maximum: 1000
+                  description: XP to award (positive integer)
+                  example: 50
+                activity_type:
+                  type: string
+                  enum:
+                    - lesson_complete
+                    - quiz_passed
+                    - daily_bonus
+                  description: Type of activity (for analytics)
+                  example: "lesson_complete"
+                activity_id:
+                  type: string
+                  description: Optional reference to specific activity
+                  example: "LESSON-12345"
+      responses:
+        '200':
+          description: XP added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "XP added successfully"
+                  new_total_xp:
+                    type: integer
+                    description: Updated total XP (from cache)
+                    example: 1300
+                  xp_added:
+                    type: integer
+                    example: 50
+                  queued_for_sync:
+                    type: boolean
+                    description: True if added to pending_wallet_sync set
+                    example: true
+        '400':
+          description: Invalid XP amount
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "XP amount must be between 1 and 1000"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/DeviceUnauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /complete_lesson:
+    post:
+      summary: Complete a lesson and update streak
+      description: |
+        Mark a lesson as complete and update student's XP and streak.
+
+        **FR-023**: Increment streak if consecutive day
+        **FR-024**: Reset streak to 1 if gap > 1 day
+        **FR-025**: No duplicate increment same day
+        **FR-026**: Record last_success_date
+        **FR-027**: Use server time (UTC) for all calculations
+        **FR-028**: Streak logic: same day=no change, next day=increment, gap=reset to 1
+
+        **Streak Initialization**:
+        - **FR-022a**: New students start at streak 0
+        - **FR-022b**: First completion sets streak to 1
+
+        **Rate Limit**: 10 requests per minute per student
+      operationId: completeLesson
+      tags:
+        - Wallet
+        - Lessons
+      security:
+        - FrappeAuth: []
+        - DeviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - lesson_id
+                - hearts_earned
+              properties:
+                lesson_id:
+                  type: string
+                  description: Memora Lesson DocType name
+                  example: "LESSON-12345"
+                hearts_earned:
+                  type: integer
+                  minimum: 0
+                  maximum: 3
+                  description: Hearts earned (0-3). Streak only updates if > 0
+                  example: 2
+                xp_awarded:
+                  type: integer
+                  minimum: 0
+                  description: Optional XP override (defaults to hearts * 10)
+                  example: 20
+      responses:
+        '200':
+          description: Lesson completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Lesson completed successfully"
+                  xp_added:
+                    type: integer
+                    example: 20
+                  new_total_xp:
+                    type: integer
+                    example: 1320
+                  streak_updated:
+                    type: boolean
+                    description: True if streak changed
+                  old_streak:
+                    type: integer
+                  new_streak:
+                    type: integer
+                    example: 8
+                  streak_action:
+                    type: string
+                    enum:
+                      - first_completion
+                      - incremented
+                      - maintained
+                      - reset
+                    description: What happened to streak
+                    example: "incremented"
+                  last_success_date:
+                    type: string
+                    format: date
+                    description: Server UTC date of completion
+                    example: "2026-01-26"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalidHearts:
+                  value:
+                    error: "hearts_earned must be between 0 and 3"
+                lessonNotFound:
+                  value:
+                    error: "Lesson LESSON-12345 does not exist"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/DeviceUnauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /get_streak_history:
+    get:
+      summary: Get streak history (last 30 days)
+      description: |
+        Retrieve the student's lesson completion history for the past 30 days
+        to visualize streak progress.
+
+        **Note**: This endpoint queries MariaDB (not cache) for historical data.
+
+        **Rate Limit**: 10 requests per minute per student
+      operationId: getStreakHistory
+      tags:
+        - Wallet
+      security:
+        - FrappeAuth: []
+        - DeviceAuth: []
+      parameters:
+        - name: days
+          in: query
+          description: Number of days to retrieve (default 30, max 90)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 90
+            default: 30
+      responses:
+        '200':
+          description: Streak history retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current_streak:
+                    type: integer
+                    description: Current streak from cache
+                    example: 7
+                  history:
+                    type: array
+                    description: Daily completion record
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        lessons_completed:
+                          type: integer
+                        total_hearts:
+                          type: integer
+                        contributed_to_streak:
+                          type: boolean
+                          description: True if first lesson this day had hearts > 0
+                    example:
+                      - date: "2026-01-26"
+                        lessons_completed: 3
+                        total_hearts: 7
+                        contributed_to_streak: true
+                      - date: "2026-01-25"
+                        lessons_completed: 2
+                        total_hearts: 5
+                        contributed_to_streak: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/DeviceUnauthorized'
+
+components:
+  schemas:
+    Wallet:
+      type: object
+      description: Student wallet state (always from Redis cache)
+      properties:
+        player:
+          type: string
+          description: Player Profile DocType name
+          example: "PLAYER-00001"
+        total_xp:
+          type: integer
+          minimum: 0
+          description: Cumulative experience points
+          example: 1250
+        current_streak:
+          type: integer
+          minimum: 0
+          description: Consecutive days with successful lesson completion
+          example: 7
+        last_success_date:
+          type: string
+          format: date
+          nullable: true
+          description: Last date with hearts > 0 lesson (server UTC)
+          example: "2026-01-26"
+        last_played_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last interaction timestamp (updated on every API call)
+          example: "2026-01-26T14:32:15Z"
+        cache_source:
+          type: boolean
+          description: Always true (indicates data from Redis)
+          example: true
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        exc_type:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: Not authenticated
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Authentication required"
+
+    DeviceUnauthorized:
+      description: Device not authorized or session invalidated
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Unauthorized device. Contact administrator."
+
+    RateLimitExceeded:
+      description: Too many requests
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Rate limit exceeded: 10 requests per minute"
+
+  securitySchemes:
+    FrappeAuth:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: Frappe session cookie
+
+    DeviceAuth:
+      type: apiKey
+      in: header
+      name: X-Device-ID
+      description: |
+        UUID v4 identifying the authorized device.
+        Validated against player's authorized_devices list in Redis.

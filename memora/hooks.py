@@ -333,7 +333,12 @@ scheduler_events = {
 	],
 	"All": [
 		"memora.services.progress_engine.snapshot_syncer.sync_pending_bitmaps"
-	]
+	],
+	"cron": {
+		"*/15 * * * *": [
+			"memora.services.wallet_sync.sync_pending_wallets"
+		]
+	}
 }
 
 # Testing
