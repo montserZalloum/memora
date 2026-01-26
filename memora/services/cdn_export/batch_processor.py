@@ -132,151 +132,337 @@ def process_pending_plans(max_plans=10):
     return results
 
 def _rebuild_plan(plan_id):
-    """
-    Rebuild all JSON files for a specific plan.
+	"""
+	Rebuild all JSON files for a specific plan.
 
-    Args:
-        plan_id (str): Plan document name
+	Args:
+		plan_id (str): Plan document name
 
-    Returns:
-        bool: True if successful, False otherwise
-    """
-    try:
-        # Get CDN settings
-        settings = frappe.get_single("CDN Settings")
-        if not settings.enabled:
-            return True  # Not an error, just disabled
+	Returns:
+		bool: True if successful, False otherwise
+	"""
+	try:
+		# Get CDN settings
+		settings = frappe.get_single("CDN Settings")
+		
+		# Check if we should generate local files (SOLUTION 0 FIX)
+		should_generate_local = settings.local_fallback_mode or settings.enabled
+		
+		if not should_generate_local:
+			frappe.log_error(
+				f"[WARN] Skipping plan rebuild for {plan_id}: CDN disabled and local fallback mode disabled",
+				"CDN Plan Rebuild"
+			)
+			return True
+		
+		# Always generate local JSON files, regardless of CDN status
+		frappe.log_error(
+			f"[INFO] Starting plan rebuild for {plan_id} - CDN enabled: {settings.enabled}, Local fallback: {settings.local_fallback_mode}",
+			"CDN Plan Rebuild"
+		)
 
-        # Get CDN client
-        client = get_cdn_client(settings)
-        bucket = settings.bucket_name
+		# Schema validation pre-flight check (T020)
+		from memora.utils.diagnostics import validate_schema
+		doctypes_to_validate = [
+			"Memora Academic Plan",
+			"Memora Subject",
+			"Memora Track",
+			"Memora Unit",
+			"Memora Topic",
+			"Memora Lesson",
+			"Memora Lesson Stage",
+			"Memora Plan Subject",
+			"Memora Plan Override"
+		]
 
-        # Generate all files for this plan (also writes to local storage)
-        files_data = get_content_paths_for_plan(plan_id)
+		schema_issues = []
+		for doctype in doctypes_to_validate:
+			validation_result = validate_schema(doctype)
+			if not validation_result["valid"]:
+				schema_issues.append({
+					"doctype": doctype,
+					"missing_fields": validation_result.get("missing_in_db", []),
+					"extra_fields": validation_result.get("extra_in_db", [])
+				})
 
-        # Build files_info with local paths
-        base_path = get_local_base_path()
-        files_info = {}
-        
-        for path, data in files_data.items():
-            local_path = os.path.join(base_path, path)
-            files_info[path] = {
-                "local_path": local_path,
-                "data": data
-            }
+		if schema_issues:
+			# Build summary for logging (limit length to avoid CharacterLengthExceededError)
+			error_summary = []
+			for issue in schema_issues:
+				issue_details = []
+				if issue["missing_fields"]:
+					# Limit to first 5 missing fields to avoid huge logs
+					missing_preview = issue["missing_fields"][:5]
+					suffix = f" (+{len(issue['missing_fields']) - 5} more)" if len(issue["missing_fields"]) > 5 else ""
+					issue_details.append(f"Missing: {missing_preview}{suffix}")
+				if issue["extra_fields"]:
+					# Limit to first 5 extra fields
+					extra_preview = issue["extra_fields"][:5]
+					suffix = f" (+{len(issue['extra_fields']) - 5} more)" if len(issue["extra_fields"]) > 5 else ""
+					issue_details.append(f"Extra: {extra_preview}{suffix}")
 
-        # Validate all generated JSON against schemas
-        if JSONSCHEMA_AVAILABLE:
-            validation_results = validate_all_json_files(files_data)
-            if not validation_results['valid']:
-                error_msg = f"JSON validation failed: {validation_results['errors']}"
-                log_error(error_msg, "JSON Schema Validation Failed")
-                return False
+				if issue_details:
+					error_summary.append(f"{issue['doctype']}: {'; '.join(issue_details)}")
 
-        # Upload all files from local storage
-        uploaded_urls, upload_results, upload_errors = upload_plan_files_from_local(
-            client, bucket, plan_id, files_info
-        )
+			error_msg = "Schema validation failed before JSON generation.\\n\\n"
+			error_msg += "\\n".join(error_summary)
+			error_msg += "\\n\\nSuggested action: Run 'bench migrate' to apply pending migrations."
+			error_msg += "\\n\\nNote: This validation now properly handles Child Tables and Table-type fields."
 
-        if upload_errors:
-            raise Exception(f"Upload errors: {'; '.join(upload_errors)}")
+			# Use title and message parameters separately to avoid title length issues
+			frappe.log_error(
+				title=f"Schema Validation Failed: Plan {plan_id}",
+				message=error_msg[:10000]  # Limit to 10,000 chars to avoid DB errors
+			)
+			return False
 
-        # Get sync log to update with hash information
-        sync_log = frappe.db.get_value(
-            "CDN Sync Log",
-            {"plan_id": plan_id, "status": "Processing"},
-            "name"
-        )
-        
-        if sync_log:
-            sync_log_doc = frappe.get_doc("CDN Sync Log", sync_log)
-            
-            # Track local paths, local hashes, CDN hashes, and sync verification
-            all_sync_verified = True
-            
-            for path, result in upload_results.items():
-                if result["success"]:
-                    local_path = result["local_path"]
-                    cdn_hash = result["etag"]
-                    
-                    # Calculate local hash
-                    local_hash = get_file_hash(path)
-                    
-                    # Compare hashes
-                    sync_verified = (local_hash == cdn_hash)
-                    
-                    if not sync_verified:
-                        all_sync_verified = False
-                        frappe.log_error(
-                            f"Hash mismatch for {path}: local={local_hash}, cdn={cdn_hash}",
-                            "CDN Sync Hash Mismatch"
-                        )
-            
-            sync_log_doc.sync_verified = 1 if all_sync_verified else 0
-            sync_log_doc.files_uploaded = len(uploaded_urls)
-            sync_log_doc.save(ignore_permissions=True)
+		files_data = get_content_paths_for_plan(plan_id)
+		
+		if not files_data:
+			frappe.log_error(
+				f"[ERROR] No files generated for plan {plan_id}",
+				"CDN Plan Rebuild"
+			)
+			return False
+		
+		frappe.log_error(
+			f"[INFO] Generated {len(files_data)} files for plan {plan_id}",
+			"CDN Plan Rebuild"
+		)
+		
+		# Only proceed with CDN operations if enabled
+		if not settings.enabled:
+			frappe.log_error(
+				f"[INFO] CDN disabled - local JSON files generated for plan {plan_id}, skipping CDN upload",
+				"CDN Plan Rebuild"
+			)
+			return True
+		
+		# Get CDN client for upload operations
+		client = get_cdn_client(settings)
+		bucket = settings.bucket_name
 
-        # Purge CDN cache for uploaded files
-        if uploaded_urls and settings.cloudflare_zone_id and settings.get_password('cloudflare_api_token'):
-            try:
-                from .cdn_uploader import purge_cdn_cache
-                
-                # Cloudflare API allows max 30 URLs per request, so batch them
-                batch_size = 30
-                purge_results = []
-                
-                for i in range(0, len(uploaded_urls), batch_size):
-                    url_batch = uploaded_urls[i:i + batch_size]
-                    purge_result = purge_cdn_cache(
-                        settings.cloudflare_zone_id,
-                        settings.get_password('cloudflare_api_token'),
-                        url_batch
-                    )
-                    purge_results.append(purge_result)
-                
-                # Log cache purge results
-                frappe.logger.info(f"Cache purge completed for {len(uploaded_urls)} files in plan {plan_id}")
-                
-            except Exception as e:
-                frappe.log_error(f"Cache purge failed for plan {plan_id}: {str(e)}", "CDN Cache Purge Failed")
-                # Don't fail the build if cache purge fails - content is still updated
+		# Build files_info with local paths
+		base_path = get_local_base_path()
+		files_info = {}
+		
+		for path, data in files_data.items():
+			local_path = os.path.join(base_path, path)
+			files_info[path] = {
+				"local_path": local_path,
+				"data": data
+			}
 
-        return True
+		# Validate all generated JSON against schemas
+		if JSONSCHEMA_AVAILABLE:
+			validation_results = validate_all_json_files(files_data)
+			if not validation_results['valid']:
+				error_msg = f"JSON validation failed: {validation_results['errors']}"
+				log_error(error_msg, "JSON Schema Validation Failed")
+				return False
 
-    except Exception as e:
-        log_error(f"Plan rebuild failed for {plan_id}: {str(e)}", "CDN Plan Rebuild Failed")
-        return False
+		# Upload all files from local storage
+		uploaded_urls, upload_results, upload_errors = upload_plan_files_from_local(
+			client, bucket, plan_id, files_info
+		)
+
+		if upload_errors:
+			raise Exception(f"Upload errors: {'; '.join(upload_errors)}")
+
+		# Get sync log to update with hash information
+		sync_log = frappe.db.get_value(
+			"CDN Sync Log",
+			{"plan_id": plan_id, "status": "Processing"},
+			"name"
+		)
+		
+		if sync_log:
+			sync_log_doc = frappe.get_doc("CDN Sync Log", sync_log)
+			
+			# Track local paths, local hashes, CDN hashes, and sync verification
+			all_sync_verified = True
+			
+			for path, result in upload_results.items():
+				if result["success"]:
+					local_path = result["local_path"]
+					cdn_hash = result["etag"]
+					
+					# Calculate local hash
+					local_hash = get_file_hash(path)
+					
+					# Compare hashes
+					sync_verified = (local_hash == cdn_hash)
+					
+					if not sync_verified:
+						all_sync_verified = False
+						frappe.log_error(
+							f"Hash mismatch for {path}: local={local_hash}, cdn={cdn_hash}",
+							"CDN Sync Hash Mismatch"
+						)
+			
+			sync_log_doc.sync_verified = 1 if all_sync_verified else 0
+			sync_log_doc.files_uploaded = len(uploaded_urls)
+			sync_log_doc.save(ignore_permissions=True)
+
+		# Purge CDN cache for uploaded files
+		if uploaded_urls and settings.cloudflare_zone_id and settings.get_password('cloudflare_api_token'):
+			try:
+				from .cdn_uploader import purge_cdn_cache
+				
+				# Cloudflare API allows max 30 URLs per request, so batch them
+				batch_size = 30
+				purge_results = []
+				
+				for i in range(0, len(uploaded_urls), batch_size):
+					url_batch = uploaded_urls[i:i + batch_size]
+					purge_result = purge_cdn_cache(
+						settings.cloudflare_zone_id,
+						settings.get_password('cloudflare_api_token'),
+						url_batch
+					)
+					purge_results.append(purge_result)
+				
+				# Log cache purge results
+				frappe.log_error(
+					f"[INFO] Cache purge completed for {len(uploaded_urls)} files in plan {plan_id}",
+					"CDN Plan Rebuild"
+				)
+				
+			except Exception as e:
+				frappe.log_error(f"Cache purge failed for plan {plan_id}: {str(e)}", "CDN Cache Purge Failed")
+				# Don't fail the build if cache purge fails - content is still updated
+
+		return True
+
+	except Exception as e:
+		import traceback
+		from pymysql.err import OperationalError
+
+		# Enhanced error logging for debugging (User Story 1)
+		error_type = type(e).__name__
+		error_message = str(e)
+		full_traceback = traceback.format_exc()
+
+		# Build detailed error context
+		error_context = f"""Plan rebuild failed for plan: {plan_id}
+
+Error Type: {error_type}
+Error Message: {error_message}
+
+Full Traceback:
+{full_traceback}
+"""
+
+		# For OperationalError (SQL errors), include additional SQL context
+		if isinstance(e, OperationalError):
+			# Try to extract SQL query information from the error
+			error_context += f"""
+SQL Error Details:
+- This is a database OperationalError (likely a SQL query issue)
+- Error code: {e.args[0] if e.args else 'N/A'}
+- Error message: {e.args[1] if len(e.args) > 1 else 'N/A'}
+
+Diagnostic Suggestion:
+Use the diagnostic tools to identify the failing query:
+1. Call diagnose_query_failure() for involved DocTypes
+2. Run validate_schema() to check for missing database columns
+3. Check Error Log for full SQL query details
+"""
+
+		# Log to Error Log DocType with title "CDN Plan Rebuild Error"
+		frappe.log_error(error_context, "CDN Plan Rebuild Error")
+
+		return False
 
 def trigger_plan_rebuild(doctype, docname):
-    """
-    Trigger a plan rebuild when content is changed.
+	"""
+	Trigger a plan rebuild when content is changed.
 
-    Args:
-        doctype (str): The DocType that was changed
-        docname (str): The document name that was changed
-    """
-    try:
-        # Get affected plans
-        affected_plans = get_affected_plan_ids(doctype, docname)
+	Args:
+		doctype (str): The DocType that was changed
+		docname (str): The document name that was changed
+	"""
+	try:
+		frappe.log_error(
+			f"[INFO] Rebuilding {doctype}/{docname}",
+			"CDN Plan Rebuild"
+		)
 
-        if not affected_plans:
-            return
+		# Get affected plans
+		affected_plans = get_affected_plan_ids(doctype, docname)
 
-        # Add all affected plans to queue
-        for plan_id in affected_plans:
-            add_plan_to_queue(plan_id)
+		if not affected_plans:
+			frappe.log_error(
+				f"[WARN] No affected plans found for {doctype}/{docname}",
+				"CDN Plan Rebuild"
+			)
+			return
 
-        # Check threshold and trigger immediate processing if needed
-        settings = frappe.get_single("CDN Settings")
-        threshold = getattr(settings, 'batch_threshold', 50)
+		frappe.log_error(
+			f"[INFO] Found {len(affected_plans)} affected plans for {doctype}/{docname}: {affected_plans}",
+			"CDN Plan Rebuild"
+		)
 
-        current_queue_size = frappe.cache().scard("cdn_export:pending_plans") or 0
-        if current_queue_size >= threshold:
-            # Process immediately if threshold reached
-            process_pending_plans(1)  # Process just one to reduce queue
+		# Check if we should process immediately (local_fallback_mode)
+		settings = frappe.get_single("CDN Settings")
+		local_fallback_mode = getattr(settings, 'local_fallback_mode', 0)
 
-    except Exception as e:
-        log_error(f"Failed to trigger plan rebuild for {doctype}/{docname}: {str(e)}")
+		if local_fallback_mode:
+			# LOCAL FALLBACK MODE: Process immediately, bypass queue
+			frappe.log_error(
+				f"[INFO] Local fallback mode enabled - processing {len(affected_plans)} plans immediately (bypassing queue)",
+				"CDN Plan Rebuild"
+			)
+
+			for plan_id in affected_plans:
+				try:
+					frappe.log_error(
+						f"[INFO] Immediate rebuild starting for plan {plan_id}",
+						"CDN Plan Rebuild"
+					)
+					success = _rebuild_plan(plan_id)
+					if success:
+						frappe.log_error(
+							f"[INFO] Immediate rebuild succeeded for plan {plan_id}",
+							"CDN Plan Rebuild"
+						)
+					else:
+						frappe.log_error(
+							f"[ERROR] Immediate rebuild failed for plan {plan_id}",
+							"CDN Plan Rebuild Error"
+						)
+				except Exception as e:
+					frappe.log_error(
+						f"[ERROR] Exception during immediate rebuild for plan {plan_id}: {str(e)}",
+						"CDN Plan Rebuild Error"
+					)
+
+			return  # Exit early - don't use queue at all
+
+		# NORMAL MODE: Add to queue for batch processing
+		# Add all affected plans to queue
+		for plan_id in affected_plans:
+			add_plan_to_queue(plan_id)
+
+		# Check threshold and trigger immediate processing if needed
+		threshold = getattr(settings, 'batch_threshold', 50)
+
+		current_queue_size = frappe.cache().scard("cdn_export:pending_plans") or 0
+		frappe.log_error(
+			f"[INFO] Queue size after adding plans: {current_queue_size}, threshold: {threshold}",
+			"CDN Plan Rebuild"
+		)
+
+		if current_queue_size >= threshold:
+			# Process immediately if threshold reached
+			frappe.log_error(
+				f"[INFO] Threshold reached ({current_queue_size} >= {threshold}), processing immediately",
+				"CDN Plan Rebuild"
+			)
+			process_pending_plans(1)  # Process just one to reduce queue
+
+	except Exception as e:
+		log_error(f"Failed to trigger plan rebuild for {doctype}/{docname}: {str(e)}", "CDN Plan Rebuild Failed")
 
 def validate_json_schema(json_data, schema_name):
     """

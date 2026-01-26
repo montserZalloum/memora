@@ -15,7 +15,8 @@
   "required_item",
   "sort_order",
   "image",
-  "description"
+  "description",
+  "is_linear"
  ],
  "fields": [
   {
@@ -71,12 +72,18 @@
    "fieldname": "description",
    "fieldtype": "Small Text",
    "label": "Description"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_linear",
+   "fieldtype": "Check",
+   "label": "is Linear"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-25 09:50:21.701108",
+ "modified": "2026-01-25 23:00:26.155710",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Memora Subject",

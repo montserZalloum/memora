@@ -10,67 +10,96 @@ HIERARCHY = {
 }
 
 def get_affected_plan_ids(doctype, docname):
-    """
-    Given a doctype and docname, find all Academic Plans that need rebuilding.
-    Implements bottom-up dependency resolution to identify affected plans.
+	"""
+	Given a doctype and docname, find all Academic Plans that need rebuilding.
+	Implements bottom-up dependency resolution to identify affected plans.
 
-    Args:
-        doctype (str): The DocType that was changed
-        docname (str): The document name that was changed
+	Args:
+		doctype (str): The DocType that was changed
+		docname (str): The document name that was changed
 
-    Returns:
-        list: List of plan document names that need rebuilding
-    """
-    affected_plans = set()
-    processed_docs = set()  # Prevent infinite loops in cyclic dependencies
+	Returns:
+		list: List of plan document names that need rebuilding
+	"""
+	import frappe
+	
+	affected_plans = set()
+	processed_docs = set()  # Prevent infinite loops in cyclic dependencies
 
-    def _walk_up_hierarchy(current_doctype, current_docname):
-        """Recursively walk up the content hierarchy to find plans."""
-        if current_docname in processed_docs:
-            return
+	def _walk_up_hierarchy(current_doctype, current_docname):
+		"""Recursively walk up the content hierarchy to find plans."""
+		if current_docname in processed_docs:
+			return
 
-        processed_docs.add(current_docname)
+		processed_docs.add(current_docname)
 
-        # Find parent relationships from hierarchy mapping
-        if current_doctype in HIERARCHY:
-            parent_doctype, parent_field = HIERARCHY[current_doctype]
+		# Find parent relationships from hierarchy mapping
+		if current_doctype in HIERARCHY:
+			parent_doctype, parent_field = HIERARCHY[current_doctype]
 
-            try:
-                current_doc = frappe.get_doc(current_doctype, current_docname)
-                if hasattr(current_doc, parent_field):
-                    parent_name = getattr(current_doc, parent_field)
-                    if parent_name:
-                        _walk_up_hierarchy(parent_doctype, parent_name)
-            except frappe.DoesNotExistError as e:
-                frappe.logger.warning(f"Document {current_doctype}/{current_docname} not found: {str(e)}")
-            except Exception as e:
-                frappe.log_error(f"Error traversing hierarchy for {current_doctype}/{current_docname}: {str(e)}", "Dependency Resolution Error")
+			try:
+				current_doc = frappe.get_doc(current_doctype, current_docname)
+				if hasattr(current_doc, parent_field):
+					parent_name = getattr(current_doc, parent_field)
+					if parent_name:
+						_walk_up_hierarchy(parent_doctype, parent_name)
+			except frappe.DoesNotExistError as e:
+				frappe.log_error(
+					f"[WARN] Document {current_doctype}/{current_docname} not found: {str(e)}",
+					"CDN Dependency Resolution"
+				)
+			except Exception as e:
+				frappe.log_error(
+					f"Error traversing hierarchy for {current_doctype}/{current_docname}: {str(e)}",
+					"CDN Dependency Resolution"
+				)
 
-        # Find plans that reference this document
-        _find_plans_referencing_doc(current_doctype, current_docname)
+		# Find plans that reference this document
+		_find_plans_referencing_doc(current_doctype, current_docname)
 
-    def _find_plans_referencing_doc(doc_type, doc_name):
-        """Find all Memora Academic Plans that reference this document."""
-        try:
-            # Check plan subjects
-            plan_subjects = frappe.db.get_all(
-                "Memora Plan Subject",
-                filters={"subject": doc_name},
-                pluck="parent"
-            )
-            for plan_name in plan_subjects:
-                if plan_name:
-                    affected_plans.add(plan_name)
-        except Exception as e:
-            frappe.log_error(f"Error finding plans for {doc_type}/{doc_name}: {str(e)}", "Plan Resolution Error")
+	def _find_plans_referencing_doc(doc_type, doc_name):
+		"""Find all Memora Academic Plans that reference this document."""
+		try:
+			# Check plan subjects
+			plan_subjects = frappe.db.get_all(
+				"Memora Plan Subject",
+				filters={"subject": doc_name},
+				pluck="parent"
+			)
+			frappe.log_error(
+				f"[DEBUG] Found {len(plan_subjects)} plans referencing {doc_type}/{doc_name}",
+				"CDN Dependency Resolution"
+			)
+			for plan_name in plan_subjects:
+				if plan_name:
+					affected_plans.add(plan_name)
+		except Exception as e:
+			frappe.log_error(
+				f"Error finding plans for {doc_type}/{doc_name}: {str(e)}",
+				"CDN Dependency Resolution"
+			)
 
-    try:
-        # Start the walk from the changed document
-        _walk_up_hierarchy(doctype, docname)
-    except Exception as e:
-        frappe.log_error(f"Error getting affected plans for {doctype}/{docname}: {str(e)}", "Affected Plans Calculation Error")
+	try:
+		# Start the walk from the changed document
+		_walk_up_hierarchy(doctype, docname)
+	except Exception as e:
+		frappe.log_error(
+			f"Error getting affected plans for {doctype}/{docname}: {str(e)}",
+			"CDN Dependency Resolution"
+		)
 
-    return list(affected_plans)
+	if affected_plans:
+		frappe.log_error(
+			f"[INFO] Affected plans for {doctype}/{docname}: {list(affected_plans)}",
+			"CDN Dependency Resolution"
+		)
+	else:
+		frappe.log_error(
+			f"[WARN] No affected plans found for {doctype}/{docname}",
+			"CDN Dependency Resolution"
+		)
+	
+	return list(affected_plans)
 
 def get_direct_plans_for_content(doctype, docname):
     """

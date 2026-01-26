@@ -197,10 +197,10 @@ Based on plan.md project structure:
 - [X] T070 [P] Add comprehensive docstrings to all public functions in `memora/services/cdn_export/local_storage.py`
 - [X] T071 [P] Add comprehensive docstrings to all public functions in `memora/services/cdn_export/url_resolver.py`
 - [X] T072 [P] Add comprehensive docstrings to all public functions in `memora/services/cdn_export/health_checker.py`
-- [ ] T073 Run full test suite: `bench --site x.conanacademy.com run-tests --app memora`
-- [ ] T074 Validate quickstart.md scenarios manually
-- [ ] T075 Performance test: Verify <500ms local file write time
-- [ ] T076 Performance test: Verify <1s URL switch propagation
+- [X] T073 Run full test suite: `bench --site x.conanacademy.com run-tests --app memora`
+- [X] T074 Validate quickstart.md scenarios manually
+- [X] T075 Performance test: Verify <500ms local file write time
+- [X] T076 Performance test: Verify <1s URL switch propagation
 - [X] T077 Update module exports in `memora/services/cdn_export/__init__.py`
 
 ---

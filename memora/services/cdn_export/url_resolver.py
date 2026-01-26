@@ -5,6 +5,7 @@ Provides a single function to get the correct content URL based on CDN settings.
 """
 
 import frappe
+from frappe.utils import get_url
 import os
 
 
@@ -50,7 +51,7 @@ def get_site_url() -> str:
 	if frappe.request:
 		return frappe.request.url_root.rstrip('/')
 	else:
-		return frappe.get_url().rstrip('/')
+		return get_url().rstrip('/')
 
 
 def get_content_url(path: str) -> str:

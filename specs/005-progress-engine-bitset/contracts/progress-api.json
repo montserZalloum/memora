@@ -1,0 +1,212 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Progress API Contracts",
+  "description": "API contracts for the Progress Engine endpoints",
+  "definitions": {
+    "CompleteLessonRequest": {
+      "type": "object",
+      "required": ["lesson_id", "hearts"],
+      "properties": {
+        "lesson_id": {
+          "type": "string",
+          "description": "The unique identifier of the lesson being completed"
+        },
+        "hearts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "description": "Number of hearts remaining at lesson completion (0-5)"
+        }
+      }
+    },
+    "CompleteLessonResponse": {
+      "type": "object",
+      "required": ["success", "xp_earned", "new_total_xp", "is_new_record"],
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the completion was recorded successfully"
+        },
+        "xp_earned": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "XP earned from this completion (base + hearts bonus, or record-breaking bonus)"
+        },
+        "new_total_xp": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Player's new total XP after this completion"
+        },
+        "is_new_record": {
+          "type": "boolean",
+          "description": "True if this completion beat the previous best hearts score"
+        },
+        "is_first_completion": {
+          "type": "boolean",
+          "description": "True if this is the first time completing this lesson"
+        }
+      }
+    },
+    "CompleteLessonError": {
+      "type": "object",
+      "required": ["success", "error_code", "message"],
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "enum": [false]
+        },
+        "error_code": {
+          "type": "string",
+          "enum": ["NO_HEARTS", "INVALID_LESSON", "NOT_UNLOCKED", "NOT_ENROLLED"],
+          "description": "Error code for client handling"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message"
+        }
+      }
+    },
+    "GetProgressRequest": {
+      "type": "object",
+      "required": ["subject_id"],
+      "properties": {
+        "subject_id": {
+          "type": "string",
+          "description": "The unique identifier of the subject"
+        }
+      }
+    },
+    "NodeStatus": {
+      "type": "string",
+      "enum": ["locked", "unlocked", "passed"],
+      "description": "The current status of a node in the progress tree"
+    },
+    "ProgressNode": {
+      "type": "object",
+      "required": ["id", "type", "status"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Node identifier"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["subject", "track", "unit", "topic", "lesson"],
+          "description": "Type of node in the hierarchy"
+        },
+        "status": {
+          "$ref": "#/definitions/NodeStatus"
+        },
+        "bit_index": {
+          "type": "integer",
+          "description": "Bitmap index (lessons only)"
+        },
+        "best_hearts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "description": "Best hearts achieved (passed lessons only)"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProgressNode"
+          },
+          "description": "Child nodes (containers only)"
+        }
+      }
+    },
+    "GetProgressResponse": {
+      "type": "object",
+      "required": ["subject_id", "root", "completion_percentage", "total_xp_earned"],
+      "properties": {
+        "subject_id": {
+          "type": "string",
+          "description": "The subject identifier"
+        },
+        "root": {
+          "$ref": "#/definitions/ProgressNode",
+          "description": "Root node of the progress tree (the subject)"
+        },
+        "completion_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of lessons completed (0-100)"
+        },
+        "total_xp_earned": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total XP earned in this subject"
+        },
+        "suggested_next_lesson_id": {
+          "type": ["string", "null"],
+          "description": "ID of the next unlocked lesson to play, or null if all completed"
+        },
+        "total_lessons": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of lessons in the subject"
+        },
+        "passed_lessons": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of lessons passed"
+        }
+      }
+    },
+    "GetProgressError": {
+      "type": "object",
+      "required": ["success", "error_code", "message"],
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "enum": [false]
+        },
+        "error_code": {
+          "type": "string",
+          "enum": ["INVALID_SUBJECT", "NOT_ENROLLED"],
+          "description": "Error code for client handling"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message"
+        }
+      }
+    }
+  },
+  "endpoints": {
+    "complete_lesson": {
+      "method": "POST",
+      "path": "/api/method/memora.api.progress.complete_lesson",
+      "description": "Mark a lesson as completed and award XP",
+      "request": {
+        "$ref": "#/definitions/CompleteLessonRequest"
+      },
+      "responses": {
+        "200": {
+          "$ref": "#/definitions/CompleteLessonResponse"
+        },
+        "400": {
+          "$ref": "#/definitions/CompleteLessonError"
+        }
+      }
+    },
+    "get_progress": {
+      "method": "GET",
+      "path": "/api/method/memora.api.progress.get_progress",
+      "description": "Get full progress tree for a subject",
+      "request": {
+        "$ref": "#/definitions/GetProgressRequest"
+      },
+      "responses": {
+        "200": {
+          "$ref": "#/definitions/GetProgressResponse"
+        },
+        "400": {
+          "$ref": "#/definitions/GetProgressError"
+        }
+      }
+    }
+  }
+}

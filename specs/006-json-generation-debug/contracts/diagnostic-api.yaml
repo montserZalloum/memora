@@ -1,0 +1,497 @@
+openapi: 3.0.3
+info:
+  title: Memora JSON Generation Diagnostics API
+  description: API endpoints for debugging and diagnosing JSON generation failures in the CDN export system
+  version: 1.0.0
+  contact:
+    name: Memora Development Team
+
+servers:
+  - url: /api/method/memora.api.cdn_debug
+    description: Frappe whitelisted API methods
+
+paths:
+  /diagnose_query_failure:
+    post:
+      summary: Diagnose SQL Query Failure
+      description: |
+        Execute a diagnostic query to identify why a specific query is failing.
+        Returns full SQL query, error details, and schema validation report.
+      operationId: diagnoseQueryFailure
+      tags:
+        - Diagnostics
+      security:
+        - SystemManager: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - doctype
+                - fields
+              properties:
+                doctype:
+                  type: string
+                  description: DocType to query
+                  example: "Memora Plan Subject"
+                filters:
+                  type: object
+                  description: Query filters
+                  example:
+                    parent: "37q5969lug"
+                fields:
+                  type: array
+                  items:
+                    type: string
+                  description: Fields to select
+                  example: ["title", "subject"]
+      responses:
+        '200':
+          description: Diagnostic results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryDiagnosticResult'
+        '400':
+          description: Invalid request parameters
+        '403':
+          description: Insufficient permissions (System Manager required)
+        '500':
+          description: Internal server error
+
+  /test_json_function:
+    post:
+      summary: Test JSON Generation Function
+      description: |
+        Execute a specific JSON generation function in isolation and return
+        results with timing and error information.
+      operationId: testJsonFunction
+      tags:
+        - Testing
+      security:
+        - SystemManager: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - function_name
+              properties:
+                function_name:
+                  type: string
+                  enum:
+                    - generate_manifest
+                    - generate_subject_json
+                    - generate_unit_json
+                    - generate_lesson_json
+                    - generate_search_index
+                  description: Name of function to test
+                  example: "generate_manifest"
+                plan_id:
+                  type: string
+                  description: Plan ID (required for most functions)
+                  example: "37q5969lug"
+                subject_id:
+                  type: string
+                  description: Subject ID (for generate_subject_json)
+                  example: "qunhaa99lf"
+                unit_id:
+                  type: string
+                  description: Unit ID (for generate_unit_json)
+                lesson_id:
+                  type: string
+                  description: Lesson ID (for generate_lesson_json)
+      responses:
+        '200':
+          description: Test results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JSONGenerationTestResult'
+        '400':
+          description: Invalid function name or missing required parameters
+        '403':
+          description: Insufficient permissions (System Manager required)
+        '500':
+          description: Internal server error
+
+  /validate_schema:
+    post:
+      summary: Validate DocType Schema
+      description: |
+        Compare DocType metadata with actual database schema to detect
+        mismatches that could cause query failures.
+      operationId: validateSchema
+      tags:
+        - Diagnostics
+      security:
+        - SystemManager: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - doctype
+              properties:
+                doctype:
+                  type: string
+                  description: DocType name to validate
+                  example: "Memora Plan Subject"
+      responses:
+        '200':
+          description: Schema validation report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchemaValidationReport'
+        '400':
+          description: Invalid DocType name
+        '403':
+          description: Insufficient permissions (System Manager required)
+        '404':
+          description: DocType not found
+        '500':
+          description: Internal server error
+
+  /audit_queries:
+    post:
+      summary: Audit All Queries in Function
+      description: |
+        Execute a JSON generation function with full query auditing enabled.
+        Returns all SQL queries executed with their context and results.
+      operationId: auditQueries
+      tags:
+        - Diagnostics
+      security:
+        - SystemManager: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - function_name
+                - plan_id
+              properties:
+                function_name:
+                  type: string
+                  enum:
+                    - generate_manifest
+                    - generate_subject_json
+                    - generate_search_index
+                  example: "generate_manifest"
+                plan_id:
+                  type: string
+                  example: "37q5969lug"
+                subject_id:
+                  type: string
+                  description: Required for generate_subject_json
+      responses:
+        '200':
+          description: Query audit results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  function_name:
+                    type: string
+                  success:
+                    type: boolean
+                  query_count:
+                    type: integer
+                    description: Total queries executed
+                  queries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/QueryAuditEntry'
+        '400':
+          description: Invalid parameters
+        '403':
+          description: Insufficient permissions (System Manager required)
+        '500':
+          description: Internal server error
+
+  /get_error_logs:
+    get:
+      summary: Get Recent CDN Error Logs
+      description: |
+        Retrieve recent error logs related to CDN JSON generation,
+        filtered by time range and optional search terms.
+      operationId: getErrorLogs
+      tags:
+        - Diagnostics
+      security:
+        - SystemManager: []
+      parameters:
+        - name: minutes
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 30
+            minimum: 1
+            maximum: 1440
+          description: Number of minutes to look back (default 30)
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Search term to filter error titles/messages
+          example: "Unknown column"
+      responses:
+        '200':
+          description: List of error logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        title:
+                          type: string
+                        error:
+                          type: string
+                        creation:
+                          type: string
+                          format: date-time
+        '403':
+          description: Insufficient permissions (System Manager required)
+        '500':
+          description: Internal server error
+
+components:
+  schemas:
+    QueryDiagnosticResult:
+      type: object
+      required:
+        - query
+        - doctype
+        - success
+        - timestamp
+      properties:
+        query:
+          type: string
+          description: SQL query executed or attempted
+        doctype:
+          type: string
+          description: Target DocType
+        filters:
+          type: object
+          description: Query filters applied
+        fields:
+          type: array
+          items:
+            type: string
+          description: Fields requested
+        success:
+          type: boolean
+          description: Whether query succeeded
+        error_message:
+          type: string
+          description: Error message if query failed
+        error_type:
+          type: string
+          description: Exception class name
+        traceback:
+          type: string
+          description: Full Python traceback
+        schema_report:
+          $ref: '#/components/schemas/SchemaValidationReport'
+        timestamp:
+          type: string
+          format: date-time
+        context:
+          type: object
+          description: Additional context (plan_id, function_name, etc.)
+
+    SchemaValidationReport:
+      type: object
+      required:
+        - doctype
+        - table_name
+        - valid
+        - validation_timestamp
+      properties:
+        doctype:
+          type: string
+          example: "Memora Plan Subject"
+        table_name:
+          type: string
+          example: "tabMemora Plan Subject"
+        expected_fields:
+          type: array
+          items:
+            type: object
+            properties:
+              fieldname:
+                type: string
+              label:
+                type: string
+              fieldtype:
+                type: string
+        actual_columns:
+          type: array
+          items:
+            type: object
+            properties:
+              column_name:
+                type: string
+              column_type:
+                type: string
+              nullable:
+                type: boolean
+        missing_in_db:
+          type: array
+          items:
+            type: string
+          description: Fields in DocType but not in database
+        extra_in_db:
+          type: array
+          items:
+            type: string
+          description: Columns in database but not in DocType
+        mismatched_types:
+          type: array
+          items:
+            type: object
+            properties:
+              fieldname:
+                type: string
+              expected_type:
+                type: string
+              actual_type:
+                type: string
+        valid:
+          type: boolean
+          description: True if schema matches completely
+        validation_timestamp:
+          type: string
+          format: date-time
+
+    JSONGenerationTestResult:
+      type: object
+      required:
+        - function_name
+        - success
+        - execution_time_ms
+        - timestamp
+      properties:
+        function_name:
+          type: string
+          enum:
+            - generate_manifest
+            - generate_subject_json
+            - generate_unit_json
+            - generate_lesson_json
+            - generate_search_index
+        test_input:
+          type: object
+          description: Input parameters provided
+        success:
+          type: boolean
+        output_data:
+          type: object
+          description: JSON data returned (if successful)
+        output_size_bytes:
+          type: integer
+          description: Size of output JSON
+        error:
+          type: object
+          description: Error information (if failed)
+          properties:
+            message:
+              type: string
+            type:
+              type: string
+            traceback:
+              type: string
+        execution_time_ms:
+          type: number
+          format: float
+          description: Execution time in milliseconds
+        timestamp:
+          type: string
+          format: date-time
+
+    QueryAuditEntry:
+      type: object
+      required:
+        - query_id
+        - query
+        - query_type
+        - success
+        - timestamp
+      properties:
+        query_id:
+          type: string
+          example: "q_20260126_104500_001"
+        query:
+          type: string
+          description: SQL query executed
+        query_type:
+          type: string
+          enum: [SELECT, INSERT, UPDATE, DELETE]
+        doctype:
+          type: string
+        method:
+          type: string
+          description: Frappe method used
+          example: "frappe.get_all"
+        fields_requested:
+          type: array
+          items:
+            type: string
+        filters:
+          type: object
+        source_file:
+          type: string
+          description: Python file where query originated
+        source_line:
+          type: integer
+          description: Line number in source file
+        execution_context:
+          type: object
+          properties:
+            plan_id:
+              type: string
+            subject_id:
+              type: string
+            function_name:
+              type: string
+        result_count:
+          type: integer
+          description: Number of rows returned (for SELECT)
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+
+  securitySchemes:
+    SystemManager:
+      type: http
+      scheme: bearer
+      description: Frappe session authentication with System Manager role required
+
+tags:
+  - name: Diagnostics
+    description: Tools for diagnosing JSON generation failures
+  - name: Testing
+    description: Isolated testing of JSON generation functions

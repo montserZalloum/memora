@@ -6,15 +6,21 @@ LOCK_PREFIX = "cdn_export:lock:"
 DEAD_LETTER_KEY = "cdn_export:dead_letter"
 
 def add_plan_to_queue(plan_id):
-    """Add plan to rebuild queue (idempotent via Set)."""
-    try:
-        frappe.cache().sadd(QUEUE_KEY, plan_id)
+	"""Add plan to rebuild queue (idempotent via Set)."""
+	import frappe
+	try:
+		frappe.cache().sadd(QUEUE_KEY, plan_id)
+		queue_size = frappe.cache().scard(QUEUE_KEY) or 0
+		frappe.log_error(
+			f"[INFO] Added plan {plan_id} to queue. Queue size: {queue_size}",
+			"CDN Queue Management"
+		)
 
-        # Check threshold and trigger immediate processing if needed
-        check_and_trigger_immediate_processing()
-    except Exception as e:
-        frappe.log_error(f"Redis queue error for plan {plan_id}: {str(e)}", "CDN Queue Error")
-        add_plan_to_fallback_queue(plan_id)
+		# Check threshold and trigger immediate processing if needed
+		check_and_trigger_immediate_processing()
+	except Exception as e:
+		frappe.log_error(f"Redis queue error for plan {plan_id}: {str(e)}", "CDN Queue Error")
+		add_plan_to_fallback_queue(plan_id)
 
 def check_and_trigger_immediate_processing():
     """Check if queue size exceeds threshold and trigger immediate processing."""
@@ -108,9 +114,14 @@ def on_content_restore(doc, method=None):
     trigger_plan_rebuild(doc.doctype, doc.name)
 
 def on_subject_update(doc, method=None):
-    """Handle Memora Subject updates."""
-    from .batch_processor import trigger_plan_rebuild
-    trigger_plan_rebuild("Memora Subject", doc.name)
+	"""Handle Memora Subject updates."""
+	import frappe
+	frappe.log_error(
+		f"[INFO] Subject update hook triggered for {doc.name} (title: {doc.title})",
+		"CDN Document Events"
+	)
+	from .batch_processor import trigger_plan_rebuild
+	trigger_plan_rebuild("Memora Subject", doc.name)
 
 def on_subject_delete(doc, method=None):
     """Handle Memora Subject deletion."""

@@ -14,6 +14,7 @@
   "parent_item_required",
   "is_published",
   "is_free_preview",
+  "is_linear",
   "sort_order",
   "image",
   "description"
@@ -82,12 +83,18 @@
    "fieldname": "description",
    "fieldtype": "Small Text",
    "label": "Description"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_linear",
+   "fieldtype": "Check",
+   "label": "is Linear"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-25 09:49:39.824194",
+ "modified": "2026-01-25 23:02:09.544672",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Memora Track",

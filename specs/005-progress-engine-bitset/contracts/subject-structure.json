@@ -1,0 +1,161 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SubjectStructure",
+  "description": "Schema for subject structure JSON used by progress engine",
+  "type": "object",
+  "required": ["id", "title", "is_linear", "tracks"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Subject document name (e.g., 'SUBJ-001')"
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable subject title"
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional subject description"
+    },
+    "is_linear": {
+      "type": "boolean",
+      "default": true,
+      "description": "If true, tracks must be completed sequentially"
+    },
+    "sort_order": {
+      "type": "integer",
+      "default": 0,
+      "description": "Display order within the academic plan"
+    },
+    "tracks": {
+      "type": "array",
+      "description": "List of tracks in this subject",
+      "items": {
+        "$ref": "#/definitions/Track"
+      }
+    }
+  },
+  "definitions": {
+    "Track": {
+      "type": "object",
+      "required": ["id", "title", "is_linear", "sort_order", "units"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Track document name"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "is_linear": {
+          "type": "boolean",
+          "default": true,
+          "description": "If true, units must be completed sequentially"
+        },
+        "sort_order": {
+          "type": "integer"
+        },
+        "units": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Unit"
+          }
+        }
+      }
+    },
+    "Unit": {
+      "type": "object",
+      "required": ["id", "title", "is_linear", "sort_order", "topics"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unit document name"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "is_linear": {
+          "type": "boolean",
+          "default": true,
+          "description": "If true, topics must be completed sequentially"
+        },
+        "sort_order": {
+          "type": "integer"
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Topic"
+          }
+        }
+      }
+    },
+    "Topic": {
+      "type": "object",
+      "required": ["id", "title", "is_linear", "sort_order", "lessons"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Topic document name"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "is_linear": {
+          "type": "boolean",
+          "default": true,
+          "description": "If true, lessons must be completed sequentially"
+        },
+        "sort_order": {
+          "type": "integer"
+        },
+        "lessons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Lesson"
+          }
+        }
+      }
+    },
+    "Lesson": {
+      "type": "object",
+      "required": ["id", "title", "bit_index", "sort_order"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Lesson document name"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "bit_index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Unique bitmap position within the subject (0-indexed)"
+        },
+        "sort_order": {
+          "type": "integer",
+          "description": "Display order within the topic"
+        },
+        "base_xp": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 0,
+          "description": "Base XP awarded on first completion"
+        }
+      }
+    }
+  }
+}

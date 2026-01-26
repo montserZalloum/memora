@@ -12,6 +12,7 @@
   "badge_image",
   "is_published",
   "is_free_preview",
+  "is_linear",
   "sort_order",
   "image",
   "description"
@@ -66,12 +67,18 @@
    "fieldname": "description",
    "fieldtype": "Small Text",
    "label": "Description"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_linear",
+   "fieldtype": "Check",
+   "label": "is Linear"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-25 09:49:02.049142",
+ "modified": "2026-01-25 23:03:26.025841",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Memora Unit",

@@ -11,6 +11,7 @@
   "parent_unit",
   "is_published",
   "is_free_preview",
+  "is_linear",
   "sort_order",
   "image",
   "description"
@@ -60,12 +61,18 @@
    "fieldname": "description",
    "fieldtype": "Small Text",
    "label": "Description"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_linear",
+   "fieldtype": "Check",
+   "label": "is Linear"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-25 09:48:36.096500",
+ "modified": "2026-01-25 23:04:08.647292",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Memora Topic",
