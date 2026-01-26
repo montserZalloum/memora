@@ -117,21 +117,21 @@
 
 ### Tests for User Story 3 (TDD Required)
 
-- [ ] T033 [P] [US3] Write unit test for generate_topic_json() with lessons array in memora/tests/unit/cdn_export/test_json_generator.py
-- [ ] T034 [P] [US3] Write unit test for bit_index included per lesson in memora/tests/unit/cdn_export/test_json_generator.py
-- [ ] T035 [P] [US3] Write unit test for lesson_url pointing to shared lessons/{lesson_id}.json in memora/tests/unit/cdn_export/test_json_generator.py
-- [ ] T036 [P] [US3] Write unit test for parent breadcrumb (unit_id, track_id, subject_id) in topic JSON in memora/tests/unit/cdn_export/test_json_generator.py
-- [ ] T037 [P] [US3] Write unit test for hidden lessons excluded from topic in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T033 [P] [US3] Write unit test for generate_topic_json() with lessons array in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T034 [P] [US3] Write unit test for bit_index included per lesson in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T035 [P] [US3] Write unit test for lesson_url pointing to shared lessons/{lesson_id}.json in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T036 [P] [US3] Write unit test for parent breadcrumb (unit_id, track_id, subject_id) in topic JSON in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T037 [P] [US3] Write unit test for hidden lessons excluded from topic in memora/tests/unit/cdn_export/test_json_generator.py
 
 ### Implementation for User Story 3
 
-- [ ] T038 [US3] Create generate_topic_json() function in memora/services/cdn_export/json_generator.py
-- [ ] T039 [US3] Include parent breadcrumb (unit, track, subject) in topic JSON
-- [ ] T040 [US3] Generate lesson_url values pointing to lessons/{lesson_id}.json
-- [ ] T041 [US3] Include stage_count per lesson without loading full stage data
-- [ ] T042 [US3] Apply plan overrides for lesson visibility (Hide action)
-- [ ] T043 [US3] Validate generated topic against topic.schema.json
-- [ ] T044 [US3] Verify User Story 3 tests pass with pytest memora/tests/unit/cdn_export/test_json_generator.py -k topic
+- [x] T038 [US3] Create generate_topic_json() function in memora/services/cdn_export/json_generator.py
+- [x] T039 [US3] Include parent breadcrumb (unit, track, subject) in topic JSON
+- [x] T040 [US3] Generate lesson_url values pointing to lessons/{lesson_id}.json
+- [x] T041 [US3] Include stage_count per lesson without loading full stage data
+- [x] T042 [US3] Apply plan overrides for lesson visibility (Hide action)
+- [x] T043 [US3] Validate generated topic against topic.schema.json
+- [x] T044 [US3] Verify User Story 3 tests pass with pytest memora/tests/unit/cdn_export/test_json_generator.py -k topic
 
 **Checkpoint**: Topic generation working, independently testable
 

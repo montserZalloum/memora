@@ -656,5 +656,359 @@ class TestGenerateSubjectHierarchy(unittest.TestCase):
                 patcher.stop()
 
 
+class TestGenerateTopicJson(unittest.TestCase):
+	"""Tests for generate_topic_json() function - Phase 5: User Story 3"""
+
+	def _setup_topic_mocks(self):
+		"""Helper to setup common mocks for topic tests"""
+		patcher_frappe = patch('memora.services.cdn_export.json_generator.frappe')
+		patcher_now = patch('memora.services.cdn_export.json_generator.now_datetime')
+		patcher_overrides = patch('memora.services.cdn_export.json_generator.apply_plan_overrides')
+		patcher_calc = patch('memora.services.cdn_export.json_generator.calculate_access_level')
+		patcher_url = patch('memora.services.cdn_export.json_generator.get_content_url')
+
+		mock_frappe = patcher_frappe.start()
+		mock_now = patcher_now.start()
+		mock_overrides = patcher_overrides.start()
+		mock_calc = patcher_calc.start()
+		mock_url = patcher_url.start()
+
+		# Setup datetime - create a mock with timestamp and isoformat methods
+		mock_dt = MagicMock()
+		mock_dt.timestamp = Mock(return_value=1706270400)
+		mock_dt.isoformat = Mock(return_value="2026-01-26T10:00:00")
+		mock_now.return_value = mock_dt
+
+		# Setup URL resolver
+		mock_url.side_effect = lambda x: x
+
+		# Setup overrides
+		mock_overrides.return_value = {}
+
+		return {
+			'frappe': (patcher_frappe, mock_frappe),
+			'now': (patcher_now, mock_now),
+			'overrides': (patcher_overrides, mock_overrides),
+			'calc': (patcher_calc, mock_calc),
+			'url': (patcher_url, mock_url)
+		}
+
+	def test_generate_topic_json_with_lessons_array(self):
+		"""T033: generate_topic_json() includes lessons array"""
+		from memora.services.cdn_export.json_generator import generate_topic_json
+
+		mocks = self._setup_topic_mocks()
+		try:
+			mock_frappe = mocks['frappe'][1]
+			mock_calc = mocks['calc'][1]
+
+			# Setup mock topic
+			topic_doc = Mock()
+			topic_doc.name = "TOPIC-001"
+			topic_doc.title = "Introduction to Algebra"
+			topic_doc.description = "Fundamentals of algebraic expressions"
+			topic_doc.image = None
+			topic_doc.is_linear = True
+			topic_doc.is_published = True
+			topic_doc.parent_unit = "UNIT-001"
+
+			# Setup mock lessons
+			lesson1 = Mock()
+			lesson1.name = "LESSON-001"
+			lesson1.title = "Variables"
+			lesson1.description = "Learn variables"
+			lesson1.is_published = True
+			lesson1.bit_index = 0
+
+			lesson2 = Mock()
+			lesson2.name = "LESSON-002"
+			lesson2.title = "Expressions"
+			lesson2.description = "Learn expressions"
+			lesson2.is_published = True
+			lesson2.bit_index = 1
+
+			# Mock frappe calls for get_doc (parent hierarchy)
+			mock_frappe.get_doc.side_effect = [
+				Mock(name="UNIT-001", parent_track="TRACK-001"),  # Unit
+				Mock(name="TRACK-001", parent_subject="SUBJ-001"),  # Track
+				Mock(name="SUBJ-001")  # Subject
+			]
+
+			# Mock frappe calls for get_all (lessons and stages)
+			mock_frappe.get_all.side_effect = [
+				[lesson1, lesson2],  # Lessons
+				[Mock(parent="LESSON-001")] * 5,  # 5 stages for lesson 1
+				[Mock(parent="LESSON-002")] * 2,  # 2 stages for lesson 2
+			]
+
+			# Mock access level calculations (topic, unit, track, subject, lesson1, lesson2)
+			mock_calc.side_effect = ["paid", "paid", "paid", "paid", "paid", "paid"]
+
+			topic = generate_topic_json(topic_doc, plan_id="PLAN-001")
+
+			# Verify lessons array structure
+			self.assertIsNotNone(topic)
+			self.assertIn("lessons", topic)
+			self.assertEqual(len(topic["lessons"]), 2)
+
+			# Verify each lesson has required fields
+			for lesson in topic["lessons"]:
+				self.assertIn("id", lesson)
+				self.assertIn("title", lesson)
+				self.assertIn("bit_index", lesson)
+				self.assertIn("lesson_url", lesson)
+				self.assertIn("access", lesson)
+
+		finally:
+			for patcher, _ in mocks.values():
+				patcher.stop()
+
+	def test_bit_index_included_per_lesson(self):
+		"""T034: bit_index included per lesson in topic JSON"""
+		from memora.services.cdn_export.json_generator import generate_topic_json
+
+		mocks = self._setup_topic_mocks()
+		try:
+			mock_frappe = mocks['frappe'][1]
+			mock_calc = mocks['calc'][1]
+
+			topic_doc = Mock()
+			topic_doc.name = "TOPIC-ALGEBRA-1"
+			topic_doc.title = "Intro to Algebra"
+			topic_doc.description = None
+			topic_doc.image = None
+			topic_doc.is_linear = True
+			topic_doc.is_published = True
+			topic_doc.parent_unit = "UNIT-ALGEBRA"
+
+			lesson1 = Mock()
+			lesson1.name = "LESSON-MATH-001"
+			lesson1.title = "Lesson 1"
+			lesson1.description = None
+			lesson1.is_published = True
+			lesson1.bit_index = 0
+
+			lesson2 = Mock()
+			lesson2.name = "LESSON-MATH-002"
+			lesson2.title = "Lesson 2"
+			lesson2.description = None
+			lesson2.is_published = True
+			lesson2.bit_index = 1
+
+			# Mock frappe calls - need to set up unit/track/subject hierarchy
+			mock_frappe.get_doc.side_effect = [
+				Mock(parent_unit="UNIT-ALGEBRA"),  # For topic's parent lookup
+				Mock(name="UNIT-ALGEBRA", parent_track="TRACK-MATH-CORE"),  # For unit's parent lookup
+				Mock(name="TRACK-MATH-CORE", parent_subject="SUBJ-MATH"),  # For track's parent lookup
+				Mock(name="SUBJ-MATH")  # For subject
+			]
+
+			mock_frappe.get_all.side_effect = [
+				[lesson1, lesson2],  # Lessons
+				[Mock(parent="LESSON-MATH-001")] * 3,  # 3 stages for lesson1
+				[Mock(parent="LESSON-MATH-002")] * 2,  # 2 stages for lesson2
+			]
+
+			mock_calc.side_effect = ["paid", "paid", "paid", "paid", "paid", "paid"]
+
+			topic = generate_topic_json(topic_doc, plan_id="PLAN-001", subject_id="SUBJ-MATH")
+
+			self.assertIsNotNone(topic)
+			self.assertIn("lessons", topic)
+			lessons = topic["lessons"]
+			self.assertEqual(len(lessons), 2)
+
+			# Verify bit_index values from lesson documents
+			self.assertEqual(lessons[0]["bit_index"], 0)
+			self.assertEqual(lessons[1]["bit_index"], 1)
+
+		finally:
+			for patcher, _ in mocks.values():
+				patcher.stop()
+
+	def test_lesson_url_pointing_to_shared_lessons(self):
+		"""T035: lesson_url pointing to shared lessons/{lesson_id}.json"""
+		from memora.services.cdn_export.json_generator import generate_topic_json
+
+		mocks = self._setup_topic_mocks()
+		try:
+			mock_frappe = mocks['frappe'][1]
+			mock_calc = mocks['calc'][1]
+			mock_url = mocks['url'][1]
+
+			topic_doc = Mock()
+			topic_doc.name = "TOPIC-ALGEBRA-1"
+			topic_doc.title = "Intro to Algebra"
+			topic_doc.description = None
+			topic_doc.image = None
+			topic_doc.is_linear = True
+			topic_doc.is_published = True
+			topic_doc.parent_unit = "UNIT-ALGEBRA"
+
+			lesson1 = Mock()
+			lesson1.name = "LESSON-MATH-001"
+			lesson1.title = "Lesson 1"
+			lesson1.description = None
+			lesson1.is_published = True
+			lesson1.bit_index = 0
+
+			mock_frappe.get_doc.side_effect = [
+				Mock(parent_unit="UNIT-ALGEBRA"),
+				Mock(name="UNIT-ALGEBRA", parent_track="TRACK-MATH-CORE"),
+				Mock(name="TRACK-MATH-CORE", parent_subject="SUBJ-MATH"),
+				Mock(name="SUBJ-MATH")
+			]
+
+			mock_frappe.get_all.side_effect = [
+				[lesson1],  # Lessons
+				[Mock(parent="LESSON-MATH-001")],  # Stages
+			]
+
+			mock_calc.side_effect = ["paid", "paid", "paid", "paid", "paid"]
+
+			# URL resolver formats the lesson path
+			mock_url.side_effect = lambda x: x
+
+			topic = generate_topic_json(topic_doc, plan_id="PLAN-001", subject_id="SUBJ-MATH")
+
+			self.assertIsNotNone(topic)
+			self.assertIn("lessons", topic)
+			lesson = topic["lessons"][0]
+			self.assertIn("lesson_url", lesson)
+			self.assertIn("lessons", lesson["lesson_url"])
+			self.assertIn("LESSON-MATH-001.json", lesson["lesson_url"])
+
+		finally:
+			for patcher, _ in mocks.values():
+				patcher.stop()
+
+	def test_parent_breadcrumb_in_topic_json(self):
+		"""T036: parent breadcrumb (unit_id, track_id, subject_id) in topic JSON"""
+		from memora.services.cdn_export.json_generator import generate_topic_json
+
+		mocks = self._setup_topic_mocks()
+		try:
+			mock_frappe = mocks['frappe'][1]
+			mock_calc = mocks['calc'][1]
+
+			topic_doc = Mock()
+			topic_doc.name = "TOPIC-ALGEBRA-1"
+			topic_doc.title = "Intro to Algebra"
+			topic_doc.description = None
+			topic_doc.image = None
+			topic_doc.is_linear = True
+			topic_doc.is_published = True
+			topic_doc.parent_unit = "UNIT-ALGEBRA"
+
+			# Setup parent documents
+			unit_doc = Mock()
+			unit_doc.name = "UNIT-ALGEBRA"
+			unit_doc.title = "Algebra Fundamentals"
+			unit_doc.parent_track = "TRACK-MATH-CORE"
+
+			track_doc = Mock()
+			track_doc.name = "TRACK-MATH-CORE"
+			track_doc.title = "Core Mathematics"
+			track_doc.parent_subject = "SUBJ-MATH"
+
+			subject_doc = Mock()
+			subject_doc.name = "SUBJ-MATH"
+			subject_doc.title = "Mathematics"
+
+			mock_frappe.get_doc.side_effect = [unit_doc, track_doc, subject_doc, subject_doc]
+
+			lesson1 = Mock()
+			lesson1.name = "LESSON-MATH-001"
+			lesson1.title = "Lesson 1"
+			lesson1.description = None
+			lesson1.is_published = True
+			lesson1.bit_index = 0
+
+			mock_frappe.get_all.side_effect = [
+				[lesson1],  # Lessons
+				[Mock(parent="LESSON-MATH-001")],  # Stages
+			]
+
+			mock_calc.side_effect = ["paid", "paid", "paid", "paid", "paid"]
+
+			topic = generate_topic_json(topic_doc, plan_id="PLAN-001", subject_id="SUBJ-MATH")
+
+			self.assertIsNotNone(topic)
+			self.assertIn("parent", topic)
+			self.assertEqual(topic["parent"]["unit_id"], "UNIT-ALGEBRA")
+			self.assertEqual(topic["parent"]["unit_title"], "Algebra Fundamentals")
+			self.assertEqual(topic["parent"]["track_id"], "TRACK-MATH-CORE")
+			self.assertEqual(topic["parent"]["track_title"], "Core Mathematics")
+			self.assertEqual(topic["parent"]["subject_id"], "SUBJ-MATH")
+			self.assertEqual(topic["parent"]["subject_title"], "Mathematics")
+
+		finally:
+			for patcher, _ in mocks.values():
+				patcher.stop()
+
+	def test_hidden_lessons_excluded_from_topic(self):
+		"""T037: hidden lessons excluded from topic"""
+		from memora.services.cdn_export.json_generator import generate_topic_json
+
+		mocks = self._setup_topic_mocks()
+		try:
+			mock_frappe = mocks['frappe'][1]
+			mock_calc = mocks['calc'][1]
+
+			topic_doc = Mock()
+			topic_doc.name = "TOPIC-ALGEBRA-1"
+			topic_doc.title = "Intro to Algebra"
+			topic_doc.description = None
+			topic_doc.image = None
+			topic_doc.is_linear = True
+			topic_doc.is_published = True
+			topic_doc.parent_unit = "UNIT-ALGEBRA"
+
+			# Visible lesson
+			lesson1 = Mock()
+			lesson1.name = "LESSON-MATH-001"
+			lesson1.title = "Lesson 1"
+			lesson1.description = None
+			lesson1.is_published = True
+			lesson1.bit_index = 0
+
+			# Hidden lesson (will return None access_level)
+			lesson2 = Mock()
+			lesson2.name = "LESSON-MATH-002"
+			lesson2.title = "Lesson 2"
+			lesson2.description = None
+			lesson2.is_published = False
+			lesson2.bit_index = 1
+
+			mock_frappe.get_doc.side_effect = [
+				Mock(parent_unit="UNIT-ALGEBRA"),
+				Mock(name="UNIT-ALGEBRA", parent_track="TRACK-MATH-CORE"),
+				Mock(name="TRACK-MATH-CORE", parent_subject="SUBJ-MATH"),
+				Mock(name="SUBJ-MATH")
+			]
+
+			mock_frappe.get_all.side_effect = [
+				[lesson1, lesson2],  # Lessons
+				[Mock(parent="LESSON-MATH-001")],  # Stages for lesson1
+				[Mock(parent="LESSON-MATH-002")],  # Stages for lesson2
+			]
+
+			# Lesson2 is hidden (access_level=None)
+			mock_calc.side_effect = ["paid", "paid", "paid", "paid", "paid", None]
+
+			topic = generate_topic_json(topic_doc, plan_id="PLAN-001", subject_id="SUBJ-MATH")
+
+			self.assertIsNotNone(topic)
+			self.assertIn("lessons", topic)
+			# Only visible lesson should be in output
+			lessons = topic["lessons"]
+			self.assertEqual(len(lessons), 1)
+			self.assertEqual(lessons[0]["id"], "LESSON-MATH-001")
+
+		finally:
+			for patcher, _ in mocks.values():
+				patcher.stop()
+
+
 if __name__ == '__main__':
     unittest.main()

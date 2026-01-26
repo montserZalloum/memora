@@ -890,6 +890,172 @@ def generate_lesson_json(lesson_doc, plan_id=None):
 
     return lesson_data
 
+def generate_topic_json(topic_doc, plan_id=None, subject_id=None):
+	"""
+	Generate topic JSON with lesson list (Phase 5: User Story 3).
+	
+	Generates {topic_id}.json with lesson list, bit_index references, and lesson_url pointers.
+	Includes parent breadcrumb (unit_id, track_id, subject_id) and access control.
+	Lessons are shared across plans, so lesson_url points to lessons/{lesson_id}.json
+
+	Args:
+		topic_doc (frappe.doc): Memora Topic document
+		plan_id (str, optional): Plan ID for override lookup
+		subject_id (str, optional): Subject ID for bitmap generation
+
+	Returns:
+		dict or None: Topic data conforming to topic.schema.json,
+					  or None if topic is hidden by override
+	"""
+	plan_overrides = apply_plan_overrides(plan_id) if plan_id else {}
+	
+	# Get parent documents for breadcrumb
+	unit_doc = frappe.get_doc("Memora Unit", topic_doc.parent_unit)
+	track_doc = frappe.get_doc("Memora Track", unit_doc.parent_track)
+	subject_doc = frappe.get_doc("Memora Subject", track_doc.parent_subject)
+	
+	# Calculate access levels with inheritance
+	subject_access = calculate_access_level(subject_doc, parent_access=None, plan_overrides=plan_overrides)
+	track_access = calculate_access_level(track_doc, parent_access=subject_access, plan_overrides=plan_overrides)
+	unit_access = calculate_access_level(unit_doc, parent_access=track_access, plan_overrides=plan_overrides)
+	topic_access = calculate_access_level(topic_doc, parent_access=unit_access, plan_overrides=plan_overrides)
+	
+	if topic_access is None:
+		frappe.log_error(
+			f"[WARN] Topic {topic_doc.name} skipped - access level is None (likely hidden by plan override)",
+			"CDN JSON Generation"
+		)
+		return None
+	
+	# Build topic data
+	topic_data = {
+		"id": topic_doc.name,
+		"title": topic_doc.title,
+		"is_linear": topic_doc.is_linear if hasattr(topic_doc, "is_linear") else True,
+		"version": int(now_datetime().timestamp()),
+		"generated_at": now_datetime().isoformat(),
+		"parent": {
+			"unit_id": unit_doc.name,
+			"unit_title": unit_doc.title,
+			"track_id": track_doc.name,
+			"track_title": track_doc.title,
+			"subject_id": subject_doc.name,
+			"subject_title": subject_doc.title
+		},
+		"access": {
+			"is_published": topic_doc.is_published,
+			"access_level": topic_access
+		},
+		"lessons": []
+	}
+	
+	# Add optional fields
+	if topic_doc.description:
+		topic_data["description"] = topic_doc.description
+	if hasattr(topic_doc, "image") and topic_doc.image:
+		topic_data["image"] = topic_doc.image
+	
+	# Include required_item if access level is paid
+	if topic_access == "paid" and hasattr(topic_doc, "required_item") and topic_doc.required_item:
+		topic_data["access"]["required_item"] = topic_doc.required_item
+	
+	# Fetch all lessons for this topic
+	lessons = frappe.get_all(
+		"Memora Lesson",
+		filters={"parent_topic": topic_doc.name},
+		fields=["name", "title", "description", "is_published", "bit_index"],
+		order_by="name"
+	)
+	
+	# Fetch stage counts
+	lesson_ids = [lesson.name for lesson in lessons]
+	if lesson_ids:
+		all_stages = frappe.get_all(
+			"Memora Lesson Stage",
+			filters={"parent": ["in", lesson_ids]},
+			fields=["parent"]
+		)
+		stage_count_by_lesson = {}
+		for stage in all_stages:
+			if stage.parent not in stage_count_by_lesson:
+				stage_count_by_lesson[stage.parent] = 0
+			stage_count_by_lesson[stage.parent] += 1
+	else:
+		stage_count_by_lesson = {}
+	
+	# Process each lesson
+	for lesson in lessons:
+		lesson_access = calculate_access_level(lesson, parent_access=topic_access, plan_overrides=plan_overrides)
+		
+		if lesson_access is None:
+			continue  # Skip hidden lessons
+		
+		lesson_data = {
+			"id": lesson.name,
+			"title": lesson.title,
+			"bit_index": lesson.bit_index if hasattr(lesson, "bit_index") else -1,
+			"lesson_url": get_content_url(f"lessons/{lesson.name}.json"),
+			"access": {
+				"is_published": lesson.is_published,
+				"access_level": lesson_access
+			},
+			"stage_count": stage_count_by_lesson.get(lesson.name, 0)
+		}
+		
+		# Add optional fields
+		if lesson.description:
+			lesson_data["description"] = lesson.description
+		
+		topic_data["lessons"].append(lesson_data)
+	
+	# Validate against schema
+	is_valid, errors = validate_topic_json_against_schema(topic_data)
+	if not is_valid:
+		frappe.log_error(
+			f"Generated topic JSON for {topic_doc.name} failed schema validation: {errors}",
+			"CDN JSON Generation"
+		)
+	
+	frappe.log_error(
+		f"[INFO] Generated topic JSON for {topic_doc.name} with {len(topic_data['lessons'])} lessons",
+		"CDN JSON Generation"
+	)
+	
+	return topic_data
+
+def validate_topic_json_against_schema(topic):
+	"""
+	Validate generated topic against topic.schema.json.
+	
+	Args:
+		topic (dict): Topic data to validate
+		
+	Returns:
+		tuple: (is_valid: bool, errors: list of error messages)
+	"""
+	import jsonschema
+	import os
+	
+	schema_path = os.path.join(
+		os.path.dirname(__file__),
+		"schemas",
+		"topic.schema.json"
+	)
+	
+	try:
+		with open(schema_path, "r") as f:
+			schema = json.load(f)
+	except Exception as e:
+		return False, [f"Failed to load topic schema: {str(e)}"]
+	
+	try:
+		jsonschema.validate(instance=topic, schema=schema)
+		return True, []
+	except jsonschema.ValidationError as e:
+		return False, [str(e)]
+	except Exception as e:
+		return False, [f"Schema validation error: {str(e)}"]
+
 def get_content_paths_for_plan(plan_name):
 	"""
 	Generate all file paths that need to be generated for a plan.
