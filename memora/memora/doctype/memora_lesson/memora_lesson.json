@@ -14,7 +14,8 @@
   "is_free_preview",
   "sort_order",
   "image",
-  "description"
+  "description",
+  "bit_index"
  ],
  "fields": [
   {
@@ -67,6 +68,15 @@
    "fieldname": "description",
    "fieldtype": "Small Text",
    "label": "Description"
+  },
+  {
+   "default": "-1",
+   "fieldname": "bit_index",
+   "fieldtype": "Int",
+   "label": "Bit Index",
+   "read_only": 1,
+   "hidden": 1,
+   "description": "Immutable bitmap position within subject"
   }
  ],
  "grid_page_length": 50,
@@ -97,6 +107,5 @@
  "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": [],
- "title_field": "title"
+ "states": []
 }

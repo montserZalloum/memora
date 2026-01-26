@@ -49,7 +49,7 @@ def generate_manifest(plan_doc):
         "Memora Subject",
         filters={"name": ["in", subject_ids]},
         # fields=["name", "title", "description", "image", "color_code", "is_published", "required_item"]
-        fields=["name", "title", "description", "image", "color_code", "is_published", "is_linear"]  # "required_item" commented out
+        fields=["name", "title", "description", "image", "color_code", "is_published"]  # "required_item" commented out
     )
     subject_dict = {s.name: s for s in subjects}
 
@@ -63,9 +63,8 @@ def generate_manifest(plan_doc):
             continue
 
         subject_data = {
-		"id": subject.name,
-		"title": subject.title,
-		"is_linear": subject.is_linear if hasattr(subject, "is_linear") else True,
+            "id": subject.name,
+            "title": subject.title,
             # "sort_order": ps.sort_order,
             "url": get_content_url(f"subjects/{subject.name}.json")
         }
@@ -138,7 +137,7 @@ def generate_subject_json(subject_doc, plan_id=None):
 		"Memora Track",
 		filters={"parent_subject": subject_doc.name},
 		# fields=["name", "title", "description", "sort_order", "is_sold_separately", "parent_item_required", "required_item"],
-		fields=["name", "title", "description", "is_sold_separately", "parent_item_required", "is_linear"],  # "sort_order" and "required_item" commented out
+		fields=["name", "title", "description", "is_sold_separately", "parent_item_required"],  # "sort_order" and "required_item" commented out
 		# order_by="sort_order"
 		order_by="name"  # sort_by commented out, using name as fallback
 	)
@@ -190,7 +189,6 @@ def generate_subject_json(subject_doc, plan_id=None):
 			"id": track.name,
 			"title": track.title,
 			"description": track.description or "",
-			"is_linear": track.is_linear if hasattr(track, "is_linear") else True,
 			# "sort_order": track.sort_order,
 			"units": [],
 			"access": {
@@ -214,7 +212,6 @@ def generate_subject_json(subject_doc, plan_id=None):
 				"id": unit.name,
 				"title": unit.title,
 				"description": unit.description or "",
-				"is_linear": unit.is_linear if hasattr(unit, "is_linear") else True,
 				# "sort_order": unit.sort_order,
 				"topics": [],
 				"access": {
@@ -235,11 +232,9 @@ def generate_subject_json(subject_doc, plan_id=None):
 					continue
 
 				topic_data = {
-			"id": topic.name,
-			"title": topic.title,
-			"description": topic.description or "",
-			"is_linear": topic.is_linear if hasattr(topic, "is_linear") else True,
-					"is_linear": topic.is_linear if hasattr(topic, "is_linear") else True,
+					"id": topic.name,
+					"title": topic.title,
+					"description": topic.description or "",
 					# "sort_order": topic.sort_order,
 					"lessons": [],
 					"access": {
@@ -260,11 +255,9 @@ def generate_subject_json(subject_doc, plan_id=None):
 						continue
 
 					lesson_data = {
-				"id": lesson.name,
-				"title": lesson.title,
-				"description": lesson.description or "",
-				"bit_index": lesson.bit_index if hasattr(lesson, "bit_index") else -1,
-						"bit_index": lesson.bit_index if hasattr(lesson, "bit_index") else -1,
+						"id": lesson.name,
+						"title": lesson.title,
+						"description": lesson.description or "",
 						# "sort_order": lesson.sort_order,
 						"stages": [],
 						"access": {
@@ -382,11 +375,9 @@ def generate_unit_json(unit_doc, plan_id=None):
             continue
 
         topic_data = {
-			"id": topic.name,
-			"title": topic.title,
-			"description": topic.description or "",
-			"is_linear": topic.is_linear if hasattr(topic, "is_linear") else True,
-					"is_linear": topic.is_linear if hasattr(topic, "is_linear") else True,
+            "id": topic.name,
+            "title": topic.title,
+            "description": topic.description or "",
             # "sort_order": topic.sort_order,
             "lessons": [],
             "access": {
@@ -407,11 +398,9 @@ def generate_unit_json(unit_doc, plan_id=None):
                 continue
 
             lesson_data = {
-				"id": lesson.name,
-				"title": lesson.title,
-				"description": lesson.description or "",
-				"bit_index": lesson.bit_index if hasattr(lesson, "bit_index") else -1,
-						"bit_index": lesson.bit_index if hasattr(lesson, "bit_index") else -1,
+                "id": lesson.name,
+                "title": lesson.title,
+                "description": lesson.description or "",
                 # "sort_order": lesson.sort_order,
                 "stages": [],
                 "access": {
@@ -472,10 +461,9 @@ def generate_lesson_json(lesson_doc, plan_id=None):
         return None
 
     lesson_data = {
-		"id": lesson_doc.name,
-		"title": lesson_doc.title,
-		"description": lesson_doc.description or "",
-		"bit_index": lesson_doc.bit_index if hasattr(lesson_doc, "bit_index") else -1,
+        "id": lesson_doc.name,
+        "title": lesson_doc.title,
+        "description": lesson_doc.description or "",
         # "sort_order": lesson_doc.sort_order,
         "version": int(now_datetime().timestamp()),
         "generated_at": now_datetime().isoformat(),

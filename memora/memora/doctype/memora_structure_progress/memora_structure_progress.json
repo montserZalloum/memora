@@ -10,6 +10,8 @@
   "academic_plan",
   "subject",
   "passed_lessons_data",
+  "passed_lessons_bitset",
+  "best_hearts_data",
   "last_lesson_completed",
   "completion_percentage",
   "total_xp_earned",
@@ -41,6 +43,18 @@
    "fieldname": "passed_lessons_data",
    "fieldtype": "JSON",
    "label": "Passed Lessons Data"
+  },
+  {
+   "fieldname": "passed_lessons_bitset",
+   "fieldtype": "Long Text",
+   "label": "Passed Lessons Bitset",
+   "description": "Base64-encoded bitmap of completed lessons"
+  },
+  {
+   "fieldname": "best_hearts_data",
+   "fieldtype": "JSON",
+   "label": "Best Hearts Data",
+   "description": "Per-lesson best hearts for XP bonus calculation"
   },
   {
    "fieldname": "last_lesson_completed",
@@ -89,6 +103,7 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

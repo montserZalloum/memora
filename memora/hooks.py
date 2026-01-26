@@ -330,6 +330,9 @@ scheduler_events = {
 	],
 	"Daily": [
 		"memora.services.cdn_export.health_checker.daily_full_scan"
+	],
+	"All": [
+		"memora.services.progress_engine.snapshot_syncer.sync_pending_bitmaps"
 	]
 }
 

@@ -9,6 +9,8 @@
   "user",
   "display_name",
   "grade",
+  "stream",
+  "season",
   "avatar",
   "current_plan",
   "devices"
@@ -53,12 +55,24 @@
    "options": "Memora Grade",
    "reqd": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "stream",
+   "fieldtype": "Link",
+   "label": "Stream",
+   "options": "Memora Stream"
+  },
+  {
+   "fieldname": "season",
+   "fieldtype": "Link",
+   "label": "Season",
+   "options": "Memora Season"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-25 10:02:01.961016",
+ "modified": "2026-01-26 15:13:03.509035",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Memora Player Profile",

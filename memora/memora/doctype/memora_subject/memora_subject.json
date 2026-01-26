@@ -16,7 +16,8 @@
   "sort_order",
   "image",
   "description",
-  "is_linear"
+  "is_linear",
+  "next_bit_index"
  ],
  "fields": [
   {
@@ -78,6 +79,15 @@
    "fieldname": "is_linear",
    "fieldtype": "Check",
    "label": "is Linear"
+  },
+  {
+   "default": "0",
+   "fieldname": "next_bit_index",
+   "fieldtype": "Int",
+   "label": "Next Bit Index",
+   "read_only": 1,
+   "hidden": 1,
+   "description": "Internal counter for lesson bit indices"
   }
  ],
  "grid_page_length": 50,

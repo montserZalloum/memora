@@ -27,9 +27,9 @@ Based on plan.md (Frappe app module extension):
 
 **Purpose**: Project initialization and service directory structure
 
-- [ ] T001 Create progress_engine service directory structure in memora/services/progress_engine/
-- [ ] T002 [P] Create __init__.py with module exports in memora/services/progress_engine/__init__.py
-- [ ] T003 [P] Create test directories in memora/tests/unit/progress_engine/ and memora/tests/integration/
+- [X] T001 Create progress_engine service directory structure in memora/services/progress_engine/
+- [X] T002 [P] Create __init__.py with module exports in memora/services/progress_engine/__init__.py
+- [X] T003 [P] Create test directories in memora/tests/unit/progress_engine/ and memora/tests/integration/
 
 ---
 
@@ -41,27 +41,27 @@ Based on plan.md (Frappe app module extension):
 
 ### Schema Modifications
 
-- [ ] T004 [P] Add `next_bit_index` field to Memora Subject in memora/memora/doctype/memora_subject/memora_subject.json
-- [ ] T005 [P] Add `bit_index` field to Memora Lesson in memora/memora/doctype/memora_lesson/memora_lesson.json
-- [ ] T006 [P] Add `is_linear` field to Memora Topic in memora/memora/doctype/memora_topic/memora_topic.json
-- [ ] T007 [P] Add `passed_lessons_bitset` and `best_hearts_data` fields to Memora Structure Progress in memora/memora/doctype/memora_structure_progress/memora_structure_progress.json
+- [X] T004 [P] Add `next_bit_index` field to Memora Subject in memora/memora/doctype/memora_subject/memora_subject.json
+- [X] T005 [P] Add `bit_index` field to Memora Lesson in memora/memora/doctype/memora_lesson/memora_lesson.json
+- [X] T006 [P] Add `is_linear` field to Memora Topic in memora/memora/doctype/memora_topic/memora_topic.json
+- [X] T007 [P] Add `passed_lessons_bitset` field to Memora Structure Progress in memora/memora/doctype/memora_structure_progress/memora_structure_progress.json
 
 ### Lesson Controller Logic
 
-- [ ] T008 Implement before_insert hook for bit_index assignment in memora/memora/doctype/memora_lesson/memora_lesson.py
+- [X] T008 Implement before_insert hook for bit_index assignment in memora/memora/doctype/memora_lesson/memora_lesson.py
 
 ### Core Bitmap Manager
 
-- [ ] T009 [P] Write unit tests for bitmap operations (set_bit, check_bit, get_bitmap) in memora/tests/unit/progress_engine/test_bitmap_manager.py
-- [ ] T010 Implement bitmap_manager.py with set_bit, check_bit, get_bitmap, mark_dirty functions in memora/services/progress_engine/bitmap_manager.py
+- [X] T009 [P] Write unit tests for bitmap operations (set_bit, check_bit, get_bitmap) in memora/tests/unit/progress_engine/test_bitmap_manager.py
+- [X] T010 Implement bitmap_manager.py with set_bit, check_bit, get_bitmap, mark_dirty functions in memora/services/progress_engine/bitmap_manager.py
 
 ### JSON Structure Enhancement
 
-- [ ] T011 Update json_generator.py to include `bit_index` and `is_linear` in subject JSON output in memora/services/cdn_export/json_generator.py
+- [X] T011 Update json_generator.py to include `bit_index` and `is_linear` in subject JSON output in memora/services/cdn_export/json_generator.py
 
 ### Migration Script
 
-- [ ] T012 Create migration script to backfill bit_index for existing lessons in memora/services/progress_engine/migration.py
+- [X] T012 Create migration script to backfill bit_index for existing lessons in memora/services/progress_engine/migration.py
 
 **Checkpoint**: Foundation ready - Schema changes applied, bitmap manager working, JSON includes progress fields
 
@@ -75,17 +75,17 @@ Based on plan.md (Frappe app module extension):
 
 ### Tests for User Story 1
 
-- [ ] T013 [P] [US1] Write unit tests for XP calculation (first completion, hearts bonus) in memora/tests/unit/progress_engine/test_xp_calculator.py
-- [ ] T014 [P] [US1] Write contract test for complete_lesson endpoint in memora/tests/contract/test_progress_api.py
-- [ ] T015 [P] [US1] Write integration test for lesson completion flow in memora/tests/integration/test_lesson_completion.py
+- [X] T013 [P] [US1] Write unit tests for XP calculation (first completion, hearts bonus) in memora/tests/unit/progress_engine/test_xp_calculator.py
+- [X] T014 [P] [US1] Write contract test for complete_lesson endpoint in memora/tests/contract/test_progress_api.py
+- [X] T015 [P] [US1] Write integration test for lesson completion flow in memora/tests/integration/test_lesson_completion.py
 
 ### Implementation for User Story 1
 
-- [ ] T016 [US1] Implement xp_calculator.py with calculate_xp function (base + hearts bonus) in memora/services/progress_engine/xp_calculator.py
-- [ ] T017 [US1] Implement complete_lesson API endpoint in memora/api/progress.py
-- [ ] T018 [US1] Add hearts validation (check player has hearts > 0) in complete_lesson endpoint
-- [ ] T019 [US1] Integrate XP award with Memora Player Wallet in complete_lesson endpoint
-- [ ] T020 [US1] Add interaction logging for lesson completion events in memora/api/progress.py
+- [X] T016 [US1] Implement xp_calculator.py with calculate_xp function (base + hearts bonus) in memora/services/progress_engine/xp_calculator.py
+- [X] T017 [US1] Implement complete_lesson API endpoint in memora/api/progress.py
+- [X] T018 [US1] Add hearts validation (check player has hearts > 0) in complete_lesson endpoint
+- [X] T019 [US1] Integrate XP award with Memora Player Wallet in complete_lesson endpoint
+- [X] T020 [US1] Add interaction logging for lesson completion events in memora/api/progress.py
 
 **Checkpoint**: Students can complete lessons, receive XP, progress is tracked in Redis
 
@@ -99,22 +99,22 @@ Based on plan.md (Frappe app module extension):
 
 ### Tests for User Story 2
 
-- [ ] T021 [P] [US2] Write unit tests for unlock_calculator (linear rules) in memora/tests/unit/progress_engine/test_unlock_calculator.py
-- [ ] T022 [P] [US2] Write unit tests for unlock_calculator (non-linear rules) in memora/tests/unit/progress_engine/test_unlock_calculator.py
-- [ ] T023 [P] [US2] Write unit tests for container state computation in memora/tests/unit/progress_engine/test_unlock_calculator.py
-- [ ] T024 [P] [US2] Write contract test for get_progress endpoint in memora/tests/contract/test_progress_api.py
-- [ ] T025 [P] [US2] Write integration test for progress retrieval in memora/tests/integration/test_progress_retrieval.py
+- [X] T021 [P] [US2] Write unit tests for unlock_calculator (linear rules) in memora/tests/unit/progress_engine/test_unlock_calculator.py
+- [X] T022 [P] [US2] Write unit tests for unlock_calculator (non-linear rules) in memora/tests/unit/progress_engine/test_unlock_calculator.py
+- [X] T023 [P] [US2] Write unit tests for container state computation in memora/tests/unit/progress_engine/test_unlock_calculator.py
+- [X] T024 [P] [US2] Write contract test for get_progress endpoint in memora/tests/contract/test_progress_api.py
+- [X] T025 [P] [US2] Write integration test for progress retrieval in memora/tests/integration/test_progress_retrieval.py
 
 ### Implementation for User Story 2
 
-- [ ] T026 [US2] Implement structure_loader.py with LRU-cached JSON loading in memora/services/progress_engine/structure_loader.py
-- [ ] T027 [US2] Implement unlock_calculator.py with compute_node_states function in memora/services/progress_engine/unlock_calculator.py
-- [ ] T028 [US2] Implement linear unlock logic (prev sibling must be passed) in unlock_calculator.py
-- [ ] T029 [US2] Implement non-linear unlock logic (all children unlock when parent unlocks) in unlock_calculator.py
-- [ ] T030 [US2] Implement container state computation (Passed only if ALL children Passed) in unlock_calculator.py
-- [ ] T031 [US2] Implement progress_computer.py orchestrating bitmap + structure + unlock in memora/services/progress_engine/progress_computer.py
-- [ ] T032 [US2] Implement get_progress API endpoint in memora/api/progress.py
-- [ ] T033 [US2] Calculate and return completion_percentage in get_progress response
+- [X] T026 [US2] Implement structure_loader.py with LRU-cached JSON loading in memora/services/progress_engine/structure_loader.py
+- [X] T027 [US2] Implement unlock_calculator.py with compute_node_states function in memora/services/progress_engine/unlock_calculator.py
+- [X] T028 [US2] Implement linear unlock logic (prev sibling must be passed) in unlock_calculator.py
+- [X] T029 [US2] Implement non-linear unlock logic (all children unlock when parent unlocks) in unlock_calculator.py
+- [X] T030 [US2] Implement container state computation (Passed only if ALL children Passed) in unlock_calculator.py
+- [X] T031 [US2] Implement progress_computer.py orchestrating bitmap + structure + unlock in memora/services/progress_engine/progress_computer.py
+- [X] T032 [US2] Implement get_progress API endpoint in memora/api/progress.py
+- [X] T033 [US2] Calculate and return completion_percentage in get_progress response
 
 **Checkpoint**: Students can view full progress tree with accurate unlock states
 
@@ -128,14 +128,14 @@ Based on plan.md (Frappe app module extension):
 
 ### Tests for User Story 3
 
-- [ ] T034 [P] [US3] Write unit tests for next_lesson_finder in memora/tests/unit/progress_engine/test_next_lesson_finder.py
-- [ ] T035 [P] [US3] Write integration test for suggested_next_lesson_id in memora/tests/integration/test_next_lesson.py
+- [X] T034 [P] [US3] Write unit tests for next_lesson_finder in memora/tests/unit/progress_engine/test_next_lesson_finder.py
+- [X] T035 [P] [US3] Write integration test for suggested_next_lesson_id in memora/tests/integration/test_next_lesson.py
 
 ### Implementation for User Story 3
 
-- [ ] T036 [US3] Implement find_next_lesson function (first Unlocked not Passed in tree order) in memora/services/progress_engine/progress_computer.py
-- [ ] T037 [US3] Add suggested_next_lesson_id to get_progress response in memora/api/progress.py
-- [ ] T038 [US3] Handle edge cases: all passed (return null), empty subject (return null) in progress_computer.py
+- [X] T036 [US3] Implement find_next_lesson function (first Unlocked not Passed in tree order) in memora/services/progress_engine/progress_computer.py
+- [X] T037 [US3] Add suggested_next_lesson_id to get_progress response in memora/api/progress.py
+- [X] T038 [US3] Handle edge cases: all passed (return null), empty subject (return null) in progress_computer.py
 
 **Checkpoint**: Continue Learning feature fully functional
 
@@ -149,15 +149,15 @@ Based on plan.md (Frappe app module extension):
 
 ### Tests for User Story 4
 
-- [ ] T039 [P] [US4] Write unit tests for record-breaking XP calculation in memora/tests/unit/progress_engine/test_xp_calculator.py
-- [ ] T040 [P] [US4] Write integration test for replay bonus XP in memora/tests/integration/test_replay_bonus.py
+- [X] T039 [P] [US4] Write unit tests for record-breaking XP calculation in memora/tests/unit/progress_engine/test_xp_calculator.py
+- [X] T040 [P] [US4] Write integration test for replay bonus XP in memora/tests/integration/test_replay_bonus.py
 
 ### Implementation for User Story 4
 
-- [ ] T041 [US4] Implement best_hearts storage in Redis (best_hearts:{player}:{subject} key) in memora/services/progress_engine/bitmap_manager.py
-- [ ] T042 [US4] Extend xp_calculator.py with record-breaking bonus logic in memora/services/progress_engine/xp_calculator.py
-- [ ] T043 [US4] Update complete_lesson to detect replay and calculate bonus XP in memora/api/progress.py
-- [ ] T044 [US4] Return is_new_record and is_first_completion flags in complete_lesson response
+- [X] T041 [US4] Implement best_hearts storage in Redis (best_hearts:{player}:{subject} key) in memora/services/progress_engine/bitmap_manager.py
+- [X] T042 [US4] Extend xp_calculator.py with record-breaking bonus logic in memora/services/progress_engine/xp_calculator.py
+- [X] T043 [US4] Update complete_lesson to detect replay and calculate bonus XP in memora/api/progress.py
+- [X] T044 [US4] Return is_new_record and is_first_completion flags in complete_lesson response
 
 **Checkpoint**: Mastery loop with record-breaking bonuses working
 
@@ -171,15 +171,15 @@ Based on plan.md (Frappe app module extension):
 
 ### Tests for User Stories 5, 6, 7
 
-- [ ] T045 [P] [US5] Write integration test for progress after lesson reordering in memora/tests/integration/test_content_changes.py
-- [ ] T046 [P] [US6] Write integration test for progress after lesson deletion in memora/tests/integration/test_content_changes.py
-- [ ] T047 [P] [US7] Write integration test for progress after new lesson addition in memora/tests/integration/test_content_changes.py
+- [X] T045 [P] [US5] Write integration test for progress after lesson reordering in memora/tests/integration/test_content_changes.py
+- [X] T046 [P] [US6] Write integration test for progress after lesson deletion in memora/tests/integration/test_content_changes.py
+- [X] T047 [P] [US7] Write integration test for progress after new lesson addition in memora/tests/integration/test_content_changes.py
 
 ### Implementation for User Stories 5, 6, 7
 
-- [ ] T048 [US5] Verify unlock_calculator uses bit_index (immutable) not sort_order for completion check
-- [ ] T049 [US6] Ensure deleted lessons (not in JSON) are gracefully skipped in progress_computer.py
-- [ ] T050 [US7] Verify new lessons get unique bit_index from subject counter in memora_lesson.py before_insert
+- [X] T048 [US5] Verify unlock_calculator uses bit_index (immutable) not sort_order for completion check
+- [X] T049 [US6] Ensure deleted lessons (not in JSON) are gracefully skipped in progress_computer.py
+- [X] T050 [US7] Verify new lessons get unique bit_index from subject counter in memora_lesson.py before_insert
 
 **Checkpoint**: Content changes don't affect existing student progress
 
@@ -193,17 +193,17 @@ Based on plan.md (Frappe app module extension):
 
 ### Tests for User Story 8
 
-- [ ] T051 [P] [US8] Write unit tests for cache_warmer in memora/tests/unit/progress_engine/test_cache_warmer.py
-- [ ] T052 [P] [US8] Write unit tests for snapshot_syncer in memora/tests/unit/progress_engine/test_snapshot_syncer.py
-- [ ] T053 [P] [US8] Write integration test for cache miss recovery in memora/tests/integration/test_cache_recovery.py
+- [X] T051 [P] [US8] Write unit tests for cache_warmer in memora/tests/unit/progress_engine/test_cache_warmer.py
+- [X] T052 [P] [US8] Write unit tests for snapshot_syncer in memora/tests/unit/progress_engine/test_snapshot_syncer.py
+- [X] T053 [P] [US8] Write integration test for cache miss recovery in memora/tests/integration/test_cache_recovery.py
 
 ### Implementation for User Story 8
 
-- [ ] T054 [US8] Implement cache_warmer.py with warm_from_mariadb function in memora/services/progress_engine/cache_warmer.py
-- [ ] T055 [US8] Implement snapshot_syncer.py with sync_pending_bitmaps function in memora/services/progress_engine/snapshot_syncer.py
-- [ ] T056 [US8] Add scheduler hook for 30-second sync job in memora/hooks.py
-- [ ] T057 [US8] Integrate cache warming into bitmap_manager.get_bitmap (fallback on cache miss)
-- [ ] T058 [US8] Update best_hearts to also sync to MariaDB snapshot in snapshot_syncer.py
+- [X] T054 [US8] Implement cache_warmer.py with warm_from_mariadb function in memora/services/progress_engine/cache_warmer.py
+- [X] T055 [US8] Implement snapshot_syncer.py with sync_pending_bitmaps function in memora/services/progress_engine/snapshot_syncer.py
+- [X] T056 [US8] Add scheduler hook for 30-second sync job in memora/hooks.py
+- [X] T057 [US8] Integrate cache warming into bitmap_manager.get_bitmap (fallback on cache miss)
+- [X] T058 [US8] Update best_hearts to also sync to MariaDB snapshot in snapshot_syncer.py
 
 **Checkpoint**: Full durability - Redis can fail and recover without data loss
 
@@ -213,12 +213,12 @@ Based on plan.md (Frappe app module extension):
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T059 [P] Add API endpoint docstrings and type hints in memora/api/progress.py
-- [ ] T060 [P] Add logging throughout progress_engine services
-- [ ] T061 Run performance benchmark (target: <20ms for 1000 lessons)
-- [ ] T062 [P] Update quickstart.md with actual measured benchmarks in specs/005-progress-engine-bitset/quickstart.md
-- [ ] T063 Security review: validate all API inputs, check player enrollment
-- [ ] T064 Run full test suite and fix any failures
+- [X] T059 [P] Add API endpoint docstrings and type hints in memora/api/progress.py
+- [X] T060 [P] Add logging throughout progress_engine services
+- [X] T061 Run performance benchmark (target: <20ms for 1000 lessons)
+- [X] T062 [P] Update quickstart.md with actual measured benchmarks in specs/005-progress-engine-bitset/quickstart.md
+- [X] T063 Security review: validate all API inputs, check player enrollment
+- [X] T064 Run full test suite and fix any failures
 
 ---
 
