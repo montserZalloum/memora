@@ -2,8 +2,20 @@
 
 **Feature Branch**: `005-progress-engine-bitset`
 **Created**: 2026-01-25
-**Status**: Draft
+**Last Updated**: 2026-01-26 (v1.1)
+**Status**: Updated
+**Version**: 1.1
 **Input**: User description: "PRD for Memora Structure Progress Engine - a high-performance progress tracking engine using Redis Bitmaps for lesson completion state and unlock logic supporting 100K concurrent users"
+
+## v1.1 Updates (2026-01-26)
+
+This version incorporates five critical enhancements to improve system performance, game balance, and data integrity:
+
+1. **Lazy Cache Warming (FR-023, FR-025, FR-026)**: Bitmaps are loaded on-demand from MariaDB instead of bulk-loading at server startup, preventing database overload during restarts
+2. **JSON Integrity Filter (FR-027, FR-028)**: Unpublished and deleted lessons are automatically excluded from the JSON structure generation
+3. **Bit Index Protection (FR-029, FR-030)**: Each lesson's bit_index is strictly scoped to its Subject ID; moving lessons triggers automatic progress reset
+4. **Persistence of Success (FR-031)**: Once a lesson is passed (bit=1), it cannot be reset to 0 through normal gameplay, protecting student achievements
+5. **Two-Tier Reward Policy (FR-021 through FR-024)**: Uses Redis SETBIT return value to distinguish first-time completions (full XP) from replays (fixed 10 XP bonus)
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -59,20 +71,20 @@ As a student, I want to tap "Continue Learning" and be taken directly to my next
 
 ---
 
-### User Story 4 - Replay Lesson for Record-Breaking Bonus (Priority: P2)
+### User Story 4 - Replay Lesson for Review (Priority: P2)
 
-As a student, I want to replay a lesson I've already passed to improve my score, and earn bonus XP if I perform better than my previous best, so that I'm motivated to master content without exploiting the XP system.
+As a student, I want to replay lessons I've already passed to review content and earn a small bonus, so that I can reinforce my learning without exploiting the XP system.
 
-**Why this priority**: This creates a meaningful "mastery loop" that encourages skill improvement rather than simple completion grinding.
+**Why this priority**: This creates a meaningful review mechanism that encourages mastery while maintaining game balance through a modest fixed reward.
 
-**Independent Test**: Can be tested by replaying a passed lesson with more hearts and verifying only the differential bonus XP is awarded.
+**Independent Test**: Can be tested by replaying a passed lesson and verifying a fixed 10 XP reward is awarded regardless of performance.
 
 **Acceptance Scenarios**:
 
-1. **Given** a student replays a lesson they previously passed with 2 hearts, **When** they complete it again with 2 or fewer hearts, **Then** no additional XP is awarded
-2. **Given** a student replays a lesson they previously passed with 2 hearts, **When** they complete it with 4 hearts, **Then** they receive bonus XP of (4-2) * 10 = 20 XP
-3. **Given** a student replays a lesson, **When** they achieve a new record, **Then** their new hearts score is stored for future comparisons
-4. **Given** a student replays a lesson, **When** they complete it, **Then** the Base XP is never awarded again (only first completion)
+1. **Given** a student completes a lesson for the first time with any hearts count > 0, **When** the system records completion, **Then** they receive the full reward: Base XP + (Remaining Hearts * 10) and the lesson bit is set to 1
+2. **Given** a student replays a lesson they previously passed (bit already = 1), **When** they complete it successfully with any hearts count > 0, **Then** they receive a fixed review bonus of 10 XP only
+3. **Given** a student replays a passed lesson, **When** they fail (Hearts = 0), **Then** no XP is awarded and the bit remains 1 (success is permanent)
+4. **Given** a student replays a passed lesson, **When** they complete it successfully, **Then** the lesson remains marked as "Passed" (green) in the progress UI
 
 ---
 
@@ -120,6 +132,7 @@ As an instructor, I want to add new lessons to an existing subject, so that I ca
 
 1. **Given** a new lesson is added to a subject, **When** the lesson is created, **Then** it receives a unique identifier that doesn't conflict with any existing or previously deleted lessons
 2. **Given** a new lesson is added, **When** students view their progress, **Then** the new lesson appears with the correct initial state based on unlock rules
+3. **Given** a new lesson is added and only appears in JSON when is_published = True, **When** the JSON structure is regenerated, **Then** students only see published lessons in their progress
 
 ---
 
@@ -134,15 +147,32 @@ As a system administrator, I want the progress data to be recoverable from persi
 **Acceptance Scenarios**:
 
 1. **Given** the fast cache becomes unavailable, **When** a student requests progress, **Then** the system loads data from persistent storage and serves the request
-2. **Given** the cache was unavailable and is restored, **When** the system recovers, **Then** it rebuilds the cache from persistent snapshots
+2. **Given** the cache was unavailable and is restored, **When** the system recovers, **Then** it rebuilds the cache from persistent snapshots on-demand as students access their progress
 3. **Given** both cache and snapshot exist, **When** they have conflicting data, **Then** the most recent write takes precedence
+
+---
+
+### User Story 9 - Lazy Cache Warming After System Restart (Priority: P3)
+
+As a system administrator, I want the system to start quickly without loading all student progress into memory, so that service restarts don't cause extended downtime or database overload.
+
+**Why this priority**: This is an operational efficiency feature that improves system resilience and reduces startup time, but it's not a user-facing feature.
+
+**Independent Test**: Can be tested by restarting Redis and verifying that progress data is loaded incrementally as students make requests, rather than all at once.
+
+**Acceptance Scenarios**:
+
+1. **Given** Redis cache is empty (after restart), **When** a student requests their progress for the first time, **Then** the system loads their bitmap from MariaDB, caches it in Redis with a TTL, and returns the progress within 100ms
+2. **Given** a bitmap is already cached in Redis, **When** a student requests progress, **Then** the system retrieves it from Redis without touching MariaDB (cache hit)
+3. **Given** a cached bitmap has expired (TTL elapsed), **When** a student requests progress, **Then** the system reloads it from MariaDB and resets the TTL
+4. **Given** 100,000 students access the system simultaneously after a restart, **When** the system warms the cache, **Then** MariaDB query load is distributed over time rather than spiking at startup
 
 ---
 
 ### Edge Cases
 
-- What happens when a student completes the same lesson multiple times? (XP: Base awarded only once; Hearts bonus only if new record achieved)
-- How does the system handle concurrent completion requests for the same lesson by the same student? (Idempotent operation - second request is a no-op for completion state, but may award bonus XP if higher hearts)
+- What happens when a student completes the same lesson multiple times? (First completion: Base XP + Hearts * 10; Subsequent completions: Fixed 10 XP; Bit remains 1)
+- How does the system handle concurrent completion requests for the same lesson by the same student? (Idempotent operation using Redis SETBIT return value; duplicate requests get replay reward)
 - What happens when a subject has zero lessons? (Return empty progress with 100% completion, null suggested_next_lesson_id)
 - How does the system handle extremely large subjects (1000+ lessons)? (Must still respond within 20ms)
 - What happens if persistent storage write fails after cache update? (Queue for retry, log the discrepancy)
@@ -150,6 +180,10 @@ As a system administrator, I want the progress data to be recoverable from persi
 - What happens if all lessons are passed? (Container shows Passed, suggested_next_lesson_id is null)
 - How are container states calculated when children have mixed states? (Container is Passed only if ALL children are Passed; otherwise Unlocked if accessible, Locked if not)
 - What if the system crashes within the 30-second snapshot window? (Up to 30 seconds of completions may need to be re-done; acceptable tradeoff for performance)
+- What happens when a lesson is moved from one subject to another? (Old bit_index is cleared, new bit_index assigned in target subject, student progress considered reset for that lesson)
+- What happens when Redis restarts and cache is empty? (Lazy loading: bitmaps loaded from MariaDB on first request per student-subject, then cached with TTL)
+- What happens when a student replays a passed lesson but loses (Hearts = 0)? (No XP awarded, bit stays 1, attempt logged, student can retry)
+- How does the JSON generator handle unpublished or deleted lessons? (Excluded from JSON structure file even if they have bit_index values; progress engine ignores missing lessons)
 
 ## Requirements *(mandatory)*
 
@@ -175,8 +209,18 @@ As a system administrator, I want the progress data to be recoverable from persi
 - **FR-018**: System MUST add earned XP to the student's profile wallet asynchronously
 - **FR-019**: System MUST determine and return `suggested_next_lesson_id` in every progress response - the first lesson in tree order that is Unlocked but not Passed
 - **FR-020**: System MUST mark a container (Topic/Unit/Track) as Passed ONLY when ALL of its descendant lessons have Passed status (all corresponding bits = 1)
-- **FR-021**: System MUST store the highest hearts score achieved per lesson for each student to enable record-breaking bonus calculations
-- **FR-022**: System MUST award bonus XP = (new_hearts - previous_best_hearts) * 10 when a student replays a passed lesson and achieves a higher hearts score
+- **FR-021**: System MUST use Redis SETBIT command to atomically set a lesson bit to 1 and retrieve the previous value (0 or 1) in a single operation
+- **FR-022**: System MUST award full XP (Base_XP + Remaining_Hearts * 10) when SETBIT returns previous value = 0 (first-time completion)
+- **FR-023**: System MUST award fixed 10 XP when SETBIT returns previous value = 1 (replay completion)
+- **FR-024**: System MUST NOT modify the Redis bitmap when a student fails a lesson (Hearts = 0), regardless of whether the lesson was previously passed
+- **FR-025**: System MUST implement lazy cache warming by loading bitmaps from MariaDB into Redis only when requested (cache miss scenario)
+- **FR-026**: System MUST set a TTL (Time To Live) on Redis bitmap keys to prevent indefinite memory growth
+- **FR-027**: System MUST exclude lessons with is_published = False from the generated JSON structure file
+- **FR-028**: System MUST exclude lessons with is_deleted = True (trashed) from the generated JSON structure file
+- **FR-029**: System MUST ensure each lesson's bit_index is scoped to its parent Subject ID and never shared across subjects
+- **FR-030**: System MUST clear a lesson's old bit_index and assign a new one if the lesson is moved to a different subject (progress reset for that lesson)
+- **FR-031**: System MUST treat success state (bit = 1) as permanent and irreversible through normal gameplay operations
+- **FR-032**: System MUST log all replay attempts, including failures, to the Interaction Log for analytics
 
 ### Key Entities
 
@@ -208,6 +252,10 @@ As a system administrator, I want the progress data to be recoverable from persi
 - **SC-008**: Progress retrieval from backup storage completes within 100 milliseconds when primary storage is unavailable
 - **SC-009**: Container (Topic/Unit/Track) statuses are accurately computed in every progress response
 - **SC-010**: `suggested_next_lesson_id` correctly identifies the next lesson 100% of the time
+- **SC-011**: First-time lesson completions always award full XP (Base + Hearts * 10); replay completions always award fixed 10 XP
+- **SC-012**: Students never lose progress on passed lessons, even after failed replay attempts
+- **SC-013**: Cache warming after Redis restart completes within 50 milliseconds per student-subject on first request
+- **SC-014**: Unpublished and deleted lessons never appear in student progress views, regardless of bitmap state
 
 ## Clarifications
 
@@ -216,6 +264,14 @@ As a system administrator, I want the progress data to be recoverable from persi
 - Q: Where is the `is_linear` unlock rule stored/retrieved from? → A: `is_linear` is stored in the pre-generated JSON structure file per container node
 - Q: What is the maximum hearts value at lesson completion? → A: Maximum 5 hearts (balanced, standard gamification)
 - Q: What is the snapshot sync frequency to persistent storage? → A: Batched every 30 seconds (aggregate pending updates)
+
+### Session 2026-01-26
+
+- Q: How are first-time vs replay completions distinguished? → A: Redis SETBIT returns the previous bit value (0 = first time, 1 = replay)
+- Q: What is the replay reward amount? → A: Fixed 10 XP for any successful replay, regardless of hearts remaining
+- Q: What happens to the bitmap when a student fails a replay? → A: Bitmap is not modified; bit stays 1 (success is permanent)
+- Q: When are bitmaps loaded into Redis? → A: Lazy loading on first request per student-subject (cache miss) from MariaDB, with TTL set
+- Q: How are unpublished/deleted lessons handled? → A: Excluded from JSON structure generation; invisible to progress engine and students
 
 ## Assumptions
 
@@ -227,3 +283,8 @@ As a system administrator, I want the progress data to be recoverable from persi
 - Background job processing infrastructure exists for async operations
 - Subjects have a reasonable upper bound of lessons (designed for up to 1000, but no hard limit enforced)
 - Base XP value is configured per lesson or subject (not specified in this feature)
+- Redis SETBIT operation is atomic and returns the previous bit value reliably
+- TTL values for Redis keys are configured appropriately (recommendation: 7-30 days based on user activity patterns)
+- JSON structure regeneration happens automatically when lessons are added, deleted, or have status changes (is_published, is_deleted)
+- Moving lessons between subjects is a rare administrative operation and requires manual intervention or explicit system support
+- MariaDB serves as the source of truth for all bitmap data; Redis is a performance cache layer
