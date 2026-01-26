@@ -1056,6 +1056,128 @@ def validate_topic_json_against_schema(topic):
 	except Exception as e:
 		return False, [f"Schema validation error: {str(e)}"]
 
+def generate_lesson_json_shared(lesson_doc):
+	"""
+	Generate shared lesson JSON with stages, NO access/parent blocks (Phase 6: User Story 4).
+	
+	This function generates a plan-agnostic shared lesson JSON file that can be referenced 
+	by multiple topics across different plans. The lesson contains only content (stages) and 
+	navigation information, with no plan-specific access control or parent information.
+	
+	Access control is determined at the topic level, and parent context varies by plan.
+	This allows lessons to be shared and cached across plans.
+	
+	Args:
+		lesson_doc (frappe.doc): Memora Lesson document
+	
+	Returns:
+		dict: Lesson data conforming to lesson.schema.json with stages but NO access/parent blocks
+	"""
+	# Build lesson data - NO access or parent blocks for shared lessons
+	lesson_data = {
+		"id": lesson_doc.name,
+		"title": lesson_doc.title,
+		"version": int(now_datetime().timestamp()),
+		"generated_at": now_datetime().isoformat(),
+		"stages": [],
+		"navigation": {
+			"is_standalone": True  # Always true for shared lessons
+		}
+	}
+	
+	# Add optional description
+	if hasattr(lesson_doc, "description") and lesson_doc.description:
+		lesson_data["description"] = lesson_doc.description
+	
+	# Add optional image
+	if hasattr(lesson_doc, "image") and lesson_doc.image:
+		lesson_data["image"] = lesson_doc.image
+	
+	# Fetch all stages for this lesson
+	stages = frappe.get_all(
+		"Memora Lesson Stage",
+		filters={"parent": lesson_doc.name},
+		fields=["idx", "title", "type", "weight", "target_time", "is_skippable", "config"],
+		order_by="idx"
+	)
+	
+	# Process each stage
+	for stage in stages:
+		# Parse config JSON
+		config = {}
+		if stage.config:
+			try:
+				config = json.loads(stage.config)
+			except (json.JSONDecodeError, TypeError):
+				config = {}
+		
+		# Build stage data with all fields
+		stage_data = {
+			"idx": stage.idx,
+			"title": stage.title,
+			"type": stage.type,
+			"config": config
+		}
+		
+		# Add optional fields if present
+		if hasattr(stage, "weight") and stage.weight is not None:
+			stage_data["weight"] = stage.weight
+		if hasattr(stage, "target_time") and stage.target_time is not None:
+			stage_data["target_time"] = stage.target_time
+		if hasattr(stage, "is_skippable") and stage.is_skippable is not None:
+			stage_data["is_skippable"] = stage.is_skippable
+		
+		lesson_data["stages"].append(stage_data)
+	
+	# Validate against schema
+	is_valid, errors = validate_lesson_json_against_schema(lesson_data)
+	if not is_valid:
+		frappe.log_error(
+			f"Generated shared lesson JSON for {lesson_doc.name} failed schema validation: {errors}",
+			"CDN JSON Generation"
+		)
+	
+	frappe.log_error(
+		f"[INFO] Generated shared lesson JSON for {lesson_doc.name} with {len(lesson_data['stages'])} stages",
+		"CDN JSON Generation"
+	)
+	
+	return lesson_data
+
+
+def validate_lesson_json_against_schema(lesson):
+	"""
+	Validate generated lesson against lesson.schema.json.
+	
+	Args:
+		lesson (dict): Lesson data to validate
+		
+	Returns:
+		tuple: (is_valid: bool, errors: list of error messages)
+	"""
+	import jsonschema
+	import os
+	
+	schema_path = os.path.join(
+		os.path.dirname(__file__),
+		"schemas",
+		"lesson.schema.json"
+	)
+	
+	try:
+		with open(schema_path, "r") as f:
+			schema = json.load(f)
+	except Exception as e:
+		return False, [f"Failed to load lesson schema: {str(e)}"]
+	
+	try:
+		jsonschema.validate(instance=lesson, schema=schema)
+		return True, []
+	except jsonschema.ValidationError as e:
+		return False, [str(e)]
+	except Exception as e:
+		return False, [f"Schema validation error: {str(e)}"]
+
 def get_content_paths_for_plan(plan_name):
 	"""
 	Generate all file paths that need to be generated for a plan.

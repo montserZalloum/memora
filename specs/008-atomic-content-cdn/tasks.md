@@ -145,21 +145,21 @@
 
 ### Tests for User Story 4 (TDD Required)
 
-- [ ] T045 [P] [US4] Write unit test for generate_lesson_json_shared() with stages array in memora/tests/unit/cdn_export/test_json_generator.py
-- [ ] T046 [P] [US4] Write unit test verifying NO access block in shared lesson JSON in memora/tests/unit/cdn_export/test_json_generator.py
-- [ ] T047 [P] [US4] Write unit test verifying NO parent block in shared lesson JSON in memora/tests/unit/cdn_export/test_json_generator.py
-- [ ] T048 [P] [US4] Write unit test for navigation.is_standalone=true in lesson JSON in memora/tests/unit/cdn_export/test_json_generator.py
-- [ ] T049 [P] [US4] Write unit test for stage fields (idx, title, type, weight, target_time, is_skippable, config) in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T045 [P] [US4] Write unit test for generate_lesson_json_shared() with stages array in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T046 [P] [US4] Write unit test verifying NO access block in shared lesson JSON in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T047 [P] [US4] Write unit test verifying NO parent block in shared lesson JSON in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T048 [P] [US4] Write unit test for navigation.is_standalone=true in lesson JSON in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T049 [P] [US4] Write unit test for stage fields (idx, title, type, weight, target_time, is_skippable, config) in memora/tests/unit/cdn_export/test_json_generator.py
 
 ### Implementation for User Story 4
 
-- [ ] T050 [US4] Create generate_lesson_json_shared() function in memora/services/cdn_export/json_generator.py
-- [ ] T051 [US4] Remove access block from lesson JSON (plan-agnostic)
-- [ ] T052 [US4] Remove parent block from lesson JSON (plan-agnostic)
-- [ ] T053 [US4] Add navigation.is_standalone=true to lesson JSON
-- [ ] T054 [US4] Ensure stage config is properly serialized (JSON within JSON)
-- [ ] T055 [US4] Validate generated lesson against lesson.schema.json
-- [ ] T056 [US4] Verify User Story 4 tests pass with pytest memora/tests/unit/cdn_export/test_json_generator.py -k lesson_shared
+- [x] T050 [US4] Create generate_lesson_json_shared() function in memora/services/cdn_export/json_generator.py
+- [x] T051 [US4] Remove access block from lesson JSON (plan-agnostic)
+- [x] T052 [US4] Remove parent block from lesson JSON (plan-agnostic)
+- [x] T053 [US4] Add navigation.is_standalone=true to lesson JSON
+- [x] T054 [US4] Ensure stage config is properly serialized (JSON within JSON)
+- [x] T055 [US4] Validate generated lesson against lesson.schema.json
+- [x] T056 [US4] Verify User Story 4 tests pass with pytest memora/tests/unit/cdn_export/test_json_generator.py -k lesson_shared
 
 **Checkpoint**: Shared lesson generation working, no access/parent blocks, independently testable
 

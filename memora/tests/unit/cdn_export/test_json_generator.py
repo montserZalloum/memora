@@ -1010,5 +1010,240 @@ class TestGenerateTopicJson(unittest.TestCase):
 				patcher.stop()
 
 
+class TestGenerateLessonJsonShared(unittest.TestCase):
+	"""Tests for generate_lesson_json_shared() function - Phase 6: User Story 4"""
+
+	def _setup_lesson_mocks(self):
+		"""Helper to setup common mocks for shared lesson tests"""
+		patcher_frappe = patch('memora.services.cdn_export.json_generator.frappe')
+		patcher_now = patch('memora.services.cdn_export.json_generator.now_datetime')
+		patcher_schema = patch('memora.services.cdn_export.json_generator.validate_lesson_json_against_schema')
+
+		mock_frappe = patcher_frappe.start()
+		mock_now = patcher_now.start()
+		mock_schema = patcher_schema.start()
+
+		# Setup datetime - create a mock with timestamp and isoformat methods
+		mock_dt = MagicMock()
+		mock_dt.timestamp = Mock(return_value=1706270400)
+		mock_dt.isoformat = Mock(return_value="2026-01-26T10:00:00")
+		mock_now.return_value = mock_dt
+
+		# Setup schema validation - default to valid
+		mock_schema.return_value = (True, [])
+
+		return {
+			'frappe': (patcher_frappe, mock_frappe),
+			'now': (patcher_now, mock_now),
+			'schema': (patcher_schema, mock_schema)
+		}
+
+	def test_generate_lesson_json_shared_with_stages_array(self):
+		"""T045: generate_lesson_json_shared() includes stages array"""
+		from memora.services.cdn_export.json_generator import generate_lesson_json_shared
+
+		mocks = self._setup_lesson_mocks()
+		try:
+			mock_frappe = mocks['frappe'][1]
+
+			# Setup mock lesson
+			lesson_doc = Mock()
+			lesson_doc.name = "LESSON-MATH-001"
+			lesson_doc.title = "Variables and Expressions"
+			lesson_doc.description = "Learn about variables"
+
+			# Setup mock stages
+			stage1 = Mock()
+			stage1.idx = 1
+			stage1.title = "Introduction Video"
+			stage1.type = "Video"
+			stage1.weight = 1.0
+			stage1.target_time = 180
+			stage1.is_skippable = False
+			stage1.config = '{"video_url": "https://cdn.example.com/videos/intro.mp4"}'
+
+			stage2 = Mock()
+			stage2.idx = 2
+			stage2.title = "Practice Question"
+			stage2.type = "Question"
+			stage2.weight = 2.0
+			stage2.target_time = 60
+			stage2.is_skippable = False
+			stage2.config = '{"question": "What is 2x when x=3?", "options": ["4", "5", "6", "7"]}'
+
+			# Mock frappe.get_all for stages
+			mock_frappe.get_all.return_value = [stage1, stage2]
+
+			lesson = generate_lesson_json_shared(lesson_doc)
+
+			# Verify lesson structure
+			self.assertIsNotNone(lesson)
+			self.assertIn("stages", lesson)
+			self.assertEqual(len(lesson["stages"]), 2)
+
+			# Verify each stage has required fields
+			for stage in lesson["stages"]:
+				self.assertIn("idx", stage)
+				self.assertIn("title", stage)
+				self.assertIn("type", stage)
+				self.assertIn("config", stage)
+
+		finally:
+			for patcher, _ in mocks.values():
+				patcher.stop()
+
+	def test_no_access_block_in_shared_lesson_json(self):
+		"""T046: Shared lesson JSON has NO access block"""
+		from memora.services.cdn_export.json_generator import generate_lesson_json_shared
+
+		mocks = self._setup_lesson_mocks()
+		try:
+			mock_frappe = mocks['frappe'][1]
+
+			lesson_doc = Mock()
+			lesson_doc.name = "LESSON-001"
+			lesson_doc.title = "Lesson 1"
+			lesson_doc.description = None
+
+			stage1 = Mock()
+			stage1.idx = 1
+			stage1.title = "Stage 1"
+			stage1.type = "Video"
+			stage1.weight = 1.0
+			stage1.target_time = 100
+			stage1.is_skippable = False
+			stage1.config = '{}'
+
+			mock_frappe.get_all.return_value = [stage1]
+
+			lesson = generate_lesson_json_shared(lesson_doc)
+
+			# Verify NO access block in output
+			self.assertIsNotNone(lesson)
+			self.assertNotIn("access", lesson)
+
+		finally:
+			for patcher, _ in mocks.values():
+				patcher.stop()
+
+	def test_no_parent_block_in_shared_lesson_json(self):
+		"""T047: Shared lesson JSON has NO parent block"""
+		from memora.services.cdn_export.json_generator import generate_lesson_json_shared
+
+		mocks = self._setup_lesson_mocks()
+		try:
+			mock_frappe = mocks['frappe'][1]
+
+			lesson_doc = Mock()
+			lesson_doc.name = "LESSON-001"
+			lesson_doc.title = "Lesson 1"
+			lesson_doc.description = None
+
+			stage1 = Mock()
+			stage1.idx = 1
+			stage1.title = "Stage 1"
+			stage1.type = "Text"
+			stage1.weight = 1.0
+			stage1.target_time = None
+			stage1.is_skippable = True
+			stage1.config = '{"content": "Some text"}'
+
+			mock_frappe.get_all.return_value = [stage1]
+
+			lesson = generate_lesson_json_shared(lesson_doc)
+
+			# Verify NO parent block in output
+			self.assertIsNotNone(lesson)
+			self.assertNotIn("parent", lesson)
+
+		finally:
+			for patcher, _ in mocks.values():
+				patcher.stop()
+
+	def test_navigation_is_standalone_true(self):
+		"""T048: Shared lesson JSON has navigation.is_standalone=true"""
+		from memora.services.cdn_export.json_generator import generate_lesson_json_shared
+
+		mocks = self._setup_lesson_mocks()
+		try:
+			mock_frappe = mocks['frappe'][1]
+
+			lesson_doc = Mock()
+			lesson_doc.name = "LESSON-001"
+			lesson_doc.title = "Test Lesson"
+			lesson_doc.description = None
+
+			stage1 = Mock()
+			stage1.idx = 1
+			stage1.title = "Stage"
+			stage1.type = "Interactive"
+			stage1.weight = 1.5
+			stage1.target_time = 120
+			stage1.is_skippable = True
+			stage1.config = '{"interactive_id": "123"}'
+
+			mock_frappe.get_all.return_value = [stage1]
+
+			lesson = generate_lesson_json_shared(lesson_doc)
+
+			# Verify navigation block with is_standalone=true
+			self.assertIsNotNone(lesson)
+			self.assertIn("navigation", lesson)
+			self.assertIn("is_standalone", lesson["navigation"])
+			self.assertTrue(lesson["navigation"]["is_standalone"])
+
+		finally:
+			for patcher, _ in mocks.values():
+				patcher.stop()
+
+	def test_stage_fields_complete(self):
+		"""T049: Stage fields (idx, title, type, weight, target_time, is_skippable, config) present"""
+		from memora.services.cdn_export.json_generator import generate_lesson_json_shared
+
+		mocks = self._setup_lesson_mocks()
+		try:
+			mock_frappe = mocks['frappe'][1]
+
+			lesson_doc = Mock()
+			lesson_doc.name = "LESSON-001"
+			lesson_doc.title = "Complete Stage Test"
+			lesson_doc.description = "Test all stage fields"
+
+			stage1 = Mock()
+			stage1.idx = 1
+			stage1.title = "Full Stage"
+			stage1.type = "Question"
+			stage1.weight = 2.5
+			stage1.target_time = 300
+			stage1.is_skippable = True
+			stage1.config = '{"complex": "config"}'
+
+			mock_frappe.get_all.return_value = [stage1]
+
+			lesson = generate_lesson_json_shared(lesson_doc)
+
+			# Verify stage has all required fields
+			self.assertIsNotNone(lesson)
+			self.assertIn("stages", lesson)
+			stage = lesson["stages"][0]
+			self.assertIn("idx", stage)
+			self.assertEqual(stage["idx"], 1)
+			self.assertIn("title", stage)
+			self.assertEqual(stage["title"], "Full Stage")
+			self.assertIn("type", stage)
+			self.assertEqual(stage["type"], "Question")
+			self.assertIn("weight", stage)
+			self.assertEqual(stage["weight"], 2.5)
+			self.assertIn("target_time", stage)
+			self.assertEqual(stage["target_time"], 300)
+			self.assertIn("is_skippable", stage)
+			self.assertTrue(stage["is_skippable"])
+			self.assertIn("config", stage)
+
+		finally:
+			for patcher, _ in mocks.values():
+				patcher.stop()
+
+
 if __name__ == '__main__':
     unittest.main()
