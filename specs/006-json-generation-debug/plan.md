@@ -1,35 +1,37 @@
-# Implementation Plan: JSON Generation Debug & Fix
+# Implementation Plan: [FEATURE]
 
-**Branch**: `006-json-generation-debug` | **Date**: 2026-01-26 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `/specs/006-json-generation-debug/spec.md`
+**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
+**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
 
 ## Summary
 
-Debug and fix the "Unknown column 'title' in SELECT" database error that prevents JSON file generation in the CDN export system. The primary requirement is to identify the exact SQL query causing the error, isolate which JSON generation component is failing, trace dynamic query construction patterns, and implement a fix that enables successful local JSON file generation when `local_fallback_mode = 1`.
-
-Technical approach: Implement diagnostic tools to capture full SQL tracebacks, create isolated test harnesses for each JSON generation function (manifest, search index, subject JSON), audit all database queries for schema validation, and apply fixes to ensure proper field name mapping using Frappe ORM metadata.
+[Extract from feature spec: primary requirement + technical approach from research]
 
 ## Technical Context
 
-**Language/Version**: Python 3.10+ (Frappe Framework v14/v15)
-**Primary Dependencies**: Frappe Framework, MariaDB (database), Redis (cache/queue), frappe.db ORM
-**Storage**: MariaDB for DocTypes (Memora Academic Plan, Subject, Track, Unit, Topic, Lesson), Local filesystem for JSON files (`/sites/{site}/public/memora_content/`)
-**Testing**: Frappe's built-in testing framework (frappe.test_runner), manual console testing via `bench console`
-**Target Platform**: Linux server (Frappe deployment)
-**Project Type**: Single backend service (Frappe app)
-**Performance Goals**: JSON generation within 10 seconds per subject, rebuild completion within 30 seconds for small plans
-**Constraints**: Cannot modify database schema, must preserve backward compatibility with existing JSON structure, must work with Frappe v14/v15
-**Scale/Scope**: Small debugging feature - affects 3 JSON generation functions, ~10 files in `memora/services/cdn_export/`, debugging tools for 1 test plan with 1 subject
+<!--
+  ACTION REQUIRED: Replace the content in this section with the technical details
+  for the project. The structure here is presented in advisory capacity to guide
+  the iteration process.
+-->
+
+**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
+**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
+**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
+**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
+**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
+**Project Type**: [single/web/mobile - determines source structure]  
+**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
+**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
+**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-**Status**: N/A - No project constitution exists yet
-
-Since no constitution file exists at `.specify/memory/constitution.md` (file contains only template placeholders), this feature will establish baseline practices for debugging and diagnostics in the Memora project. No constitutional gates to validate.
+[Gates determined based on constitution file]
 
 ## Project Structure
 
@@ -46,111 +48,57 @@ specs/[###-feature]/
 ```
 
 ### Source Code (repository root)
+<!--
+  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
+  for this feature. Delete unused options and expand the chosen structure with
+  real paths (e.g., apps/admin, packages/something). The delivered plan must
+  not include Option labels.
+-->
 
 ```text
-memora/
+# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
+src/
+├── models/
 ├── services/
-│   └── cdn_export/                    # Existing CDN export service (TO BE DEBUGGED)
-│       ├── json_generator.py          # FAILING: Contains generate_manifest(), generate_subject_json()
-│       ├── batch_processor.py         # FAILING: Contains _rebuild_plan()
-│       ├── access_calculator.py       # Helper: Access level calculation
-│       ├── dependency_resolver.py     # Helper: Plan dependency resolution
-│       ├── change_tracker.py          # Helper: Queue management
-│       └── url_resolver.py            # Helper: URL generation
-│
-├── api/
-│   └── cdn_debug.py                   # Existing debug endpoints (TO BE ENHANCED)
-│
-└── memora/
-    └── doctype/                        # DocType definitions
-        ├── memora_academic_plan/
-        ├── memora_subject/
-        ├── memora_track/
-        ├── memora_unit/
-        ├── memora_topic/
-        └── memora_lesson/
+├── cli/
+└── lib/
 
-# New diagnostic/debugging utilities (TO BE CREATED)
-memora/
-├── utils/
-│   └── diagnostics.py                 # NEW: Diagnostic tools for schema validation
-│
+tests/
+├── contract/
+├── integration/
+└── unit/
+
+# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
+backend/
+├── src/
+│   ├── models/
+│   ├── services/
+│   └── api/
 └── tests/
-    └── cdn_export/                    # NEW: Test harnesses for JSON generation
-        ├── test_json_generator.py     # NEW: Isolated function tests
-        └── test_schema_validation.py  # NEW: Schema validation tests
+
+frontend/
+├── src/
+│   ├── components/
+│   ├── pages/
+│   └── services/
+└── tests/
+
+# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
+api/
+└── [same as backend above]
+
+ios/ or android/
+└── [platform-specific structure: feature modules, UI flows, platform tests]
 ```
 
-**Structure Decision**: Frappe app structure (single backend). This is a debugging/fix feature that:
-1. Enhances existing `memora/services/cdn_export/` modules
-2. Adds new diagnostic utilities in `memora/utils/diagnostics.py`
-3. Creates test harnesses in `memora/tests/cdn_export/`
-4. Works within Frappe's app structure conventions
+**Structure Decision**: [Document the selected structure and reference the real
+directories captured above]
 
 ## Complexity Tracking
 
 > **Fill ONLY if Constitution Check has violations that must be justified**
 
-N/A - No project constitution exists, therefore no violations to track. This feature establishes baseline debugging practices.
-
----
-
-## Phase Completion Status
-
-### Phase 0: Research ✅ COMPLETE
-
-**Artifacts Generated**:
-- `research.md` - All technical unknowns resolved
-
-**Key Decisions**:
-1. Use `frappe.get_meta()` for field name resolution
-2. Audit all query patterns for proper field usage
-3. Implement diagnostic wrappers with `frappe.log_error()`
-4. Pre-flight schema validation using `DESCRIBE` queries
-5. Frappe test framework with minimal fixtures
-
-**No NEEDS CLARIFICATION remaining** - All research questions answered.
-
----
-
-### Phase 1: Design & Contracts ✅ COMPLETE
-
-**Artifacts Generated**:
-- `data-model.md` - 4 diagnostic data structures defined
-- `contracts/diagnostic-api.yaml` - OpenAPI 3.0 specification with 5 endpoints
-- `quickstart.md` - Developer debugging guide
-- `CLAUDE.md` - Updated with new technologies
-
-**Design Decisions**:
-1. **Data Structures**: SQL Query Diagnostic Result, Schema Validation Report, JSON Generation Test Result, Query Audit Entry
-2. **API Endpoints**: 
-   - `POST /diagnose_query_failure` - Diagnose SQL errors
-   - `POST /test_json_function` - Test functions in isolation
-   - `POST /validate_schema` - Validate DocType schemas
-   - `POST /audit_queries` - Audit all queries in function
-   - `GET /get_error_logs` - Retrieve recent CDN errors
-3. **Test Strategy**: Isolated unit tests with minimal fixtures, Frappe test framework
-4. **Error Handling**: Full traceback logging to Error Log DocType for UI visibility
-
-**Constitution Re-check**: N/A (no constitution exists)
-
----
-
-## Next Steps
-
-This plan is now complete. The next command is:
-
-```bash
-/speckit.tasks
-```
-
-This will generate `tasks.md` with actionable, dependency-ordered implementation tasks.
-
----
-
-## Plan Metadata
-
-**Created**: 2026-01-26
-**Last Updated**: 2026-01-26
-**Status**: Complete - Ready for task generation
-**Approver**: N/A (auto-approved, no constitution gates)
+| Violation | Why Needed | Simpler Alternative Rejected Because |
+|-----------|------------|-------------------------------------|
+| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
+| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
