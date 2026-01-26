@@ -90,6 +90,122 @@ def generate_manifest(plan_doc):
 
     return manifest
 
+def generate_manifest_atomic(plan_doc):
+    """
+    Generate plan manifest JSON for atomic CDN distribution (Phase 3: User Story 1).
+    
+    Atomic structure includes hierarchy_url and bitmap_url for each subject,
+    enabling granular cache invalidation and shared lesson content.
+
+    Args:
+        plan_doc (frappe.doc): Memora Academic Plan document
+
+    Returns:
+        dict: Manifest data conforming to manifest.schema.json
+    """
+    manifest = {
+        "plan_id": plan_doc.name,
+        "title": plan_doc.title,
+        "version": int(now_datetime().timestamp()),
+        "generated_at": now_datetime().isoformat(),
+        "subjects": [],
+        "search_index_url": get_content_url(f"plans/{plan_doc.name}/search_index.json")
+    }
+
+    if plan_doc.season:
+        manifest["season"] = plan_doc.season
+    if plan_doc.grade:
+        manifest["grade"] = plan_doc.grade
+    if plan_doc.stream:
+        manifest["stream"] = plan_doc.stream
+
+    plan_overrides = apply_plan_overrides(plan_doc.name)
+
+    plan_subjects = frappe.get_all(
+        "Memora Plan Subject",
+        filters={"parent": plan_doc.name},
+        fields=["subject"],
+        order_by="subject"
+    )
+
+    subject_ids = [ps.subject for ps in plan_subjects]
+    subjects = frappe.get_all(
+        "Memora Subject",
+        filters={"name": ["in", subject_ids]},
+        fields=["name", "title", "description", "image", "color_code", "is_published", "is_linear"]
+    )
+    subject_dict = {s.name: s for s in subjects}
+
+    for ps in plan_subjects:
+        subject = subject_dict.get(ps.subject)
+        if not subject:
+            continue
+
+        access_level = calculate_access_level(subject, parent_access=None, plan_overrides=plan_overrides)
+        if access_level is None:
+            continue
+
+        subject_data = {
+            "id": subject.name,
+            "title": subject.title,
+            "is_linear": subject.is_linear if hasattr(subject, "is_linear") else True,
+            "hierarchy_url": get_content_url(f"plans/{plan_doc.name}/{subject.name}_h.json"),
+            "bitmap_url": get_content_url(f"plans/{plan_doc.name}/{subject.name}_b.json"),
+        }
+
+        if subject.description:
+            subject_data["description"] = subject.description
+        if subject.image:
+            subject_data["image"] = subject.image
+        if subject.color_code:
+            subject_data["color_code"] = subject.color_code
+
+        subject_data["access"] = {
+            "is_published": subject.is_published,
+            "access_level": access_level
+        }
+
+        # Include required_item if access level is paid
+        if access_level == "paid" and hasattr(subject, "required_item") and subject.required_item:
+            subject_data["access"]["required_item"] = subject.required_item
+
+        manifest["subjects"].append(subject_data)
+
+    return manifest
+
+def validate_manifest_against_schema(manifest):
+    """
+    Validate generated manifest against manifest.schema.json.
+    
+    Args:
+        manifest (dict): Manifest data to validate
+        
+    Returns:
+        tuple: (is_valid: bool, errors: list of error messages)
+    """
+    import jsonschema
+    import os
+    
+    schema_path = os.path.join(
+        os.path.dirname(__file__),
+        "schemas",
+        "manifest.schema.json"
+    )
+    
+    try:
+        with open(schema_path, "r") as f:
+            schema = json.load(f)
+    except Exception as e:
+        return False, [f"Failed to load manifest schema: {str(e)}"]
+    
+    try:
+        jsonschema.validate(instance=manifest, schema=schema)
+        return True, []
+    except jsonschema.ValidationError as e:
+        return False, [str(e)]
+    except Exception as e:
+        return False, [f"Schema validation error: {str(e)}"]
+
 def generate_subject_json(subject_doc, plan_id=None):
 	"""
 	Generate subject JSON with complete content hierarchy.

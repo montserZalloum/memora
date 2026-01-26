@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://memora.app/schemas/cdn/008/lesson.schema.json",
+  "title": "Lesson Content (Shared)",
+  "description": "Shared lesson content with stages - plan-agnostic, no access control",
+  "type": "object",
+  "required": ["id", "title", "version", "generated_at", "stages", "navigation"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Lesson document name"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "image": {
+      "type": "string",
+      "format": "uri"
+    },
+    "version": {
+      "type": "integer",
+      "description": "File version (Unix timestamp)"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "stages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/stage"
+      }
+    },
+    "navigation": {
+      "type": "object",
+      "required": ["is_standalone"],
+      "properties": {
+        "is_standalone": {
+          "type": "boolean",
+          "description": "Always true for shared lessons - navigation determined by topic context"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "stage": {
+      "type": "object",
+      "required": ["idx", "title", "type", "config"],
+      "properties": {
+        "idx": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Stage order (1-based)"
+        },
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["Video", "Question", "Text", "Interactive"],
+          "description": "Stage type determining config structure"
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0,
+          "description": "XP weight multiplier for this stage"
+        },
+        "target_time": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Expected completion time in seconds"
+        },
+        "is_skippable": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether stage can be skipped"
+        },
+        "config": {
+          "type": "object",
+          "description": "Type-specific configuration data"
+        }
+      }
+    }
+  }
+}

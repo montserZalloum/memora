@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://memora.app/schemas/cdn/008/manifest.schema.json",
+  "title": "Plan Manifest (Atomic)",
+  "description": "Entry point for plan content - lists available subjects with hierarchy/bitmap URLs",
+  "type": "object",
+  "required": ["plan_id", "title", "version", "generated_at", "subjects"],
+  "properties": {
+    "plan_id": {
+      "type": "string",
+      "description": "Unique plan identifier (Frappe document name)"
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable plan title"
+    },
+    "season": {
+      "type": "string",
+      "description": "Academic season/year"
+    },
+    "grade": {
+      "type": "string",
+      "description": "Grade level"
+    },
+    "stream": {
+      "type": "string",
+      "description": "Academic stream (e.g., Scientific, Literary)"
+    },
+    "version": {
+      "type": "integer",
+      "description": "Manifest version (Unix timestamp for cache busting)"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 generation timestamp"
+    },
+    "subjects": {
+      "type": "array",
+      "description": "List of subjects in this plan",
+      "items": {
+        "$ref": "#/definitions/subjectEntry"
+      }
+    },
+    "search_index_url": {
+      "type": "string",
+      "description": "Relative path to search index JSON"
+    }
+  },
+  "definitions": {
+    "subjectEntry": {
+      "type": "object",
+      "required": ["id", "title", "is_linear", "hierarchy_url", "bitmap_url", "access"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Subject document name"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string",
+          "format": "uri",
+          "description": "Subject icon/image URL"
+        },
+        "color_code": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "description": "Hex color code"
+        },
+        "is_linear": {
+          "type": "boolean",
+          "description": "Whether subject enforces linear navigation"
+        },
+        "hierarchy_url": {
+          "type": "string",
+          "description": "Relative path to subject hierarchy JSON (_h.json)"
+        },
+        "bitmap_url": {
+          "type": "string",
+          "description": "Relative path to subject bitmap JSON (_b.json)"
+        },
+        "access": {
+          "$ref": "#/definitions/accessControl"
+        }
+      }
+    },
+    "accessControl": {
+      "type": "object",
+      "required": ["is_published", "access_level"],
+      "properties": {
+        "is_published": {
+          "type": "boolean",
+          "description": "Whether content is visible"
+        },
+        "access_level": {
+          "type": "string",
+          "enum": ["public", "authenticated", "paid", "free_preview"],
+          "description": "Access level for this content"
+        },
+        "required_item": {
+          "type": "string",
+          "description": "ERPNext Item Code required to access (only when access_level is 'paid')"
+        }
+      }
+    }
+  }
+}

@@ -14,6 +14,19 @@ Auto-generated from all feature plans. Last updated: 2026-01-26
 - Python 3.10+ (Frappe Framework v14/v15) + Frappe Framework, redis-py (via frappe.cache), RQ (background jobs) (007-player-core)
 - MariaDB (persistent DocTypes), Redis (session/wallet cache, device lists) (007-player-core)
 - Python 3.10+ (Frappe Framework) + Frappe Framework (v14/v15), ERPNext (for Item/Invoice links) (001-doctype-schema)
+- Python 3.10+ (Frappe Framework v14/v15) + Frappe Framework, redis-py (via frappe.cache), RQ (background jobs), boto3 (S3/R2 CDN) (008-atomic-content-cdn)
+- MariaDB (DocTypes), Redis (queue/locks), Local filesystem (`/sites/{site}/public/memora_content/`), S3/Cloudflare R2 (CDN target) (008-atomic-content-cdn)
+
+## MCP Usage & Code Search
+- **Always prioritize Serena MCP tools** for any codebase exploration, symbol searching, or code retrieval tasks.
+- Before reading a whole file or using `grep`, use Serena's semantic tools to find relevant code parts.
+- Specifically, use:
+  - `find_symbol`: To locate definitions of classes, functions, or variables.
+  - `find_referencing_symbols`: To find where a symbol is used.
+  - `find_file`: To locate files by path or name.
+  - `read_memory` / `list_memories`: To get project context from Serena's index.
+- Only fall back to standard `read_file` or `ls` if Serena cannot find the information or if you need to read a very specific, small utility file.
+- **Reason:** Using Serena saves tokens and provides better semantic accuracy.
 
 ## Project Structure
 
@@ -31,6 +44,7 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.10+ (Frappe Framework): Follow standard conventions
 
 ## Recent Changes
+- 008-atomic-content-cdn: Added Python 3.10+ (Frappe Framework v14/v15) + Frappe Framework, redis-py (via frappe.cache), RQ (background jobs), boto3 (S3/R2 CDN)
 - 007-player-core: Added Python 3.10+ (Frappe Framework v14/v15) + Frappe Framework, redis-py (via frappe.cache), RQ (background jobs)
   - DocTypes: Memora Player Profile, Memora Player Wallet, Memora Authorized Device (child table)
   - Services: device_auth.py, session_manager.py, wallet_engine.py, wallet_sync.py
@@ -38,7 +52,6 @@ Python 3.10+ (Frappe Framework): Follow standard conventions
   - Redis Patterns: player:{user}:devices (SET), active_session:{user} (STRING), wallet:{user} (HASH), pending_wallet_sync (SET)
   - Migration: v007_player_core_create_profiles.py (creates profiles for existing users)
 - 006-json-generation-debug: Added Python 3.10+ (Frappe Framework v14/v15) + Frappe Framework, MariaDB (database), Redis (cache/queue), frappe.db ORM
-- 005-progress-engine-bitset: Added Python 3.10+ (Frappe Framework v14/v15) + Frappe Framework, redis-py (via frappe.cache), RQ (background jobs)
 
 <!-- MANUAL ADDITIONS START -->
 

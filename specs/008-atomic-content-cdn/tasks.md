@@ -43,16 +43,16 @@
 
 ### DocType Schema Updates
 
-- [ ] T007 Add "Set Access Level" and "Set Linear" options to action field in memora/memora/doctype/memora_plan_override/memora_plan_override.json
-- [ ] T008 Run bench migrate to apply DocType changes
+- [x] T007 Add "Set Access Level" and "Set Linear" options to action field in memora/memora/doctype/memora_plan_override/memora_plan_override.json
+- [x] T008 Run bench migrate to apply DocType changes
 
 ### Access Calculator Enhancements (TDD Required - Constitution Gate IV)
 
-- [ ] T009 Write unit tests for "Set Access Level" override action in memora/tests/unit/cdn_export/test_access_calculator.py
-- [ ] T010 Write unit tests for "Set Linear" override action in memora/tests/unit/cdn_export/test_access_calculator.py
-- [ ] T011 Implement "Set Access Level" override in calculate_access_level() in memora/services/cdn_export/access_calculator.py
-- [ ] T012 Implement "Set Linear" override handling (new function calculate_linear_mode()) in memora/services/cdn_export/access_calculator.py
-- [ ] T013 Verify all access calculator tests pass with pytest memora/tests/unit/cdn_export/test_access_calculator.py
+- [x] T009 Write unit tests for "Set Access Level" override action in memora/tests/unit/cdn_export/test_access_calculator.py
+- [x] T010 Write unit tests for "Set Linear" override action in memora/tests/unit/cdn_export/test_access_calculator.py
+- [x] T011 Implement "Set Access Level" override in calculate_access_level() in memora/services/cdn_export/access_calculator.py
+- [x] T012 Implement "Set Linear" override handling (new function calculate_linear_mode()) in memora/services/cdn_export/access_calculator.py
+- [x] T013 Verify all access calculator tests pass with pytest memora/tests/unit/cdn_export/test_access_calculator.py
 
 **Checkpoint**: Foundation ready - DocType updated, access calculator enhanced, tests passing
 
@@ -66,16 +66,16 @@
 
 ### Tests for User Story 1 (TDD Required)
 
-- [ ] T014 [P] [US1] Write unit test for generate_manifest_atomic() validating subjects array structure in memora/tests/unit/cdn_export/test_json_generator.py
-- [ ] T015 [P] [US1] Write unit test for manifest including hierarchy_url and bitmap_url per subject in memora/tests/unit/cdn_export/test_json_generator.py
-- [ ] T016 [P] [US1] Write unit test for empty subjects array when plan has no subjects in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T014 [P] [US1] Write unit test for generate_manifest_atomic() validating subjects array structure in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T015 [P] [US1] Write unit test for manifest including hierarchy_url and bitmap_url per subject in memora/tests/unit/cdn_export/test_json_generator.py
+- [x] T016 [P] [US1] Write unit test for empty subjects array when plan has no subjects in memora/tests/unit/cdn_export/test_json_generator.py
 
 ### Implementation for User Story 1
 
-- [ ] T017 [US1] Create generate_manifest_atomic() function in memora/services/cdn_export/json_generator.py (new function, preserve existing generate_manifest for backward compat)
-- [ ] T018 [US1] Update manifest structure to include hierarchy_url, bitmap_url per subject (data-model.md section 1)
-- [ ] T019 [US1] Validate generated manifest against manifest.schema.json using jsonschema
-- [ ] T020 [US1] Verify User Story 1 tests pass with pytest memora/tests/unit/cdn_export/test_json_generator.py -k manifest
+- [x] T017 [US1] Create generate_manifest_atomic() function in memora/services/cdn_export/json_generator.py (new function, preserve existing generate_manifest for backward compat)
+- [x] T018 [US1] Update manifest structure to include hierarchy_url, bitmap_url per subject (data-model.md section 1)
+- [x] T019 [US1] Validate generated manifest against manifest.schema.json using jsonschema
+- [x] T020 [US1] Verify User Story 1 tests pass with pytest memora/tests/unit/cdn_export/test_json_generator.py -k manifest
 
 **Checkpoint**: Manifest generation working, independently testable
 

@@ -67,6 +67,13 @@ def calculate_access_level(node, parent_access=None, plan_overrides=None):
 				"CDN JSON Generation"
 			)
 			return "free_preview"
+		if override.action == "Set Access Level":
+			access_value = override.override_value
+			frappe.log_error(
+				f"[DEBUG] Content access level set to {access_value} by override: {node.name}",
+				"CDN JSON Generation"
+			)
+			return access_value
 		if override.action == "Set Sold Separately":
 			pass
 	
@@ -78,8 +85,38 @@ def calculate_access_level(node, parent_access=None, plan_overrides=None):
 	
 	if getattr(node, 'is_public', False):
 		return "public"
-	
+
 	if parent_access == "paid":
 		return "paid"
-	
+
 	return "authenticated" if parent_access != "public" else "public"
+
+def calculate_linear_mode(node, plan_overrides=None):
+	"""
+	Calculate is_linear flag with override application.
+
+	Linear Mode Hierarchy:
+	1. Plan-specific overrides (Set Linear)
+	2. is_linear flag on node
+	3. Default: False (non-linear navigation)
+
+	Args:
+		node: Document object (Subject, Track, Unit, Topic, Lesson)
+		plan_overrides (dict, optional): Indexed overrides from apply_plan_overrides()
+
+	Returns:
+		bool: True if linear mode, False if non-linear
+	"""
+	if plan_overrides and node.name in plan_overrides:
+		override = plan_overrides[node.name]
+		if override.action == "Set Linear":
+			# Parse string value to boolean
+			is_linear = override.override_value.lower() in ("true", "1", "yes")
+			frappe.log_error(
+				f"[DEBUG] Content linear mode set to {is_linear} by override: {node.name}",
+				"CDN JSON Generation"
+			)
+			return is_linear
+
+	# Return node's is_linear flag if present, default to False
+	return getattr(node, 'is_linear', False)

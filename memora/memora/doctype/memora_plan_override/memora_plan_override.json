@@ -33,7 +33,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Action",
-   "options": "Hide\nRename\nSet Free\nSet Sold Separately",
+   "options": "Hide\nRename\nSet Free\nSet Sold Separately\nSet Access Level\nSet Linear",
    "reqd": 1
   },
   {
