@@ -1340,10 +1340,10 @@ def generate_bitmap_json(subject_doc):
 	
 	topic_ids = [t.name for t in topics]
 	
-	# Get all lessons for these topics (ordered by creation/index)
+	# Get all published lessons for these topics (ordered by creation/index)
 	lessons = frappe.get_all(
 		"Memora Lesson",
-		filters={"parent_topic": ["in", topic_ids]},  # Only submitted lessons
+		filters={"parent_topic": ["in", topic_ids], "is_published": 1},  # Only published lessons
 		fields=["name", "parent_topic", "bit_index"],
 		order_by="creation"
 	)
