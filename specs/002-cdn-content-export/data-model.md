@@ -87,7 +87,7 @@ The following fields are already present in existing DocTypes (verified from sch
 
 | DocType | Field | Type | Purpose |
 |---------|-------|------|---------|
-| Memora Subject | `is_public` | Check | Distinguish public vs authenticated |
+| Memora Subject | `is_published` | Check | Distinguish public vs authenticated |
 | Memora Subject | `required_item` | Link to Item | ERPNext Item for paid access |
 | Memora Track | `required_item` | Link to Item | ERPNext Item for DLC purchase |
 | Memora Track | `parent_item_required` | Check | True if parent Subject purchase unlocks |

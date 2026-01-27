@@ -114,7 +114,7 @@ pytest memora/tests/unit/cdn_export/test_access_calculator.py
 
 **Example**:
 ```markdown
-- [x] T009 Add is_public field (Check) to Memora Subject DocType
+- [x] T009 Add is_published field (Check) to Memora Subject DocType
 ```
 
 **Additional Updates**:
@@ -128,9 +128,9 @@ pytest memora/tests/unit/cdn_export/test_access_calculator.py
 git add .
 
 # Commit with descriptive message
-git commit -m "feat: add is_public field to Memora Subject
+git commit -m "feat: add is_published field to Memora Subject
 
-- Add is_public Check field to distinguish public vs authenticated content
+- Add is_published Check field to distinguish public vs authenticated content
 - Update field_order in JSON schema
 - Add default value of 0 (unchecked)
 - Complies with Constitution Principle III (Content-Commerce Decoupling)
@@ -175,21 +175,21 @@ git push origin <branch-name>
 
 ## Task-Specific Checklists
 
-### T009: Add is_public field to Memora Subject
-- [ ] Add `is_public` field to JSON schema
+### T009: Add is_published field to Memora Subject
+- [ ] Add `is_published` field to JSON schema
 - [ ] Add to `field_order` array (after `is_free_preview`)
 - [ ] Set fieldtype to `Check`
 - [ ] Set default to `0`
 - [ ] Run `pre-commit run check-json`
 - [ ] Run `bench migrate`
 - [ ] Verify field appears in Frappe UI
-- [ ] Test creating Subject with is_public checked
+- [ ] Test creating Subject with is_published checked
 - [ ] Mark T009 as complete in tasks.md
 - [ ] Commit changes
 
 ### T010: Add required_item field to Memora Subject
 - [ ] Add `required_item` field to JSON schema
-- [ ] Add to `field_order` array (after `is_public`)
+- [ ] Add to `field_order` array (after `is_published`)
 - [ ] Set fieldtype to `Link`
 - [ ] Set options to `Item`
 - [ ] Set `search_index: 1`

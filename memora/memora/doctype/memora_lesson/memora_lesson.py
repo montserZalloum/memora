@@ -21,5 +21,8 @@ class MemoraLesson(Document):
 			subject.save(ignore_permissions=True)
 
 	def on_trash(self):
-		"""Delete local lesson file when lesson is deleted."""
-		delete_content_file(f"lessons/{self.name}.json")
+		"""Handle lesson deletion and trigger plan rebuild."""
+		from memora.services.cdn_export.change_tracker import on_lesson_delete
+		
+		# Delegate to change tracker which handles both file deletion and plan rebuild
+		on_lesson_delete(self)

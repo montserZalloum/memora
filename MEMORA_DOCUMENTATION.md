@@ -948,7 +948,7 @@ Calculate access level with inheritance and override application.
 2. is_free_preview flag
 3. required_item (paid)
 4. Parent access level (inheritance)
-5. is_public flag
+5. is_published flag
 6. Default: authenticated
 
 **Access Levels:**

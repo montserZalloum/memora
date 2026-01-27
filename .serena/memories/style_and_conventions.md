@@ -171,7 +171,7 @@ Examples:
 subjects = frappe.get_all(
     "Memora Subject",
     filters={"is_published": 1},
-    fields=["name", "title", "is_public"],
+    fields=["name", "title", "is_published"],
     order_by="sort_order"
 )
 
@@ -230,7 +230,7 @@ Common field types:
 Example:
 ```json
 {
-  "fieldname": "is_public",
+  "fieldname": "is_published",
   "fieldtype": "Check",
   "label": "Is Public",
   "default": "0"

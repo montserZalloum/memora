@@ -176,18 +176,9 @@ def on_lesson_delete(doc, method=None):
 	topic_name = doc.parent_topic if hasattr(doc, 'parent_topic') else None
 	
 	if topic_name:
-		# Get plans that will be affected by walking from the topic
-		affected_plans = get_affected_plan_ids("Memora Topic", topic_name)
-		
-		if affected_plans:
-			from .batch_processor import add_plan_to_queue
-			for plan_id in affected_plans:
-				add_plan_to_queue(plan_id)
-			
-			frappe.log_error(
-				f"[INFO] Triggered rebuild for {len(affected_plans)} plans due to lesson deletion: {affected_plans}",
-				"CDN Plan Rebuild"
-			)
+		# Trigger full plan rebuild (not just queue)
+		# This ensures the plan JSON is regenerated with the lesson removed
+		trigger_plan_rebuild("Memora Topic", topic_name)
 	
 
 def on_lesson_stage_update(doc, method=None):

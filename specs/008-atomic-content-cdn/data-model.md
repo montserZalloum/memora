@@ -394,7 +394,7 @@ Priority order (highest to lowest):
 1. Plan override (Hide, Set Access Level, Set Free, Set Sold Separately)
 2. `is_free_preview` flag on node
 3. `required_item` field (→ paid)
-4. `is_public` flag on node
+4. `is_published` flag on node
 5. Parent access level (inheritance)
 6. Default: `authenticated`
 

@@ -236,7 +236,7 @@ Each feature has a spec in `specs/{feature-id}/` with:
 Building an automated static JSON generation system that exports educational content from Frappe/MariaDB to CDN (S3/Cloudflare R2). This implements the "Generator Pattern" from the constitution.
 
 **Status**: Phase 2 (Foundational) - Adding required fields to existing DocTypes
-- T009: Add `is_public` field to Memora Subject
+- T009: Add `is_published` field to Memora Subject
 - T010: Add `required_item` field to Memora Subject
 - T011: Add `required_item` field to Memora Track
 - T012: Add `parent_item_required` field to Memora Track

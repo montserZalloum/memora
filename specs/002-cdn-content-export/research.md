@@ -338,7 +338,7 @@ def calculate_access_level(node, parent_access=None, plan_overrides=None):
         return "paid"
 
     # Check if explicitly public
-    if getattr(node, 'is_public', False):
+    if getattr(node, 'is_published', False):
         return "public"
 
     # Default: authenticated (non-public, non-paid parent)

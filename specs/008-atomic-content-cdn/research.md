@@ -69,7 +69,7 @@ def calculate_access_level(node, parent_access=None, plan_overrides=None):
     # Override check (Hide, Set Free, Set Sold Separately)
     # is_free_preview flag check
     # required_item check (→ paid)
-    # is_public flag check
+    # is_published flag check
     # Parent inheritance
     # Default: authenticated
 ```

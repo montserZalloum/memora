@@ -50,7 +50,7 @@ Based on plan.md, this is a Frappe app with structure:
 
 ### Schema Updates
 
-- [x] T009 Add is_public field (Check) to Memora Subject DocType at memora/memora/doctype/memora_subject/memora_subject.json
+- [x] T009 Add is_published field (Check) to Memora Subject DocType at memora/memora/doctype/memora_subject/memora_subject.json
 - [x] T010 [P] Add required_item field (Link to Item) to Memora Subject DocType
 - [x] T011 [P] Add required_item field (Link to Item) to Memora Track DocType at memora/memora/doctype/memora_track/memora_track.json
 - [x] T012 [P] Add parent_item_required field (Check) to Memora Track DocType

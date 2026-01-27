@@ -100,7 +100,7 @@ git status
 git add .
 
 # Commit changes
-git commit -m "feat: add is_public field to Memora Subject"
+git commit -m "feat: add is_published field to Memora Subject"
 
 # Push to remote
 git push origin [branch-name]
@@ -165,7 +165,7 @@ bench migrate
 
 # 6. Commit changes
 git add .
-git commit -m "feat: add is_public field to Memora Subject"
+git commit -m "feat: add is_published field to Memora Subject"
 
 # 7. Push to remote
 git push origin feature/002-cdn-content-export
@@ -226,7 +226,7 @@ pre-commit run --all-files
 
 # 7. Commit
 git add .
-git commit -m "feat: implement T009 - add is_public field to Memora Subject"
+git commit -m "feat: implement T009 - add is_published field to Memora Subject"
 ```
 
 ### Constitution Compliance Check
