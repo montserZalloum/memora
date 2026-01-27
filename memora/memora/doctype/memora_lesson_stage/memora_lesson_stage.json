@@ -8,6 +8,9 @@
  "field_order": [
   "title",
   "type",
+  "weight",
+  "target_time",
+  "is_skippable",
   "config"
  ],
  "fields": [
@@ -30,13 +33,31 @@
    "fieldname": "config",
    "fieldtype": "JSON",
    "label": "Configuration"
+  },
+  {
+   "default": "1.0",
+   "fieldname": "weight",
+   "fieldtype": "Float",
+   "label": "Weight"
+  },
+  {
+   "default": "0",
+   "fieldname": "target_time",
+   "fieldtype": "Int",
+   "label": "Target Time"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_skippable",
+   "fieldtype": "Check",
+   "label": "is Skippable"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-01-24 13:00:35.494689",
+ "modified": "2026-01-27 09:21:45.807866",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Memora Lesson Stage",

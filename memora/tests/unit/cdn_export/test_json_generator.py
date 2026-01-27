@@ -1375,7 +1375,7 @@ class TestGetAtomicContentPaths(unittest.TestCase):
 			lesson2.name = "LESSON-002"
 
 			def mock_get_all(doctype, filters=None, fields=None):
-				if doctype == "Memora Academic Plan Subject" and filters:
+				if doctype == "Memora Plan Subject" and filters:
 					return [plan_subject1, plan_subject2]
 				elif doctype == "Memora Topic" and filters:
 					return [topic1, topic2]

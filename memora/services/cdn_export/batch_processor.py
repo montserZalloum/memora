@@ -156,7 +156,7 @@ def _generate_atomic_files_for_plan(plan_id):
 
 	try:
 		plan_doc = frappe.get_doc("Memora Academic Plan", plan_id)
-
+		
 		# 1. Generate manifest
 		try:
 			manifest_data = generate_manifest_atomic(plan_doc)
@@ -175,81 +175,134 @@ def _generate_atomic_files_for_plan(plan_id):
 			errors.append(f"Manifest generation error: {str(e)}")
 			raise
 
+		
 		# 2. Generate hierarchies and bitmaps for plan subjects
 		plan_subjects = frappe.get_all(
-			"Memora Academic Plan Subject",
+			"Memora Plan Subject",
 			filters={"parent": plan_id},
 			fields=["subject"]
 		)
-
+		
 		subject_ids = [ps.subject for ps in plan_subjects]
-		subjects = frappe.get_all(
-			"Memora Subject",
-			filters={"name": ["in", subject_ids]},
-			fields=["name"]
-		)
+
+		# Handle empty subject list
+		if not subject_ids:
+			frappe.log_error(
+				f"[WARN] No subjects found for plan {plan_id}, skipping subject hierarchy/bitmap generation",
+				"Atomic File Generation"
+			)
+			subjects = []
+		else:
+			subjects = frappe.get_all(
+				"Memora Subject",
+				filters={"name": ["in", subject_ids]},
+				fields=["name"]
+			)
 
 		for subject in subjects:
 			try:
 				subject_doc = frappe.get_doc("Memora Subject", subject.name)
-
+				frappe.log_error(
+					f"[WARN] Subject log 1",
+					"_generate_atomic_files_for_plan for subject in subjects"
+				)
 				# Generate hierarchy
 				hierarchy_data = generate_subject_hierarchy(subject_doc, plan_id=plan_id)
-				hierarchy_path = f"plans/{plan_id}/{subject.name}_h.json"
-				success, error = write_content_file(hierarchy_path, hierarchy_data)
-				if success:
-					files_written[hierarchy_path] = hierarchy_data
+
+				# Skip if subject is hidden by override
+				if hierarchy_data is None:
 					frappe.log_error(
-						f"[INFO] Generated {hierarchy_path}",
+						f"[WARN] Skipping hierarchy for {subject.name} - hidden by plan override",
 						"Atomic File Generation"
 					)
 				else:
-					errors.append(f"Hierarchy generation failed for {subject.name}: {error}")
-					raise Exception(error)
+					hierarchy_path = f"plans/{plan_id}/{subject.name}_h.json"
+					success, error = write_content_file(hierarchy_path, hierarchy_data)
+					if success:
+						files_written[hierarchy_path] = hierarchy_data
+						frappe.log_error(
+							f"[INFO] Generated {hierarchy_path}",
+							"Atomic File Generation"
+						)
+					else:
+						errors.append(f"Hierarchy generation failed for {subject.name}: {error}")
+						raise Exception(error)
 
 				# Generate bitmap
 				bitmap_data = generate_bitmap_json(subject_doc)
-				bitmap_path = f"plans/{plan_id}/{subject.name}_b.json"
-				success, error = write_content_file(bitmap_path, bitmap_data)
-				if success:
-					files_written[bitmap_path] = bitmap_data
+
+				# Skip if bitmap is None (shouldn't happen, but be defensive)
+				if bitmap_data is None:
 					frappe.log_error(
-						f"[INFO] Generated {bitmap_path}",
+						f"[WARN] Skipping bitmap for {subject.name} - no bitmap data",
 						"Atomic File Generation"
 					)
 				else:
-					errors.append(f"Bitmap generation failed for {subject.name}: {error}")
-					raise Exception(error)
+					bitmap_path = f"plans/{plan_id}/{subject.name}_b.json"
+					success, error = write_content_file(bitmap_path, bitmap_data)
+					if success:
+						files_written[bitmap_path] = bitmap_data
+						frappe.log_error(
+							f"[INFO] Generated {bitmap_path}",
+							"Atomic File Generation"
+						)
+					else:
+						errors.append(f"Bitmap generation failed for {subject.name}: {error}")
+						raise Exception(error)
 
 			except Exception as e:
 				errors.append(f"Subject {subject.name} generation failed: {str(e)}")
 				raise
 
 		# 3. Generate topics for plan subjects
-		tracks = frappe.get_all(
-			"Memora Track",
-			filters={"parent_subject": ["in", subject_ids]},
-			fields=["name"]
-		)
-		track_ids = [t.name for t in tracks]
+		# Only proceed if we have subject_ids (guard against empty list)
+		topics = []
+		if subject_ids:
+			tracks = frappe.get_all(
+				"Memora Track",
+				filters={"parent_subject": ["in", subject_ids]},
+				fields=["name"]
+			)
+			track_ids = [t.name for t in tracks]
 
-		units = frappe.get_all(
-			"Memora Unit",
-			filters={"parent_track": ["in", track_ids]},
-			fields=["name"]
-		)
-		unit_ids = [u.name for u in units]
+			if track_ids:
+				units = frappe.get_all(
+					"Memora Unit",
+					filters={"parent_track": ["in", track_ids]},
+					fields=["name"]
+				)
+				unit_ids = [u.name for u in units]
 
-		topics = frappe.get_all(
-			"Memora Topic",
-			filters={"parent_unit": ["in", unit_ids]},
-			fields=["name"]
-		)
+				if unit_ids:
+					topics = frappe.get_all(
+						"Memora Topic",
+						filters={"parent_unit": ["in", unit_ids]},
+						fields=["name"]
+					)
+				else:
+					frappe.log_error(
+						f"[WARN] No units found for plan {plan_id}, skipping topic generation",
+						"Atomic File Generation"
+					)
+			else:
+				frappe.log_error(
+					f"[WARN] No tracks found for plan {plan_id}, skipping topic generation",
+					"Atomic File Generation"
+				)
 
 		for topic in topics:
 			try:
 				topic_doc = frappe.get_doc("Memora Topic", topic.name)
 				topic_data = generate_topic_json(topic_doc, plan_id=plan_id)
+
+				# Skip if topic is hidden by override
+				if topic_data is None:
+					frappe.log_error(
+						f"[WARN] Skipping topic {topic.name} - hidden by plan override",
+						"Atomic File Generation"
+					)
+					continue
+
 				topic_path = f"plans/{plan_id}/{topic.name}.json"
 				success, error = write_content_file(topic_path, topic_data)
 				if success:
@@ -266,16 +319,34 @@ def _generate_atomic_files_for_plan(plan_id):
 				raise
 
 		# 4. Generate shared lessons for plan topics
-		lessons = frappe.get_all(
-			"Memora Lesson",
-			filters={"parent_topic": ["in", [t.name for t in topics]]},
-			fields=["name"]
-		)
+		# Only proceed if we have topics (guard against empty list)
+		lessons = []
+		topic_ids = [t.name for t in topics]
+		if topic_ids:
+			lessons = frappe.get_all(
+				"Memora Lesson",
+				filters={"parent_topic": ["in", topic_ids]},
+				fields=["name"]
+			)
+		else:
+			frappe.log_error(
+				f"[WARN] No topics found for plan {plan_id}, skipping lesson generation",
+				"Atomic File Generation"
+			)
 
 		for lesson in lessons:
 			try:
 				lesson_doc = frappe.get_doc("Memora Lesson", lesson.name)
 				lesson_data = generate_lesson_json_shared(lesson_doc)
+
+				# Skip if lesson is None (shouldn't happen, but be defensive)
+				if lesson_data is None:
+					frappe.log_error(
+						f"[WARN] Skipping lesson {lesson.name} - no lesson data",
+						"Atomic File Generation"
+					)
+					continue
+
 				lesson_path = f"lessons/{lesson.name}.json"
 				success, error = write_content_file(lesson_path, lesson_data)
 				if success:

@@ -227,7 +227,10 @@ def generate_subject_hierarchy(subject_doc, plan_id=None):
                       or None if subject is hidden by override
     """
     plan_overrides = apply_plan_overrides(plan_id) if plan_id else {}
-    
+    frappe.log_error(
+		f"generate_subject_hierarchy",
+		"generate_subject_hierarchy zalloum 1"
+	)
     subject_access = calculate_access_level(subject_doc, parent_access=None, plan_overrides=plan_overrides)
     if subject_access is None:
         frappe.log_error(
@@ -365,9 +368,6 @@ def generate_subject_hierarchy(subject_doc, plan_id=None):
             if hasattr(unit, "badge_image") and unit.badge_image:
                 unit_data["badge_image"] = unit.badge_image
 
-            if unit_access == "paid" and hasattr(unit, "required_item") and unit.required_item:
-                unit_data["access"]["required_item"] = unit.required_item
-
             for topic in topics_by_unit.get(unit.name, []):
                 topic_access = calculate_access_level(topic, parent_access=unit_access, plan_overrides=plan_overrides)
                 
@@ -393,9 +393,6 @@ def generate_subject_hierarchy(subject_doc, plan_id=None):
                     topic_data["description"] = topic.description
                 if hasattr(topic, "image") and topic.image:
                     topic_data["image"] = topic.image
-
-                if topic_access == "paid" and hasattr(topic, "required_item") and topic.required_item:
-                    topic_data["access"]["required_item"] = topic.required_item
 
                 unit_data["topics"].append(topic_data)
                 stats["total_topics"] += 1
@@ -935,7 +932,7 @@ def generate_topic_json(topic_doc, plan_id=None, subject_id=None):
 	topic_data = {
 		"id": topic_doc.name,
 		"title": topic_doc.title,
-		"is_linear": topic_doc.is_linear if hasattr(topic_doc, "is_linear") else True,
+		"is_linear": bool(topic_doc.is_linear) if hasattr(topic_doc, "is_linear") else True,
 		"version": int(now_datetime().timestamp()),
 		"generated_at": now_datetime().isoformat(),
 		"parent": {
@@ -947,7 +944,7 @@ def generate_topic_json(topic_doc, plan_id=None, subject_id=None):
 			"subject_title": subject_doc.title
 		},
 		"access": {
-			"is_published": topic_doc.is_published,
+			"is_published": bool(topic_doc.is_published) if hasattr(topic_doc, "is_published") else True,
 			"access_level": topic_access
 		},
 		"lessons": []
@@ -958,11 +955,7 @@ def generate_topic_json(topic_doc, plan_id=None, subject_id=None):
 		topic_data["description"] = topic_doc.description
 	if hasattr(topic_doc, "image") and topic_doc.image:
 		topic_data["image"] = topic_doc.image
-	
-	# Include required_item if access level is paid
-	if topic_access == "paid" and hasattr(topic_doc, "required_item") and topic_doc.required_item:
-		topic_data["access"]["required_item"] = topic_doc.required_item
-	
+
 	# Fetch all lessons for this topic
 	lessons = frappe.get_all(
 		"Memora Lesson",
@@ -1000,7 +993,7 @@ def generate_topic_json(topic_doc, plan_id=None, subject_id=None):
 			"bit_index": lesson.bit_index if hasattr(lesson, "bit_index") else -1,
 			"lesson_url": get_content_url(f"lessons/{lesson.name}.json"),
 			"access": {
-				"is_published": lesson.is_published,
+				"is_published": bool(lesson.is_published) if hasattr(lesson, "is_published") else True,
 				"access_level": lesson_access
 			},
 			"stage_count": stage_count_by_lesson.get(lesson.name, 0)
@@ -1129,7 +1122,8 @@ def generate_lesson_json_shared(lesson_doc):
 		if hasattr(stage, "target_time") and stage.target_time is not None:
 			stage_data["target_time"] = stage.target_time
 		if hasattr(stage, "is_skippable") and stage.is_skippable is not None:
-			stage_data["is_skippable"] = stage.is_skippable
+		    stage_data["is_skippable"] = bool(stage.is_skippable)
+
 		
 		lesson_data["stages"].append(stage_data)
 	
@@ -1425,7 +1419,7 @@ def get_atomic_content_paths_for_plan(plan_name):
 	
 	# Get all plan subjects
 	plan_subjects = frappe.get_all(
-		"Memora Academic Plan Subject",
+		"Memora Plan Subject",
 		filters={"parent": plan_name},
 		fields=["subject"]
 	)
