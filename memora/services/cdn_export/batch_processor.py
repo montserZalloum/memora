@@ -630,10 +630,6 @@ def trigger_plan_rebuild(doctype, docname):
 		docname (str): The document name that was changed
 	"""
 	try:
-		frappe.log_error(
-			f"[INFO] Rebuilding {doctype}/{docname}",
-			"CDN Plan Rebuild"
-		)
 
 		# Get affected plans
 		affected_plans = get_affected_plan_ids(doctype, docname)

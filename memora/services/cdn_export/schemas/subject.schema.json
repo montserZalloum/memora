@@ -58,7 +58,7 @@
         "is_published": { "type": "boolean" },
         "access_level": {
           "type": "string",
-          "enum": ["public", "authenticated", "paid", "free_preview"]
+          "enum": ["authenticated", "paid", "free_preview"]
         },
         "required_item": { "type": "string" },
         "is_sold_separately": { "type": "boolean" },

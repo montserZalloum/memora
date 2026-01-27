@@ -160,8 +160,35 @@ def on_lesson_update(doc, method=None):
     trigger_plan_rebuild("Memora Lesson", doc.name)
 
 def on_lesson_delete(doc, method=None):
-    """Handle Memora Lesson deletion."""
-    on_content_delete(doc, method)
+	"""Handle Memora Lesson deletion."""
+	from .local_storage import delete_content_file
+	from .batch_processor import trigger_plan_rebuild
+	from .dependency_resolver import get_affected_plan_ids
+	
+	# Delete the lesson's JSON file
+	lesson_file_path = f"lessons/{doc.name}.json"
+	success, error = delete_content_file(lesson_file_path)
+	if not success:
+		frappe.log_error(error, "Lesson File Deletion")
+	
+	# Get affected plans before the doc is fully deleted
+	# Walk up the hierarchy manually since doc will be deleted soon
+	topic_name = doc.parent_topic if hasattr(doc, 'parent_topic') else None
+	
+	if topic_name:
+		# Get plans that will be affected by walking from the topic
+		affected_plans = get_affected_plan_ids("Memora Topic", topic_name)
+		
+		if affected_plans:
+			from .batch_processor import add_plan_to_queue
+			for plan_id in affected_plans:
+				add_plan_to_queue(plan_id)
+			
+			frappe.log_error(
+				f"[INFO] Triggered rebuild for {len(affected_plans)} plans due to lesson deletion: {affected_plans}",
+				"CDN Plan Rebuild"
+			)
+	
 
 def on_lesson_stage_update(doc, method=None):
     """Handle Memora Lesson Stage updates."""

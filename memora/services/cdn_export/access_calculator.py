@@ -1,47 +1,44 @@
 import frappe
 
+
 def apply_plan_overrides(plan_id):
-    """
-    Load and index plan-specific overrides for fast lookup.
+	"""
+	Load and index plan-specific overrides for fast lookup.
 
-    Args:
-        plan_id (str): Plan document name
+	Args:
+	    plan_id (str): Plan document name
 
-    Returns:
-        dict: Indexed overrides {node_name: {action, fields}}
-    """
-    overrides = {}
-    
-    try:
-        plan_overrides = frappe.get_all(
-            "Memora Plan Override",
-            filters={"parent": plan_id},
-            fields=["target_name", "action"],
-            pluck=False
-        )
-        
-        for override in plan_overrides:
-            overrides[override.target_name] = override
-            
-    except Exception as e:
-        frappe.log_error(
-            f"Error loading overrides for plan {plan_id}: {str(e)}",
-            "CDN Export: Access Calculator"
-        )
-    
-    return overrides
+	Returns:
+	    dict: Indexed overrides {node_name: {action, fields}}
+	"""
+	overrides = {}
+
+	try:
+		plan_overrides = frappe.get_all(
+			"Memora Plan Override", filters={"parent": plan_id}, fields=["target_name", "action"], pluck=False
+		)
+
+		for override in plan_overrides:
+			overrides[override.target_name] = override
+
+	except Exception as e:
+		frappe.log_error(
+			f"Error loading overrides for plan {plan_id}: {str(e)}", "CDN Export: Access Calculator"
+		)
+
+	return overrides
+
 
 def calculate_access_level(node, parent_access=None, plan_overrides=None):
 	"""
 	Calculate access level with inheritance and override application.
 
 	Access Level Hierarchy:
-	1. Plan-specific overrides (Hide, Set Free, Set Sold Separately)
-	2. is_free_preview flag
-	3. required_item (paid)
-	4. Parent access level (inheritance)
-	5. is_public flag
-	6. Default: authenticated
+	1. Visibility Check (is_public/is_published must be True)
+	2. Plan-specific overrides (Hide, Set Free, Set Access Level, Set Sold Separately)
+	3. is_free_preview flag (piercing)
+	4. required_item (paid) or parent_access (paid inheritance)
+	5. Default: authenticated
 
 	Args:
 		node: Document object (Subject, Track, Unit, Topic, Lesson)
@@ -49,47 +46,51 @@ def calculate_access_level(node, parent_access=None, plan_overrides=None):
 		plan_overrides (dict, optional): Indexed overrides from apply_plan_overrides()
 
 	Returns:
-		str or None: "public", "authenticated", "paid", "free_preview", or None if hidden
+		str or None: "authenticated", "paid", "free_preview", or None if hidden/not published
 	"""
 	import frappe
-	
+
+	is_visible = getattr(node, "is_public", None)
+	if is_visible is None:
+		is_visible = getattr(node, "is_published", True)
+
+	if not is_visible:
+		frappe.log_error(
+			f"[DEBUG] Content not visible (is_public/is_published=False): {node.name}", "CDN JSON Generation"
+		)
+		return None
+
 	if plan_overrides and node.name in plan_overrides:
 		override = plan_overrides[node.name]
 		if override.action == "Hide":
 			frappe.log_error(
-				f"[WARN] Content hidden by override: {node.name} (action: Hide)",
-				"CDN JSON Generation"
+				f"[WARN] Content hidden by override: {node.name} (action: Hide)", "CDN JSON Generation"
 			)
 			return None
 		if override.action == "Set Free":
-			frappe.log_error(
-				f"[DEBUG] Content set to free by override: {node.name}",
-				"CDN JSON Generation"
-			)
+			frappe.log_error(f"[DEBUG] Content set to free by override: {node.name}", "CDN JSON Generation")
 			return "free_preview"
 		if override.action == "Set Access Level":
 			access_value = override.override_value
 			frappe.log_error(
 				f"[DEBUG] Content access level set to {access_value} by override: {node.name}",
-				"CDN JSON Generation"
+				"CDN JSON Generation",
 			)
 			return access_value
 		if override.action == "Set Sold Separately":
 			pass
-	
-	if getattr(node, 'is_free_preview', False):
+
+	if getattr(node, "is_free_preview", False):
 		return "free_preview"
-	
-	if getattr(node, 'required_item', None):
+
+	if getattr(node, "required_item", None):
 		return "paid"
-	
-	if getattr(node, 'is_public', False):
-		return "public"
 
 	if parent_access == "paid":
 		return "paid"
 
-	return "authenticated" if parent_access != "public" else "public"
+	return "authenticated"
+
 
 def calculate_linear_mode(node, plan_overrides=None):
 	"""
@@ -114,9 +115,9 @@ def calculate_linear_mode(node, plan_overrides=None):
 			is_linear = override.override_value.lower() in ("true", "1", "yes")
 			frappe.log_error(
 				f"[DEBUG] Content linear mode set to {is_linear} by override: {node.name}",
-				"CDN JSON Generation"
+				"CDN JSON Generation",
 			)
 			return is_linear
 
 	# Return node's is_linear flag if present, default to False
-	return getattr(node, 'is_linear', False)
+	return getattr(node, "is_linear", False)

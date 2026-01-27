@@ -99,7 +99,7 @@
         },
         "access_level": {
           "type": "string",
-          "enum": ["public", "authenticated", "paid", "free_preview"],
+          "enum": ["authenticated", "paid", "free_preview"],
           "description": "Access level for this content"
         },
         "required_item": {
