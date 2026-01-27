@@ -1344,10 +1344,10 @@ def generate_bitmap_json(subject_doc):
 	lessons = frappe.get_all(
 		"Memora Lesson",
 		filters={"parent_topic": ["in", topic_ids]},  # Only submitted lessons
-		fields=["name", "parent_topic"],
+		fields=["name", "parent_topic", "bit_index"],
 		order_by="creation"
 	)
-	
+
 	# Build bitmap with bit_index for each lesson
 	bitmap_data = {
 		"subject_id": subject_doc.name,
@@ -1356,10 +1356,10 @@ def generate_bitmap_json(subject_doc):
 		"total_lessons": len(lessons),
 		"mappings": {}
 	}
-	
-	for idx, lesson in enumerate(lessons):
+
+	for lesson in lessons:
 		bitmap_data["mappings"][lesson.name] = {
-			"bit_index": idx,
+			"bit_index": lesson.bit_index if hasattr(lesson, "bit_index") else -1,
 			"topic_id": lesson.parent_topic
 		}
 	
