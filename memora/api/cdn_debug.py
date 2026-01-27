@@ -167,7 +167,6 @@ def diagnose_subject_issue(subject_id):
 			"name": subject.name,
 			"title": subject.title,
 			"is_published": subject.is_published,
-			"is_public": getattr(subject, "is_public", False),
 			"required_item": subject.required_item
 		}
 

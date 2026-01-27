@@ -35,14 +35,14 @@ def create_test_plan(plan_id=None, title="Test Academic Plan"):
 	return plan_doc
 
 
-def create_test_subject(subject_id=None, title="Test Subject", is_public=0, is_free_preview=0):
+def create_test_subject(subject_id=None, title="Test Subject", is_published=0, is_free_preview=0):
 	"""
 	Create a test Memora Subject document.
 
 	Args:
 		subject_id (str, optional): Custom subject ID. If None, auto-generated.
 		title (str): Subject title
-		is_public (int): 1 if public, 0 if authenticated
+		is_published (int): 1 if public, 0 if authenticated
 		is_free_preview (int): 1 if free preview, 0 otherwise
 
 	Returns:
@@ -53,7 +53,7 @@ def create_test_subject(subject_id=None, title="Test Subject", is_public=0, is_f
 		"title": title,
 		"description": f"Test description for {title}",
 		"is_published": 1,
-		"is_public": is_public,
+		"is_published": is_published,
 		"is_free_preview": is_free_preview,
 		"sort_order": 1,
 		"color_code": "#3498db"
@@ -194,7 +194,7 @@ def create_full_test_hierarchy(
 	subject = create_test_subject(
 		subject_id=subject_id,
 		title="Test Subject",
-		is_public=0,
+		is_published=0,
 		is_free_preview=1
 	)
 

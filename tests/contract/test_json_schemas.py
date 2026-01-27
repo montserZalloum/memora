@@ -402,7 +402,6 @@ class TestJSONSchemas(unittest.TestCase):
                 "title": "Test Subject",
                 "description": "Test subject description",
                 "is_published": 1,
-                "is_public": 0
             }).insert(ignore_permissions=True)
 
     def _create_test_unit(self):

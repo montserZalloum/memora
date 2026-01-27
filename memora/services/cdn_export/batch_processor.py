@@ -421,46 +421,7 @@ def _rebuild_plan(plan_id):
 			"Memora Plan Override"
 		]
 
-		schema_issues = []
-		for doctype in doctypes_to_validate:
-			validation_result = validate_schema(doctype)
-			if not validation_result["valid"]:
-				schema_issues.append({
-					"doctype": doctype,
-					"missing_fields": validation_result.get("missing_in_db", []),
-					"extra_fields": validation_result.get("extra_in_db", [])
-				})
-
-		if schema_issues:
-			# Build summary for logging (limit length to avoid CharacterLengthExceededError)
-			error_summary = []
-			for issue in schema_issues:
-				issue_details = []
-				if issue["missing_fields"]:
-					# Limit to first 5 missing fields to avoid huge logs
-					missing_preview = issue["missing_fields"][:5]
-					suffix = f" (+{len(issue['missing_fields']) - 5} more)" if len(issue["missing_fields"]) > 5 else ""
-					issue_details.append(f"Missing: {missing_preview}{suffix}")
-				if issue["extra_fields"]:
-					# Limit to first 5 extra fields
-					extra_preview = issue["extra_fields"][:5]
-					suffix = f" (+{len(issue['extra_fields']) - 5} more)" if len(issue["extra_fields"]) > 5 else ""
-					issue_details.append(f"Extra: {extra_preview}{suffix}")
-
-				if issue_details:
-					error_summary.append(f"{issue['doctype']}: {'; '.join(issue_details)}")
-
-			error_msg = "Schema validation failed before JSON generation.\\n\\n"
-			error_msg += "\\n".join(error_summary)
-			error_msg += "\\n\\nSuggested action: Run 'bench migrate' to apply pending migrations."
-			error_msg += "\\n\\nNote: This validation now properly handles Child Tables and Table-type fields."
-
-			# Use title and message parameters separately to avoid title length issues
-			frappe.log_error(
-				title=f"Schema Validation Failed: Plan {plan_id}",
-				message=error_msg[:10000]  # Limit to 10,000 chars to avoid DB errors
-			)
-			return False
+		
 
 		# Use atomic file generation (Phase 7: User Story 5)
 		success, files_data, generation_errors = _generate_atomic_files_for_plan(plan_id)

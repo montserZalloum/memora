@@ -41,7 +41,7 @@ class TestCDNExportFlow:
             "subject_name": "Test Subject",
             "subject_code": "TEST-001",
             "is_published": 1,
-            "is_public": 1,
+            "is_published": 1,
         })
         subject.insert()
 
@@ -99,7 +99,7 @@ class TestCDNExportFlow:
             "subject_name": "Update Test Subject",
             "subject_code": "UPD-001",
             "is_published": 1,
-            "is_public": 1,
+            "is_published": 1,
         })
         subject.insert()
 
@@ -152,7 +152,7 @@ class TestCDNExportFlow:
             "subject_name": "Delete Test Subject",
             "subject_code": "DEL-001",
             "is_published": 1,
-            "is_public": 1,
+            "is_published": 1,
         })
         subject.insert()
 

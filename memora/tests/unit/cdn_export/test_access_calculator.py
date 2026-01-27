@@ -5,19 +5,19 @@ from memora.services.cdn_export.access_calculator import calculate_access_level,
 
 class TestAccessCalculator(unittest.TestCase):
 	def test_public_subject_access(self):
-		"""Public subject (is_public=True) returns authenticated by default"""
+		"""Public subject (is_published=True) returns authenticated by default"""
 		node = Mock()
 		node.name = "public_subject"
-		node.is_public = True
+		node.is_published = True
 		node.is_free_preview = False
 		node.required_item = None
 		self.assertEqual(calculate_access_level(node), "authenticated")
 
 	def test_auth_subject_access(self):
-		"""Subject with is_public=False is excluded (returns None)"""
+		"""Subject with is_published=False is excluded (returns None)"""
 		node = Mock()
 		node.name = "auth_subject"
-		node.is_public = False
+		node.is_published = False
 		node.is_free_preview = False
 		node.required_item = None
 		self.assertIsNone(calculate_access_level(node))
@@ -26,7 +26,7 @@ class TestAccessCalculator(unittest.TestCase):
 		"""Published non-subject node (is_published=True) returns authenticated by default"""
 		node = Mock()
 		node.name = "published_node"
-		node.is_public = None
+		node.is_published = None
 		node.is_published = True
 		node.is_free_preview = False
 		node.required_item = None
@@ -36,7 +36,7 @@ class TestAccessCalculator(unittest.TestCase):
 		"""Non-subject node with is_published=False is excluded (returns None)"""
 		node = Mock()
 		node.name = "hidden_node"
-		node.is_public = None
+		node.is_published = None
 		node.is_published = False
 		node.is_free_preview = False
 		node.required_item = None
@@ -46,7 +46,7 @@ class TestAccessCalculator(unittest.TestCase):
 		"""Node with required_item returns paid (if visible)"""
 		node = Mock()
 		node.name = "paid_node"
-		node.is_public = None
+		node.is_published = None
 		node.is_published = True
 		node.is_free_preview = False
 		node.required_item = "ITEM-001"
@@ -56,7 +56,7 @@ class TestAccessCalculator(unittest.TestCase):
 		"""is_free_preview=True overrides required_item and returns free_preview"""
 		node = Mock()
 		node.name = "preview_node"
-		node.is_public = None
+		node.is_published = None
 		node.is_published = True
 		node.is_free_preview = True
 		node.required_item = "ITEM-001"
@@ -66,7 +66,7 @@ class TestAccessCalculator(unittest.TestCase):
 		"""Child inherits paid access from parent (if visible)"""
 		node = Mock()
 		node.name = "child_of_paid"
-		node.is_public = None
+		node.is_published = None
 		node.is_published = True
 		node.is_free_preview = False
 		node.required_item = None
@@ -76,7 +76,7 @@ class TestAccessCalculator(unittest.TestCase):
 		"""Child inherits authenticated access from parent (if visible)"""
 		node = Mock()
 		node.name = "child_of_auth"
-		node.is_public = None
+		node.is_published = None
 		node.is_published = True
 		node.is_free_preview = False
 		node.required_item = None
@@ -86,7 +86,7 @@ class TestAccessCalculator(unittest.TestCase):
 		"""Hide override returns None (excludes node)"""
 		node = Mock()
 		node.name = "node_to_hide"
-		node.is_public = None
+		node.is_published = None
 		node.is_published = True
 		plan_overrides = {"node_to_hide": Mock(action="Hide")}
 		self.assertIsNone(calculate_access_level(node, plan_overrides=plan_overrides))
@@ -95,7 +95,7 @@ class TestAccessCalculator(unittest.TestCase):
 		"""Set Free override returns free_preview"""
 		node = Mock()
 		node.name = "node_to_set_free"
-		node.is_public = None
+		node.is_published = None
 		node.is_published = True
 		node.required_item = "ITEM-001"
 		plan_overrides = {"node_to_set_free": Mock(action="Set Free")}
@@ -105,7 +105,7 @@ class TestAccessCalculator(unittest.TestCase):
 		"""Set Access Level override sets access_level to paid"""
 		node = Mock()
 		node.name = "node_set_paid"
-		node.is_public = None
+		node.is_published = None
 		node.is_published = True
 		node.is_free_preview = False
 		node.required_item = None
@@ -116,7 +116,7 @@ class TestAccessCalculator(unittest.TestCase):
 		"""Set Access Level override sets access_level to authenticated"""
 		node = Mock()
 		node.name = "node_set_auth"
-		node.is_public = None
+		node.is_published = None
 		node.is_published = True
 		node.required_item = None
 		plan_overrides = {"node_set_auth": Mock(action="Set Access Level", override_value="authenticated")}
@@ -126,7 +126,7 @@ class TestAccessCalculator(unittest.TestCase):
 		"""Set Access Level override sets access_level to free_preview"""
 		node = Mock()
 		node.name = "node_set_preview"
-		node.is_public = None
+		node.is_published = None
 		node.is_published = True
 		node.is_free_preview = False
 		node.required_item = "ITEM-001"
@@ -137,7 +137,7 @@ class TestAccessCalculator(unittest.TestCase):
 		"""Set Access Level override takes precedence over all node flags"""
 		node = Mock()
 		node.name = "node_all_flags"
-		node.is_public = None
+		node.is_published = None
 		node.is_published = True
 		node.is_free_preview = True
 		node.required_item = "ITEM-001"
@@ -148,7 +148,7 @@ class TestAccessCalculator(unittest.TestCase):
 		"""Published node with no flags returns authenticated by default"""
 		node = Mock()
 		node.name = "default_node"
-		node.is_public = None
+		node.is_published = None
 		node.is_published = True
 		node.is_free_preview = False
 		node.required_item = None
@@ -208,7 +208,7 @@ class TestAccessControlIntegration(unittest.TestCase):
 		"""Paid subject makes all children inherit paid access"""
 		subject = Mock()
 		subject.name = "SUBJ-PAID"
-		subject.is_public = None
+		subject.is_published = None
 		subject.is_published = True
 		subject.is_free_preview = False
 		subject.required_item = "ITEM-PAID"
@@ -217,7 +217,7 @@ class TestAccessControlIntegration(unittest.TestCase):
 
 		track = Mock()
 		track.name = "TRACK-CHILD"
-		track.is_public = None
+		track.is_published = None
 		track.is_published = True
 		track.is_free_preview = False
 		track.required_item = None
@@ -226,7 +226,7 @@ class TestAccessControlIntegration(unittest.TestCase):
 
 		unit = Mock()
 		unit.name = "UNIT-CHILD"
-		unit.is_public = None
+		unit.is_published = None
 		unit.is_published = True
 		unit.is_free_preview = False
 		unit.required_item = None
@@ -237,7 +237,7 @@ class TestAccessControlIntegration(unittest.TestCase):
 		"""is_free_preview on node pierces down to all descendants"""
 		unit = Mock()
 		unit.name = "UNIT-PREVIEW"
-		unit.is_public = None
+		unit.is_published = None
 		unit.is_published = True
 		unit.is_free_preview = True
 		unit.required_item = None
@@ -246,7 +246,7 @@ class TestAccessControlIntegration(unittest.TestCase):
 
 		topic = Mock()
 		topic.name = "TOPIC-CHILD"
-		topic.is_public = None
+		topic.is_published = None
 		topic.is_published = True
 		topic.is_free_preview = False
 		topic.required_item = None
@@ -257,7 +257,7 @@ class TestAccessControlIntegration(unittest.TestCase):
 		"""Override precedence: Set Access Level > Set Free > is_free_preview > required_item > inheritance"""
 		node = Mock()
 		node.name = "PRIORITY-TEST"
-		node.is_public = None
+		node.is_published = None
 		node.is_published = True
 		node.is_free_preview = False
 		node.required_item = "ITEM-001"
@@ -283,7 +283,7 @@ class TestAccessControlIntegration(unittest.TestCase):
 		"""required_item propagates to children unless overridden"""
 		track = Mock()
 		track.name = "TRACK-ITEM"
-		track.is_public = None
+		track.is_published = None
 		track.is_published = True
 		track.is_free_preview = False
 		track.required_item = "PROD-TRACK"
@@ -292,7 +292,7 @@ class TestAccessControlIntegration(unittest.TestCase):
 
 		unit = Mock()
 		unit.name = "UNIT-CHILD"
-		unit.is_public = None
+		unit.is_published = None
 		unit.is_published = True
 		unit.is_free_preview = False
 		unit.required_item = None

@@ -1343,7 +1343,7 @@ def generate_bitmap_json(subject_doc):
 	# Get all lessons for these topics (ordered by creation/index)
 	lessons = frappe.get_all(
 		"Memora Lesson",
-		filters={"parent_topic": ["in", topic_ids], "docstatus": 1},  # Only submitted lessons
+		filters={"parent_topic": ["in", topic_ids]},  # Only submitted lessons
 		fields=["name", "parent_topic"],
 		order_by="creation"
 	)
@@ -1454,7 +1454,7 @@ def get_atomic_content_paths_for_plan(plan_name):
 	# Get all lessons
 	lessons = frappe.get_all(
 		"Memora Lesson",
-		filters={"parent_topic": ["in", topic_ids], "docstatus": 1},
+		filters={"parent_topic": ["in", topic_ids], "is_published": 1},
 		fields=["name"]
 	)
 	

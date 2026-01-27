@@ -11,6 +11,7 @@
   "season",
   "grade",
   "stream",
+  "is_published",
   "subjects",
   "overrides"
  ],
@@ -60,6 +61,12 @@
    "options": "Memora Grade",
    "reqd": 1,
    "search_index": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "is_published",
+   "fieldtype": "Check",
+   "label": "Is Published"
   }
  ],
  "grid_page_length": 50,

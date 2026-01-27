@@ -34,7 +34,7 @@ def calculate_access_level(node, parent_access=None, plan_overrides=None):
 	Calculate access level with inheritance and override application.
 
 	Access Level Hierarchy:
-	1. Visibility Check (is_public/is_published must be True)
+	1. Visibility Check (is_published must be True)
 	2. Plan-specific overrides (Hide, Set Free, Set Access Level, Set Sold Separately)
 	3. is_free_preview flag (piercing)
 	4. required_item (paid) or parent_access (paid inheritance)
@@ -50,13 +50,13 @@ def calculate_access_level(node, parent_access=None, plan_overrides=None):
 	"""
 	import frappe
 
-	is_visible = getattr(node, "is_public", None)
+	is_visible = getattr(node, "is_published", None)
 	if is_visible is None:
 		is_visible = getattr(node, "is_published", True)
 
 	if not is_visible:
 		frappe.log_error(
-			f"[DEBUG] Content not visible (is_public/is_published=False): {node.name}", "CDN JSON Generation"
+			f"[DEBUG] Content not visible (is_published=False): {node.name}", "CDN JSON Generation"
 		)
 		return None
 

@@ -44,7 +44,7 @@ def get_sample_subject() -> Dict[str, Any]:
 		"name": "SUBJ-MATH",
 		"subject_title": "Mathematics",
 		"subject_description": "Core Mathematics",
-		"is_public": 1,
+		"is_published": 1,
 		"is_linear": 0,
 		"color_code": "#3B82F6",
 		"image": "/files/math.png",
