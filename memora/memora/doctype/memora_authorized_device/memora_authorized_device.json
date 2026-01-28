@@ -1,54 +1,46 @@
 {
-  "actions": [],
-  "allow_rename": 1,
-  "autoname": "hash",
-  "creation": "2026-01-26 13:00:00.000000",
-  "doctype": "DocType",
-  "editable_grid": 1,
-  "engine": "InnoDB",
-  "field_order": [
-    "device_id",
-    "device_name",
-    "added_on"
-  ],
-  "fields": [
-    {
-      "fieldname": "device_id",
-      "fieldtype": "Data",
-      "in_list_view": 1,
-      "label": "Device ID",
-      "reqd": 1
-    },
-    {
-      "fieldname": "device_name",
-      "fieldtype": "Data",
-      "in_list_view": 1,
-      "label": "Device Name",
-      "reqd": 1
-    },
-    {
-      "default": "Now",
-      "fieldname": "added_on",
-      "fieldtype": "Datetime",
-      "label": "Added On",
-      "read_only": 1,
-      "reqd": 1
-    }
-  ],
-  "grid_page_length": 50,
-  "index_web_pages_for_search": 1,
-  "istable": 1,
-  "links": [],
-  "modified": "2026-01-26 13:00:00.000000",
-  "modified_by": "Administrator",
-  "module": "Memora",
-  "name": "Memora Authorized Device",
-  "naming_rule": "Random",
-  "owner": "Administrator",
-  "permissions": [],
-  "row_format": "Dynamic",
-  "rows_threshold_for_grid_search": 20,
-  "sort_field": "modified",
-  "sort_order": "DESC",
-  "states": []
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-01-28 09:32:09.553185",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "device_id",
+  "device_name",
+  "added_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "device_id",
+   "fieldtype": "Data",
+   "label": "Device ID"
+  },
+  {
+   "fieldname": "device_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Device Name"
+  },
+  {
+   "fieldname": "added_on",
+   "fieldtype": "Datetime",
+   "label": "Added On"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-01-28 09:38:11.627151",
+ "modified_by": "Administrator",
+ "module": "Memora",
+ "name": "Memora Authorized Device",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
 }

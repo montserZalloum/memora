@@ -5,16 +5,16 @@
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
-  "field_order": [
-   "user",
-   "display_name",
-   "grade",
-   "stream",
-   "season",
-   "avatar",
-   "current_plan",
-   "authorized_devices"
-  ],
+ "field_order": [
+  "user",
+  "display_name",
+  "grade",
+  "stream",
+  "season",
+  "avatar",
+  "current_plan",
+  "authorized_devices"
+ ],
  "fields": [
   {
    "fieldname": "user",
@@ -42,12 +42,6 @@
    "options": "Memora Academic Plan",
    "search_index": 1
   },
-   {
-    "fieldname": "authorized_devices",
-    "fieldtype": "Table",
-    "label": "Authorized Devices",
-    "options": "Memora Authorized Device"
-   },
   {
    "fieldname": "grade",
    "fieldtype": "Link",
@@ -67,12 +61,18 @@
    "fieldtype": "Link",
    "label": "Season",
    "options": "Memora Season"
+  },
+  {
+   "fieldname": "authorized_devices",
+   "fieldtype": "Table",
+   "label": "User Devices",
+   "options": "Memora Authorized Device"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-26 15:13:03.509035",
+ "modified": "2026-01-28 09:54:18.913704",
  "modified_by": "Administrator",
  "module": "Memora",
  "name": "Memora Player Profile",
