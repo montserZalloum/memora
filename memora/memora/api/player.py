@@ -717,14 +717,10 @@ def get_player_data():
 	Raises:
 	    frappe.PermissionError: Device not authorized or session invalid
 	"""
-	frappe.logger().info("[get_player_data] *** ENDPOINT REACHED ***")
 
 	user_id = frappe.session.user
 	device_id = frappe.get_request_header("X-Device-ID")
 
-	frappe.logger().info(
-		f"[get_player_data] user={user_id} device_id={device_id} session={frappe.session.sid}"
-	)
 	redis_client = frappe.cache()
 
 	snapshot_key = get_player_snapshot_key(user_id)

@@ -55,9 +55,6 @@ def calculate_access_level(node, parent_access=None, plan_overrides=None):
 		is_visible = getattr(node, "is_published", True)
 
 	if not is_visible:
-		frappe.log_error(
-			f"[DEBUG] Content not visible (is_published=False): {node.name}", "CDN JSON Generation"
-		)
 		return None
 
 	if plan_overrides and node.name in plan_overrides:
