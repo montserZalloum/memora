@@ -92,7 +92,8 @@ def validate_session(user_id, session_id):
 	redis_client = frappe.cache()
 	session_key = get_active_session_key(user_id)
 
-	active_session = redis_client.get(session_key)
+	active_session_bytes = redis_client.get(session_key)
+	active_session = active_session_bytes.decode("utf-8") if active_session_bytes else None
 
 	is_valid = active_session == session_id
 
