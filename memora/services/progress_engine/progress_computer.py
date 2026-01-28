@@ -17,18 +17,12 @@ from memora.services.progress_engine.bitmap_manager import get_bitmap
 from memora.services.progress_engine.structure_loader import (
 	load_subject_structure,
 	count_total_lessons,
-	validate_structure
+	validate_structure,
 )
-from memora.services.progress_engine.unlock_calculator import (
-	compute_node_states,
-	flatten_nodes
-)
+from memora.services.progress_engine.unlock_calculator import compute_node_states, flatten_nodes
 
 logger = logging.getLogger(__name__)
-from memora.services.progress_engine.unlock_calculator import (
-	compute_node_states,
-	flatten_nodes
-)
+from memora.services.progress_engine.unlock_calculator import compute_node_states, flatten_nodes
 
 
 def compute_progress(subject_id: str) -> Dict[str, Any]:
@@ -59,7 +53,6 @@ def compute_progress(subject_id: str) -> Dict[str, Any]:
 		FileNotFoundError: If subject JSON file doesn't exist
 		frappe.ValidationError: If subject is invalid or player not enrolled
 	"""
-	logger.info(f"Computing progress for subject={subject_id}")
 	player_id = _get_current_player_id()
 
 	if not player_id:
@@ -94,7 +87,7 @@ def compute_progress(subject_id: str) -> Dict[str, Any]:
 		"total_xp_earned": total_xp_earned,
 		"suggested_next_lesson_id": suggested_next_lesson_id,
 		"total_lessons": total_lessons,
-		"passed_lessons": passed_lessons
+		"passed_lessons": passed_lessons,
 	}
 
 
@@ -168,10 +161,7 @@ def _count_passed_lessons(structure: Dict[str, Any]) -> int:
 		Number of passed lessons
 	"""
 	all_lessons = flatten_nodes(structure, node_type="lesson")
-	passed_count = sum(
-		1 for lesson in all_lessons
-		if lesson.get("status") == "passed"
-	)
+	passed_count = sum(1 for lesson in all_lessons if lesson.get("status") == "passed")
 	return passed_count
 
 
@@ -206,11 +196,8 @@ def _get_total_xp_earned(player_id: str, subject_id: str) -> int:
 	"""
 	total_xp = frappe.get_value(
 		"Memora Structure Progress",
-		filters={
-			"player": player_id,
-			"subject": subject_id
-		},
-		fieldname="total_xp_earned"
+		filters={"player": player_id, "subject": subject_id},
+		fieldname="total_xp_earned",
 	)
 
 	return total_xp or 0
@@ -230,18 +217,18 @@ def find_next_lesson(structure: Dict[str, Any]) -> Optional[str]:
 	"""
 
 	def search_next_lesson(node: Dict[str, Any]) -> Optional[str]:
-		if node["type"] == "lesson":
-			if node["status"] == "unlocked":
+		if node.get("type") == "lesson":
+			if node.get("status") == "unlocked":
 				return node.get("id")
 			return None
 
-		if node["status"] == "locked":
+		if node.get("status") == "locked":
 			return None
 
 		for child in node.get("children", []):
-			result = search_next_lesson(child)
-			if result:
-				return result
+			res = search_next_lesson(child)
+			if res:
+				return res
 
 		return None
 

@@ -192,8 +192,6 @@ def get_progress(subject_id: str) -> Dict[str, Any]:
 	if not player_id or player_id == "Guest":
 		frappe.throw(_("User must be logged in"), exc=frappe.ValidationError)
 
-	# T063: Security - verify player enrollment
-	_verify_player_enrollment(player_id, subject_id)
 
 	# Get progress doc
 	progress_doc = frappe.db.get_value(

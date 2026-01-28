@@ -67,20 +67,22 @@ def _phase1_compute_lesson_and_container_states(
 		subject_id: Subject ID for fetching best_hearts
 	"""
 	def process_node(node: Dict[str, Any], parent_is_linear: bool) -> None:
-		if node["type"] == "lesson":
+		node_type = node.get("type")  # آمن بدل node["type"]
+
+		if node_type == "lesson":
 			bit_index = node.get("bit_index")
 			if bit_index is None:
-				raise ValueError(f"Lesson {node['id']} missing bit_index")
+				raise ValueError(f"Lesson {node.get('id')} missing bit_index")
 
 			is_passed = check_bit(bitmap, bit_index)
 			node["status"] = "passed" if is_passed else "not_passed"
 
 			if is_passed and player_id and subject_id:
 				node["best_hearts"] = _get_best_hearts_for_lesson(
-					player_id, subject_id, node["id"]
+					player_id, subject_id, node.get("id")
 				)
 
-		elif node["type"] in ["topic", "unit", "track", "subject"]:
+		elif node_type in ["topic", "unit", "track", "subject"]:
 			children = node.get("children", [])
 
 			if not children:
@@ -91,8 +93,14 @@ def _phase1_compute_lesson_and_container_states(
 					process_node(child, child_is_linear)
 
 				node["status"] = compute_container_status(node, children, structure)
+		else:
+			# أي node بدون type يعتبر unlocked بشكل افتراضي
+			node["status"] = node.get("status", "unlocked")
 
-	process_node(structure, structure["is_linear"])
+
+	# استدعاء آمن
+	process_node(structure, structure.get("is_linear", True))
+
 
 
 def _phase2_apply_unlock_rules(structure: Dict[str, Any], parent_is_linear: bool) -> None:
@@ -251,7 +259,7 @@ def flatten_nodes(structure: Dict[str, Any], node_type: Optional[str] = None) ->
 	nodes = []
 
 	def collect_nodes(node: Dict[str, Any]) -> None:
-		if node_type is None or node["type"] == node_type:
+		if node_type is None or node.get("type") == node_type:
 			nodes.append(node)
 
 		for child in node.get("children", []):

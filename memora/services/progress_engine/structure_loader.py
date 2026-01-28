@@ -9,6 +9,7 @@ import logging
 import os
 from functools import lru_cache
 from typing import Dict, Any
+import frappe
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +31,9 @@ def get_subject_json_path(subject_id: str) -> str:
 	"""
 	from frappe import local
 
+	plan_id = frappe.get_request_header("X-Plan-ID")
 	site_path = local.site_path
-	json_path = os.path.join(
-		site_path,
-		"public",
-		"memora_content",
-		f"{subject_id}.json"
-	)
+	json_path = os.path.join(site_path, "public", "memora_content", "plans", plan_id, f"{subject_id}_h.json")
 
 	if not os.path.exists(json_path):
 		raise FileNotFoundError(f"Subject JSON not found: {json_path}")
@@ -58,10 +55,9 @@ def load_subject_structure(subject_id: str) -> Dict[str, Any]:
 		FileNotFoundError: If JSON file doesn't exist
 		json.JSONDecodeError: If JSON file is malformed
 	"""
-	logger.debug(f"Loading structure for subject={subject_id}")
 	json_path = get_subject_json_path(subject_id)
 
-	with open(json_path, 'r', encoding='utf-8') as f:
+	with open(json_path, "r", encoding="utf-8") as f:
 		structure = json.load(f)
 
 	logger.debug(f"Loaded structure for subject={subject_id} with {len(structure.get('tracks', []))} tracks")
