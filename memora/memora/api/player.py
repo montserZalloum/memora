@@ -27,10 +27,12 @@ Endpoints:
 - POST /logout: Invalidate session
 - POST /complete_lesson: Complete lesson (update XP/streak)
 - GET /get_wallet: Get wallet data (cache-first)
+- GET /get_player_data: Get cached player snapshot (profile + wallet + devices)
 - POST /add_xp: Award XP
 - POST /trigger_wallet_sync (admin): Manual batch sync
 """
 
+import json
 import time
 import uuid
 from functools import wraps
@@ -38,7 +40,7 @@ from functools import wraps
 import frappe
 
 from memora.services import device_auth, session_manager, wallet_engine
-from memora.utils.redis_keys import get_rate_limit_key
+from memora.utils.redis_keys import get_player_devices_key, get_player_snapshot_key, get_rate_limit_key
 
 
 def validate_uuid(uuid_str, param_name="uuid"):
@@ -55,7 +57,7 @@ def validate_uuid(uuid_str, param_name="uuid"):
     try:
         uuid.UUID(uuid_str, version=4)
     except (ValueError, AttributeError, TypeError):
-        frappe.throw(f"{param_name} must be a valid UUID v4", exc_type="ValidationError")
+        frappe.throw(f"{param_name} must be a valid UUID v4", frappe.ValidationError)
 
 
 def validate_xp_amount(xp_amount):
@@ -69,9 +71,9 @@ def validate_xp_amount(xp_amount):
         frappe.ValidationError: If XP amount is invalid
     """
     if not isinstance(xp_amount, int):
-        frappe.throw("XP amount must be an integer", exc_type="ValidationError")
+        frappe.throw("XP amount must be an integer", frappe.ValidationError)
     if xp_amount < 1 or xp_amount > 1000:
-        frappe.throw("XP amount must be between 1 and 1000", exc_type="ValidationError")
+        frappe.throw("XP amount must be between 1 and 1000", frappe.ValidationError)
 
 
 def validate_hearts_earned(hearts):
@@ -85,9 +87,9 @@ def validate_hearts_earned(hearts):
         frappe.ValidationError: If hearts value is invalid
     """
     if not isinstance(hearts, int):
-        frappe.throw("hearts_earned must be an integer", exc_type="ValidationError")
+        frappe.throw("hearts_earned must be an integer", frappe.ValidationError)
     if hearts < 0 or hearts > 3:
-        frappe.throw("hearts_earned must be between 0 and 3", exc_type="ValidationError")
+        frappe.throw("hearts_earned must be between 0 and 3", frappe.ValidationError)
 
 
 def validate_email(email):
@@ -101,7 +103,7 @@ def validate_email(email):
         frappe.ValidationError: If email is invalid
     """
     if not email or "@" not in email or "." not in email:
-        frappe.throw("Invalid email format", exc_type="ValidationError")
+        frappe.throw("Invalid email format", frappe.ValidationError)
 
 
 def log_security_event(event_type, user_id, device_id, endpoint, result, **kwargs):
@@ -178,11 +180,11 @@ def rate_limit(max_requests=100, window_seconds=60):
                 frappe.local.response.headers["X-RateLimit-Limit"] = str(max_requests)
                 frappe.local.response.headers["X-RateLimit-Remaining"] = "0"
                 frappe.local.response.headers["X-RateLimit-Reset"] = str(int(time.time()) + ttl)
+                frappe.local.response.http_status_code = 429
                 frappe.throw(
                     f"Rate limit exceeded: {max_requests} requests per {window_seconds}s. "
                     f"Please wait {ttl} seconds before retrying.",
-                    exc_type="RateLimitExceeded",
-                    http_status_code=429
+                    frappe.ValidationError,
                 )
 
             frappe.local.response.headers["X-RateLimit-Limit"] = str(max_requests)
@@ -214,7 +216,17 @@ def require_authorized_device(fn):
         user_id = frappe.session.user
         device_id = frappe.get_request_header("X-Device-ID")
 
+        frappe.logger().debug(
+            f"[require_authorized_device] endpoint={fn.__name__} "
+            f"user={user_id} device_id={device_id} session_sid={frappe.session.sid}"
+        )
+
         if not device_id:
+            frappe.log_error(
+                f"[require_authorized_device] GATE 1 FAILED — missing X-Device-ID header. "
+                f"user={user_id} endpoint={fn.__name__}",
+                "Player Auth - Missing Device ID"
+            )
             log_security_event(
                 event_type="missing_device_id",
                 user_id=user_id,
@@ -222,9 +234,24 @@ def require_authorized_device(fn):
                 endpoint=fn.__name__,
                 result="rejected"
             )
-            frappe.throw("X-Device-ID header required", exc_type="MissingDeviceError")
+            frappe.throw("X-Device-ID header required", frappe.PermissionError)
+
+        redis_client = frappe.cache()
+        device_key = get_player_devices_key(user_id)
+        raw_members = redis_client.smembers(device_key)
+        authorized_devices = [
+            d if isinstance(d, str) else d.decode("utf-8") for d in raw_members
+        ]
 
         if not device_auth.is_device_authorized(user_id, device_id):
+            frappe.log_error(
+                f"[require_authorized_device] GATE 2 FAILED — device not in authorized set. "
+                f"user={user_id} device_id={device_id} "
+                f"redis_key={device_key} "
+                f"authorized_devices={authorized_devices} "
+                f"endpoint={fn.__name__}",
+                "Player Auth - Unauthorized Device"
+            )
             log_security_event(
                 event_type="unauthorized_device",
                 user_id=user_id,
@@ -234,11 +261,23 @@ def require_authorized_device(fn):
             )
             frappe.throw(
                 "Unauthorized device. Contact administrator to authorize this device.",
-                exc_type="UnauthorizedDeviceError"
+                frappe.PermissionError
             )
 
         session_id = frappe.session.sid
+        active_session = redis_client.get(
+            f"memora:active_session:{user_id}"
+        )
+
         if not session_manager.validate_session(user_id, session_id):
+            frappe.log_error(
+                f"[require_authorized_device] GATE 3 FAILED — session mismatch. "
+                f"user={user_id} device_id={device_id} "
+                f"current_sid={session_id} "
+                f"redis_active_session={active_session} "
+                f"endpoint={fn.__name__}",
+                "Player Auth - Session Mismatch"
+            )
             log_security_event(
                 event_type="session_invalidated",
                 user_id=user_id,
@@ -249,7 +288,7 @@ def require_authorized_device(fn):
             )
             frappe.throw(
                 "Session invalidated. Another device has logged in. Please log in again.",
-                exc_type="SessionExpiredError"
+                frappe.PermissionError
             )
 
         wallet_engine.update_last_played_at(user_id)
@@ -290,7 +329,7 @@ def login(usr, pwd, device_name=None):
             endpoint="login",
             result="rejected"
         )
-        frappe.throw("X-Device-ID header required", exc_type="MissingDeviceError")
+        frappe.throw("X-Device-ID header required", frappe.PermissionError)
 
     validate_email(usr)
 
@@ -340,7 +379,7 @@ def login(usr, pwd, device_name=None):
         first_device.insert(ignore_permissions=True)
 
         redis_client = frappe.cache()
-        redis_client.sadd(f"player:{user_id}:devices", device_id)
+        redis_client.sadd(get_player_devices_key(user_id), device_id)
 
         frappe.logger().info(f"First device auto-authorized for {user_id}: {device_id}")
 
@@ -356,7 +395,7 @@ def login(usr, pwd, device_name=None):
         )
         frappe.throw(
             "Unauthorized device. Contact administrator to authorize this device.",
-            exc_type="UnauthorizedDeviceError"
+            frappe.PermissionError
         )
     else:
         devices_authorized = len(existing_devices)
@@ -448,7 +487,7 @@ def register_device(student_email, device_id, device_name):
     validate_uuid(device_id, "device_id")
 
     if not device_name or len(device_name) < 3 or len(device_name) > 100:
-        frappe.throw("device_name must be between 3 and 100 characters", exc_type="ValidationError")
+        frappe.throw("device_name must be between 3 and 100 characters", frappe.ValidationError)
 
     if "System Manager" not in frappe.get_roles():
         log_security_event(
@@ -460,7 +499,7 @@ def register_device(student_email, device_id, device_name):
             action="register_device",
             target_user=student_email
         )
-        frappe.throw("Only System Manager can register devices", exc_type="PermissionError")
+        frappe.throw("Only System Manager can register devices", frappe.PermissionError)
 
     profile_name = frappe.db.get_value(
         "Memora Player Profile",
@@ -532,7 +571,7 @@ def remove_device(student_email, device_id):
             action="remove_device",
             target_user=student_email
         )
-        frappe.throw("Only System Manager can remove devices", exc_type="PermissionError")
+        frappe.throw("Only System Manager can remove devices", frappe.PermissionError)
 
     profile_name = frappe.db.get_value(
         "Memora Player Profile",
@@ -647,7 +686,7 @@ def complete_lesson(lesson_id, hearts_earned):
     validate_hearts_earned(hearts_earned)
 
     if not lesson_id or not isinstance(lesson_id, str):
-        frappe.throw("lesson_id is required and must be a string", exc_type="ValidationError")
+        frappe.throw("lesson_id is required and must be a string", frappe.ValidationError)
 
     user_id = frappe.session.user
 
@@ -722,6 +761,80 @@ def get_wallet():
     }
 
 
+@frappe.whitelist(allow_guest=False, methods=["GET"])
+@require_authorized_device
+@rate_limit(max_requests=60, window_seconds=60)
+def get_player_data():
+	"""
+	Get cached player snapshot (profile + wallet + devices)
+
+	Returns a unified player data payload from cache where possible.
+	On cache miss, fetches from DB and Redis, builds the snapshot,
+	stores it with a 24h TTL, and returns.
+
+	Cache invalidation is handled by:
+	- MemoraPlayerProfile.on_update()
+	- MemoraPlayerWallet.on_update()
+
+	Returns:
+		dict: Player snapshot with profile, wallet, and devices
+
+	Raises:
+		frappe.PermissionError: Device not authorized or session invalid
+	"""
+	frappe.logger().info("[get_player_data] *** ENDPOINT REACHED ***")
+
+	user_id = frappe.session.user
+	device_id = frappe.get_request_header("X-Device-ID")
+
+	frappe.logger().info(
+		f"[get_player_data] user={user_id} device_id={device_id} session={frappe.session.sid}"
+	)
+	redis_client = frappe.cache()
+
+	snapshot_key = get_player_snapshot_key(user_id)
+	cached = redis_client.get(snapshot_key)
+
+	if cached:
+		return json.loads(cached)
+
+	# Cache miss — build snapshot from DB + Redis
+	profile = frappe.db.get_value(
+		"Memora Player Profile",
+		{"user": user_id},
+		["display_name", "current_plan", "grade", "stream", "avatar"],
+		as_dict=True
+	) or {}
+
+	wallet_data = wallet_engine.get_wallet_safe(user_id)
+
+	devices_raw = redis_client.smembers(get_player_devices_key(user_id))
+	devices = [d if isinstance(d, str) else d.decode("utf-8") for d in devices_raw]
+
+	snapshot = {
+		"profile": {
+			"full_name": profile.get("display_name") or "",
+			"plan_id": profile.get("current_plan") or "",
+			"grade": profile.get("grade") or "",
+			"stream": profile.get("stream") or "",
+			"photo": profile.get("avatar") or "",
+		},
+		"wallet": {
+			"total_xp": int(wallet_data.get("total_xp", 0)),
+			"streak": int(wallet_data.get("current_streak", 0)),
+		},
+		"devices": devices,
+	}
+
+	# Cache with 24h TTL
+	redis_client.set(snapshot_key, json.dumps(snapshot), ex=86400)
+
+	# Ensure session metadata is up to date
+	session_manager.create_session(user_id, device_id, frappe.session.sid)
+
+	return snapshot
+
+
 @frappe.whitelist(allow_guest=False, methods=["POST"])
 @require_authorized_device
 @rate_limit(max_requests=10, window_seconds=60)
@@ -791,7 +904,7 @@ def trigger_wallet_sync(force=False):
             result="rejected",
             action="trigger_wallet_sync"
         )
-        frappe.throw("Only System Manager can trigger wallet sync", exc_type="PermissionError")
+        frappe.throw("Only System Manager can trigger wallet sync", frappe.PermissionError)
 
     from memora.services.wallet_sync import trigger_wallet_sync as sync_trigger
 

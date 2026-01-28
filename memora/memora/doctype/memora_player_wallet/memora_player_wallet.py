@@ -28,57 +28,68 @@ Data Flow:
 Performance: <1s wallet display, 90%+ DB write reduction.
 """
 
+from datetime import date
+
 import frappe
 from frappe.model.document import Document
-from datetime import date
-from memora.utils.redis_keys import get_wallet_key, get_pending_wallet_sync_key
+
+from memora.utils.redis_keys import get_pending_wallet_sync_key, get_player_snapshot_key, get_wallet_key
+
 
 class MemoraPlayerWallet(Document):
-    def validate(self):
-        self.validate_non_negative_xp()
-        self.validate_non_negative_streak()
-        self.validate_date_not_in_future()
-    
-    def validate_non_negative_xp(self):
-        if self.total_xp < 0:
-            frappe.throw(_("Total XP cannot be negative"))
-    
-    def validate_non_negative_streak(self):
-        if self.current_streak < 0:
-            self.current_streak = 0
-    
-    def validate_date_not_in_future(self):
-        if self.last_success_date:
-            last_date = date.fromisoformat(self.last_success_date)
-            if last_date > date.today():
-                frappe.throw(_("Last success date cannot be in the future"))
-    
-    def after_insert(self):
-        self.populate_wallet_cache()
-    
-    def populate_wallet_cache(self):
-        redis_client = frappe.cache()
-        wallet_key = get_wallet_key(self.player)
-        
-        wallet_data = {
-            "total_xp": self.total_xp,
-            "current_streak": self.current_streak,
-            "last_success_date": self.last_success_date or "",
-            "last_played_at": self.last_played_at or ""
-        }
-        
-        redis_client.hset(wallet_key, mapping=wallet_data)
-    
-    def on_update(self):
-        redis_client = frappe.cache()
-        redis_client.sadd(get_pending_wallet_sync_key(), self.player)
-    
-    def on_trash(self):
-        self.cleanup_wallet_cache()
-    
-    def cleanup_wallet_cache(self):
-        redis_client = frappe.cache()
-        wallet_key = get_wallet_key(self.player)
-        redis_client.delete(wallet_key)
-        
-        redis_client.srem(get_pending_wallet_sync_key(), self.player)
+	def validate(self):
+		self.validate_non_negative_xp()
+		self.validate_non_negative_streak()
+		self.validate_date_not_in_future()
+
+	def validate_non_negative_xp(self):
+		if self.total_xp < 0:
+			frappe.throw(_("Total XP cannot be negative"))
+
+	def validate_non_negative_streak(self):
+		if self.current_streak < 0:
+			self.current_streak = 0
+
+	def validate_date_not_in_future(self):
+		if self.last_success_date:
+			last_date = date.fromisoformat(self.last_success_date)
+			if last_date > date.today():
+				frappe.throw(_("Last success date cannot be in the future"))
+
+	def after_insert(self):
+		self.populate_wallet_cache()
+
+	def populate_wallet_cache(self):
+		redis_client = frappe.cache()
+		wallet_key = get_wallet_key(self.player)
+
+		wallet_data = {
+			"total_xp": self.total_xp,
+			"current_streak": self.current_streak,
+			"last_success_date": self.last_success_date or "",
+			"last_played_at": self.last_played_at or "",
+		}
+
+		for key, value in wallet_data.items():
+			redis_client.hset(wallet_key, key, value)
+
+	def on_update(self):
+		redis_client = frappe.cache()
+
+		# Invalidate player snapshot cache so next get_player_data rebuilds
+		player_user = frappe.db.get_value("Memora Player Profile", self.player, "user")
+		if player_user:
+			redis_client.delete(get_player_snapshot_key(player_user))
+
+		# Queue for 15-min batch sync to DB
+		redis_client.sadd(get_pending_wallet_sync_key(), self.player)
+
+	def on_trash(self):
+		self.cleanup_wallet_cache()
+
+	def cleanup_wallet_cache(self):
+		redis_client = frappe.cache()
+		wallet_key = get_wallet_key(self.player)
+		redis_client.delete(wallet_key)
+
+		redis_client.srem(get_pending_wallet_sync_key(), self.player)
