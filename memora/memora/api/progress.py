@@ -13,7 +13,8 @@ import frappe
 from frappe import _
 from typing import Dict, Any, Optional
 
-from memora.services.progress_engine import bitmap_manager, xp_calculator
+import memora.services.progress_engine.bitmap_manager as bitmap_manager
+import memora.services.progress_engine.xp_calculator as xp_calculator
 
 
 @frappe.whitelist()
@@ -73,7 +74,7 @@ def complete_lesson(lesson_id: str, hearts: int) -> Dict[str, Any]:
 		frappe.throw(
 			_("No hearts remaining. Wait for hearts to regenerate."),
 			exc=frappe.ValidationError,
-			title=_("No Hearts")
+			title=_("No Hearts"),
 		)
 
 	# Get subject ID from lesson hierarchy
@@ -87,20 +88,11 @@ def complete_lesson(lesson_id: str, hearts: int) -> Dict[str, Any]:
 
 	# Get existing structure progress record
 	progress_doc = frappe.db.get_value(
-		"Memora Structure Progress",
-		{
-			"player": player_id,
-			"subject": subject_id
-		},
-		"name"
+		"Memora Structure Progress", {"player": player_id, "subject": subject_id}, "name"
 	)
 
 	if not progress_doc:
-		frappe.throw(
-			_("Not enrolled in this subject"),
-			exc=frappe.ValidationError,
-			title=_("Not Enrolled")
-		)
+		frappe.throw(_("Not enrolled in this subject"), exc=frappe.ValidationError, title=_("Not Enrolled"))
 
 	progress_doc = frappe.get_doc("Memora Structure Progress", progress_doc)
 
@@ -117,34 +109,35 @@ def complete_lesson(lesson_id: str, hearts: int) -> Dict[str, Any]:
 		hearts=hearts,
 		is_first_completion=is_first_completion,
 		best_hearts_data=best_hearts_data,
-		base_xp=lesson.base_xp if hasattr(lesson, 'base_xp') else 10
+		base_xp=lesson.base_xp if hasattr(lesson, "base_xp") else 10,
 	)
 
 	# Update bitmap
 	bitmap_manager.update_bitmap(player_id, subject_id, lesson.bit_index)
 
 	# Update best hearts data in Redis and mark for sync
-	from memora.services.progress_engine import snapshot_syncer
-	snapshot_syncer.sync_best_hearts_with_bitmap(
-		player_id, subject_id, xp_result["best_hearts_data"]
-	)
+	import memora.services.progress_engine.snapshot_syncer as snapshot_syncer
+
+	snapshot_syncer.sync_best_hearts_with_bitmap(player_id, subject_id, xp_result["best_hearts_data"])
 
 	# Calculate completion percentage
-	passed_lessons = bin(int.from_bytes(bitmap_manager.get_bitmap(player_id, subject_id) or b'\x00', 'big')).count('1')
+	passed_lessons = bin(
+		int.from_bytes(bitmap_manager.get_bitmap(player_id, subject_id) or b"\x00", "big")
+	).count("1")
 	total_lessons = frappe.db.count("Memora Lesson", {"parent_subject": subject_id})
 	completion_percentage = (passed_lessons / total_lessons * 100) if total_lessons > 0 else 0
 
 	progress_doc.completion_percentage = completion_percentage
-	progress_doc.total_xp_earned = progress_doc.total_xp_earned + xp_result["xp_earned"] if progress_doc.total_xp_earned else xp_result["xp_earned"]
+	progress_doc.total_xp_earned = (
+		progress_doc.total_xp_earned + xp_result["xp_earned"]
+		if progress_doc.total_xp_earned
+		else xp_result["xp_earned"]
+	)
 	progress_doc.last_synced_at = frappe.utils.now()
 	progress_doc.save(ignore_permissions=True)
 
 	# T019: Integrate XP award with Memora Player Wallet
-	player_wallet = frappe.db.get_value(
-		"Memora Player Wallet",
-		{"player": player_id},
-		"name"
-	)
+	player_wallet = frappe.db.get_value("Memora Player Wallet", {"player": player_id}, "name")
 
 	if not player_wallet:
 		frappe.throw(_("Player wallet not found"), exc=frappe.ValidationError)
@@ -161,7 +154,7 @@ def complete_lesson(lesson_id: str, hearts: int) -> Dict[str, Any]:
 		"xp_earned": xp_result["xp_earned"],
 		"new_total_xp": player_wallet_doc.total_xp,
 		"is_first_completion": is_first_completion,
-		"is_new_record": xp_result["is_new_record"]
+		"is_new_record": xp_result["is_new_record"],
 	}
 
 
@@ -188,6 +181,7 @@ def get_progress(subject_id: str) -> Dict[str, Any]:
 	Raises:
 		frappe.ValidationError: If subject_id is invalid or user not enrolled
 	"""
+
 	# T032: Implement get_progress API endpoint
 	# Sanitize and validate input
 	if not subject_id or not isinstance(subject_id, str):
@@ -203,12 +197,7 @@ def get_progress(subject_id: str) -> Dict[str, Any]:
 
 	# Get progress doc
 	progress_doc = frappe.db.get_value(
-		"Memora Structure Progress",
-		{
-			"player": player_id,
-			"subject": subject_id
-		},
-		["name", "total_xp_earned"]
+		"Memora Structure Progress", {"player": player_id, "subject": subject_id}, ["name", "total_xp_earned"]
 	)
 
 	# Use progress_computer to compute full progress tree
@@ -232,22 +221,18 @@ def _log_lesson_completion(player_id: str, lesson_id: str, hearts: int, xp_earne
 		xp_earned: XP earned
 	"""
 	try:
-		frappe.get_doc({
-			"doctype": "Memora Interaction Log",
-			"player": player_id,
-			"interaction_type": "lesson_completion",
-			"reference_id": lesson_id,
-			"interaction_data": {
-				"hearts": hearts,
-				"xp_earned": xp_earned
+		frappe.get_doc(
+			{
+				"doctype": "Memora Interaction Log",
+				"player": player_id,
+				"interaction_type": "lesson_completion",
+				"reference_id": lesson_id,
+				"interaction_data": {"hearts": hearts, "xp_earned": xp_earned},
 			}
-		}).insert(ignore_permissions=True)
+		).insert(ignore_permissions=True)
 	except Exception as e:
 		# Log failure but don't block the completion flow
-		frappe.log_error(
-			message=f"Failed to log lesson completion: {str(e)}",
-			title="Interaction Log Error"
-		)
+		frappe.log_error(message=f"Failed to log lesson completion: {str(e)}", title="Interaction Log Error")
 
 
 def _verify_player_enrollment(player_id: str, subject_id: str) -> None:
@@ -264,17 +249,8 @@ def _verify_player_enrollment(player_id: str, subject_id: str) -> None:
 		frappe.ValidationError: If player is not enrolled
 	"""
 	progress_doc = frappe.db.get_value(
-		"Memora Structure Progress",
-		{
-			"player": player_id,
-			"subject": subject_id
-		},
-		"name"
+		"Memora Structure Progress", {"player": player_id, "subject": subject_id}, "name"
 	)
 
 	if not progress_doc:
-		frappe.throw(
-			_("Not enrolled in this subject"),
-			exc=frappe.ValidationError,
-			title=_("Not Enrolled")
-		)
+		frappe.throw(_("Not enrolled in this subject"), exc=frappe.ValidationError, title=_("Not Enrolled"))

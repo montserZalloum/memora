@@ -113,7 +113,11 @@ def _sync_single_key(player_id: str, subject_id: str, redis_key: str):
 
 	if _progress_doc:
 		progress_name = _progress_doc[0]
-		academic_plan = _progress_doc[1]
+		progress = frappe.get_doc("Memora Structure Progress", progress_name)
+		progress.passed_lessons_bitset = encoded_bitmap
+		progress.best_hearts_data = json.loads(hearts_data) if hearts_data else {}
+		progress.last_synced_at = frappe.utils.now()
+		progress.save(ignore_permissions=True)
 	else:
 		academic_plan = frappe.get_value("Memora Subject", subject_id, "academic_plan")
 		if not academic_plan:
@@ -131,13 +135,6 @@ def _sync_single_key(player_id: str, subject_id: str, redis_key: str):
 			"last_synced_at": frappe.utils.now()
 		})
 		progress.insert(ignore_permissions=True)
-		progress_name = progress.name
-	else:
-		progress = frappe.get_doc("Memora Structure Progress", progress_name)
-		progress.passed_lessons_bitset = encoded_bitmap
-		progress.best_hearts_data = json.loads(hearts_data) if hearts_data else {}
-		progress.last_synced_at = frappe.utils.now()
-		progress.save(ignore_permissions=True)
 
 	frappe.cache().srem(DIRTY_KEYS_SET, redis_key)
 
